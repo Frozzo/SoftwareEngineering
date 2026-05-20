@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://www.omg.org/XMI" xmlns:uml="http://www.omg.org/spec/UML/20090901" xmlns:vp="http://www.visual-paradigm.com">
+  <xmi:Documentation exporter="Visual Paradigm" exporterVersion="18.0"/>
+  <uml:Model xmi:id="model_unolegends_vp_full" name="UnoLegendsModel_VP_Full">
+
+    <!-- Model elements (classes/interfaces) - reused IDs from previous XMI -->
+    <packagedElement xmi:type="uml:Class" xmi:id="class_carta_vp" name="Carta">
+      <ownedAttribute xmi:id="attr_carta_id_vp" name="id" visibility="private"/>
+      <ownedOperation xmi:id="op_carta_getId_vp" name="getId" visibility="public"/>
+      <ownedOperation xmi:id="op_carta_compatibileCon_vp" name="compatibileCon" visibility="public"/>
+      <ownedOperation xmi:id="op_carta_toCliString_vp" name="toCliString" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_cartanumero_vp" name="CartaNumero">
+      <generalization xmi:id="gen_cartanumero_carta_vp" general="class_carta_vp"/>
+      <ownedAttribute xmi:id="attr_cartanumero_colore_vp" name="colore" visibility="private"/>
+      <ownedAttribute xmi:id="attr_cartanumero_numero_vp" name="numero" visibility="private"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_cartaspeciale_vp" name="CartaSpeciale">
+      <generalization xmi:id="gen_cartaspeciale_carta_vp" general="class_carta_vp"/>
+      <ownedAttribute xmi:id="attr_cartaspeciale_tipo_vp" name="tipo" visibility="private"/>
+      <ownedAttribute xmi:id="attr_cartaspeciale_attributi_vp" name="attributi" visibility="private"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Interface" xmi:id="interface_regole_vp" name="RegoleDiGioco">
+      <ownedOperation xmi:id="op_regole_isGiocabile_vp" name="isGiocabile" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_regolestandard_vp" name="RegoleStandard">
+      <ownedOperation xmi:id="op_regolestd_isGiocabile_vp" name="isGiocabile" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_giocatore_vp" name="Giocatore">
+      <ownedAttribute xmi:id="attr_giocatore_nome_vp" name="nome" visibility="private"/>
+      <ownedOperation xmi:id="op_giocatore_aggiungi_vp" name="aggiungiCarta" visibility="public"/>
+      <ownedOperation xmi:id="op_giocatore_estrai_vp" name="estraiCarta" visibility="public"/>
+      <ownedOperation xmi:id="op_giocatore_getCarta_vp" name="getCartaInPosizione" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_mazzo_vp" name="Mazzo">
+      <ownedOperation xmi:id="op_mazzo_preleva_vp" name="prelevaCarta" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_pila_vp" name="PilaDegliScarti">
+      <ownedOperation xmi:id="op_pila_aggiungi_vp" name="aggiungiCarta" visibility="public"/>
+      <ownedOperation xmi:id="op_pila_get_vp" name="getCartaInCima" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_partita_vp" name="Partita">
+      <ownedAttribute xmi:id="attr_partita_turno_vp" name="turnoCorrente" visibility="private"/>
+      <ownedOperation xmi:id="op_partita_getStato_vp" name="getStatoTurno" visibility="public"/>
+      <ownedOperation xmi:id="op_partita_gioca_vp" name="giocaCarta" visibility="public"/>
+      <ownedOperation xmi:id="op_partita_pesca_vp" name="pescaCarta" visibility="public"/>
+      <ownedOperation xmi:id="op_partita_passa_vp" name="passaTurno" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_partitafactory_vp" name="PartitaFactory">
+      <ownedOperation xmi:id="op_pf_creaStandard_vp" name="creaPartitaStandard" visibility="public"/>
+      <ownedOperation xmi:id="op_pf_crea_vp" name="creaPartita" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_mazzofactory_vp" name="MazzoFactory" isAbstract="true">
+      <ownedOperation xmi:id="op_mf_getCarte_vp" name="getCarteNormali" visibility="public"/>
+      <ownedOperation xmi:id="op_mf_creaMazzo_vp" name="creaMazzo" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_standardmazzofactory_vp" name="StandardMazzoFactory">
+      <generalization xmi:id="gen_std_mf_vp" general="class_mazzofactory_vp"/>
+      <ownedAttribute xmi:id="attr_std_instance_vp" name="instance" visibility="private"/>
+      <ownedOperation xmi:id="op_std_getInstance_vp" name="getInstance" visibility="public"/>
+      <ownedOperation xmi:id="op_std_getCarte_vp" name="getCarteNormali" visibility="public"/>
+      <ownedOperation xmi:id="op_std_creaMazzo_vp" name="creaMazzo" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_unolegendsgame_vp" name="UnoLegendsGame">
+      <ownedOperation xmi:id="op_game_richiedi_vp" name="richiediStato" visibility="public"/>
+      <ownedOperation xmi:id="op_game_gioca_vp" name="giocaCarta" visibility="public"/>
+      <ownedOperation xmi:id="op_game_pesca_vp" name="pescaCarta" visibility="public"/>
+      <ownedOperation xmi:id="op_game_passa_vp" name="passaTurno" visibility="public"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Class" xmi:id="class_statoturno_vp" name="StatoTurno">
+      <ownedAttribute xmi:id="attr_stato_nome_vp" name="nomeGiocatoreAttivo" visibility="private"/>
+      <ownedAttribute xmi:id="attr_stato_deve_vp" name="deveGiocareCartaPescata" visibility="private"/>
+    </packagedElement>
+
+    <!-- Diagram Package -->
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_diagrams_vp" name="Diagrams">
+      <packagedElement xmi:type="uml:Diagram" xmi:id="diagram_class_vp" name="Class Diagram">
+        <!-- Visual Paradigm diagram content (nodes referencing subject IDs) -->
+        <ownedDiagram xmi:type="vp:Diagram" xmi:id="vp_diag_class_1">
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_carta" subject="class_carta_vp" x="40" y="24" width="160" height="80"/>
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_cartanumero" subject="class_cartanumero_vp" x="240" y="24" width="160" height="80"/>
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_cartaspeciale" subject="class_cartaspeciale_vp" x="440" y="24" width="160" height="80"/>
+
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_giocatore" subject="class_giocatore_vp" x="40" y="140" width="200" height="80"/>
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_mazzo" subject="class_mazzo_vp" x="280" y="140" width="160" height="80"/>
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_pila" subject="class_pila_vp" x="480" y="140" width="180" height="80"/>
+
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_partita" subject="class_partita_vp" x="40" y="260" width="240" height="100"/>
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_partitafactory" subject="class_partitafactory_vp" x="320" y="260" width="200" height="80"/>
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_mazzofactory" subject="class_mazzofactory_vp" x="560" y="260" width="220" height="80"/>
+
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_standardmf" subject="class_standardmazzofactory_vp" x="560" y="360" width="220" height="80"/>
+
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_unogame" subject="class_unolegendsgame_vp" x="320" y="380" width="220" height="80"/>
+
+          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_statoturno" subject="class_statoturno_vp" x="40" y="380" width="220" height="80"/>
+
+          <!-- Optionally add simple connectors for key associations -->
+          <diagramElement xmi:type="vp:Connector" xmi:id="vp_conn_partita_giocatori" subject="assoc_partita_giocatori_vp" waypoints="(220,310),(260,300)"/>
+          <diagramElement xmi:type="vp:Connector" xmi:id="vp_conn_game_partita" subject="assoc_game_partita_vp" waypoints="(440,420),(360,360)"/>
+          <diagramElement xmi:type="vp:Connector" xmi:id="vp_conn_std_mf_gen" subject="gen_std_mf_vp"/>
+
+        </ownedDiagram>
+      </packagedElement>
+    </packagedElement>
+
+    <!-- Comment -->
+    <packagedElement xmi:type="uml:Comment" xmi:id="note_design_vp_full" body="Design notes: Diagram auto-generated to populate Visual Paradigm canvas. After import, you may need to adjust layout or styling."/>
+
+  </uml:Model>
+</xmi:XMI>

@@ -25,6 +25,7 @@ import java.util.Objects;
 public class PartitaFactory {
     private static final int CARTE_PER_GIOCATORE = 5;
     private static final int CARTE_IN_MAZZO_INIZIALE = 10;
+    private static final MazzoFactory MAZZO_FACTORY = StandardMazzoFactory.getInstance();
 
     /**
      * Crea una Partita standard con 2 giocatori.
@@ -46,8 +47,8 @@ public class PartitaFactory {
             throw new IllegalArgumentException("Attualmente solo 2 giocatori sono supportati");
         }
 
-        // 1. Obtain complete deck from CarteCatalogo (Expert: CarteCatalogo knows which cards exist)
-        List<Carta> carteTotali = CarteCatalogo.getCarteNormali();
+        // 1. Obtain complete deck from the concrete MazzoFactory (Expert: knows which cards exist)
+        List<Carta> carteTotali = MAZZO_FACTORY.getCarteNormali();
 
         // 2. Shuffle (randomize distribution)
         List<Carta> carteMescolate = new ArrayList<>(carteTotali);
@@ -58,7 +59,7 @@ public class PartitaFactory {
 
         // 4. Crea il Mazzo tramite MazzoFactory (estendibile per house rules in futuro)
         int indicePartenzaMazzo = numeroDiGiocatori * CARTE_PER_GIOCATORE;
-        Mazzo mazzo = MazzoFactory.creaMazzo(carteMescolate, indicePartenzaMazzo, CARTE_IN_MAZZO_INIZIALE);
+        Mazzo mazzo = MAZZO_FACTORY.creaMazzo(carteMescolate, indicePartenzaMazzo, CARTE_IN_MAZZO_INIZIALE);
 
         // 5. Discard pile initialization (first card from remaining deck)
         int indicePartenzaScarti = Math.min(indicePartenzaMazzo + CARTE_IN_MAZZO_INIZIALE, carteMescolate.size());

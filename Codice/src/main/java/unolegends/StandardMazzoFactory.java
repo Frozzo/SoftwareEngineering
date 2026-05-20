@@ -4,19 +4,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Catalogo delle carte normali: numero 0-9 per ciascun colore.
- * In futuro estenderai con altri cataloghi (carte speciali, carte legend, ecc.)
- * oppure creerai classi separate (CarteSpeciali, CarteLegend).
+ * Concrete singleton factory per il mazzo standard.
  */
-public final class CarteCatalogo {
-    private CarteCatalogo() {
+public final class StandardMazzoFactory extends MazzoFactory {
+    private static final StandardMazzoFactory INSTANCE = new StandardMazzoFactory();
+
+    private StandardMazzoFactory() {
     }
 
-    /**
-     * Restituisce il set completo di carte normali: 0-9 per ciascun colore.
-     * Totale: 40 carte.
-     */
-    public static List<Carta> getCarteNormali() {
+    public static StandardMazzoFactory getInstance() {
+        return INSTANCE;
+    }
+
+    @Override
+    public List<Carta> getCarteNormali() {
         List<Carta> carte = new ArrayList<>();
         int idCounter = 0;
 

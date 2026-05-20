@@ -1,100 +1,115 @@
 @startuml
-title Design Class Diagram - UnoLegends
+title Design Class Diagram - UnoLegends (Iterazione 1 & Foresight)
 skinparam classAttributeIconSize 0
 
 ' Interfaces and abstract
 abstract class Carta {
-  -String id
-  +String getId()
-  +boolean compatibileCon(Carta cartaInCima)
-  +String toCliString()
+  -id : String
+  +getId() : String
+  +compatibileCon(cartaInCima : Carta) : boolean
+  +toCliString() : String
 }
 
 interface RegoleDiGioco {
-  +boolean isGiocabile(Carta candidata, Carta inCima, Partita partita)
+  +isGiocabile(candidata : Carta, inCima : Carta, partita : Partita) : boolean
+}
+
+class RegoleStandard {
+  +isGiocabile(candidata : Carta, inCima : Carta, partita : Partita) : boolean
 }
 
 class CartaNumero {
-  -Colore colore
-  -int numero
+  -colore : Colore
+  -numero : int
 }
 
 class CartaSpeciale {
-  -String tipo
-  -Map<String,Object> attributi
+  -tipo : String
+  -attributi : Map<String,Object>
 }
 
 ' Domain actors / aggregates
 class Giocatore {
-  -String nome
-  +aggiungiCarta(Carta carta)
-  +estraiCarta(int indice): Carta
-  +getCartaInPosizione(int indice): Carta
+  -nome : String
+  +aggiungiCarta(carta : Carta) : void
+  +estraiCarta(indice : int) : Carta
+  +getCartaInPosizione(indice : int) : Carta
 }
 
 class Mazzo {
-  +prelevaCarta(): Carta
+  +prelevaCarta() : Carta
 }
 
 class PilaDegliScarti {
-  +aggiungiCarta(Carta carta)
-  +getCartaInCima(): Carta
-}
-
-class CarteCatalogo {
-  +static List<Carta> getCarteNormali()
+  +aggiungiCarta(carta : Carta) : void
+  +getCartaInCima() : Carta
 }
 
 class Partita {
-  -int turnoCorrente
-  +getStatoTurno(): StatoTurno
-  +giocaCarta(int indice): boolean
-  +pescaCarta(): boolean
-  +passaTurno(): boolean
+  -turnoCorrente : int
+  +getStatoTurno() : StatoTurno
+  +giocaCarta(indice : int) : boolean
+  +pescaCarta() : boolean
+  +passaTurno() : boolean
 }
 
 class PartitaFactory <<Factory>> {
-  +static Partita creaPartitaStandard()
-  +static Partita creaPartita(int numeroGiocatori)
+  +{static} creaPartitaStandard() : Partita
+  +{static} creaPartita(numeroGiocatori : int) : Partita
 }
 
-class MazzoFactory <<Factory>> {
-  +static Mazzo creaMazzo(List<Carta> source, int startIndex, int size)
+abstract class MazzoFactory <<Abstract Factory>> {
+  +getCarteNormali() : List<Carta>
+  +creaMazzo(source : List<Carta>, startIndex : int, size : int) : Mazzo
+}
+
+class StandardMazzoFactory <<Factory, Singleton>> {
+  -{static} instance : StandardMazzoFactory
+  +{static} getInstance() : StandardMazzoFactory
+  +getCarteNormali() : List<Carta>
+  +creaMazzo(source : List<Carta>, startIndex : int, size : int) : Mazzo
 }
 
 class UnoLegendsGame <<Facade>> {
-  -Partita partita
-  +richiediStato(): StatoTurno
-  +giocaCarta(int indice): boolean
-  +pescaCarta(): boolean
-  +passaTurno(): boolean
+  +richiediStato() : StatoTurno
+  +giocaCarta(indice : int) : boolean
+  +pescaCarta() : boolean
+  +passaTurno() : boolean
 }
 
 class StatoTurno {
-  -String nomeGiocatoreAttivo
-  -List<Carta> manoGiocatoreAttivo
-  -Carta cartaInCima
-  -boolean deveGiocareCartaPescata
-  -Carta cartaAppenaPescata
+  -nomeGiocatoreAttivo : String
+  -deveGiocareCartaPescata : boolean
 }
 
-' relationships
+' relationships (Inheritance and Realization)
 Carta <|-- CartaNumero
 Carta <|-- CartaSpeciale
+RegoleDiGioco <|.. RegoleStandard
+MazzoFactory <|-- StandardMazzoFactory
 
+' Navigability (Attribute visualization)
 Giocatore "1" --> "*" Carta : mano
 Mazzo "1" --> "*" Carta : contiene
 PilaDegliScarti "1" --> "*" Carta : scarti
 
-Partita "1" --> "*" Giocatore : giocatori
+Partita "1" --> "2..4" Giocatore : giocatori
 Partita "1" --> "1" Mazzo : mazzo
 Partita "1" --> "1" PilaDegliScarti : scarti
 Partita "1" --> "1" RegoleDiGioco : regole
 
-CarteCatalogo ..> Carta : crea
-PartitaFactory ..> Partita : crea
-UnoLegendsGame ..> Partita : usa
+UnoLegendsGame --> "1" Partita : partita
 
-note "Design notes:\n- `Carta` is the abstract base class for card types; `CartaNumero` implements standard number+color logic.\n- `RegoleDiGioco` Strategy/Policy is injected into `Partita` to evaluate special playability rules (this is an Iteration-2/optional feature).\n- `CartaSpeciale` represents extensibility for non-numeric cards (Iteration-2).\n- `CarteCatalogo` is a static factory (utility) rather than singleton; it can become singleton if stateful.\n- `PartitaFactory` is a Factory (GOF) / Creator (GRASP) for setup.\n- `UnoLegendsGame` is Facade/Controller.\n" as N1
+' StatoTurno Visual Attributes
+StatoTurno --> "*" Carta : manoGiocatoreAttivo
+StatoTurno --> "1" Carta : cartaInCima
+StatoTurno --> "0..1" Carta : cartaAppenaPescata
+
+' Creation and Dependency relationships
+PartitaFactory ..> Partita : crea
+PartitaFactory ..> MazzoFactory : usa
+StandardMazzoFactory ..> Mazzo : crea
+
+note "Design notes:\n- Sintassi UML standard applicata per attributi e metodi.\n- `RegoleDiGioco` is an interface Strategy/Policy; `RegoleStandard` is the default implementation injected into `Partita`.\n- `CartaSpeciale` represents extensibility for non-numeric cards (Iteration-2).\n- `MazzoFactory` is modeled as an Abstract Factory; `StandardMazzoFactory` implements the Singleton pattern and owns deck composition.\n- `PartitaFactory` is a Factory (GOF) / Creator (GRASP) for setup and selects the concrete deck factory during start-up.\n- `UnoLegendsGame` is Facade/Controller.\n" as N2
 
 @enduml

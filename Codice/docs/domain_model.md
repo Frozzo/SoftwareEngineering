@@ -2,7 +2,7 @@ Design Class Diagram & Class Design - Decision log
 
 Scopo
 
-Questo documento spiega le scelte di modellazione per il dominio delle carte e le scelte GRASP / GOF per classi astratte, factory, strategy e polimorfismo.
+Questo documento riassume le scelte di modellazione per il dominio delle carte e le scelte GRASP / GOF per classi astratte, factory, strategy e polimorfismo.
 
 Sintesi delle scelte
 
@@ -14,60 +14,57 @@ Sintesi delle scelte
   - Attributi: `colore`, `numero`.
   - Implementa `compatibileCon` con la logica standard (stesso colore o stesso numero) e `toCliString` per la rappresentazione CLI.
 
-- `CartaSpeciale` / `CartaUnica` (future)
-  - Potranno estendere `Carta` e sovrascrivere `compatibileCon` e `onGiocata` per effetti speciali o regole passive.
+- `CartaSpeciale` (future)
+  - Potrà estendere `Carta` per effetti speciali o regole passive.
 
 - `RegoleDiGioco` (interface / Strategy)
-  - Motivazione: la logica che decide se una carta è giocabile può dipendere da house rules e abilità passive. Incapsularla in una interfaccia permette di cambiare policy senza modificare `Partita`.
-  - Esempio: `RegoleStandard`, `RegoleHouseX`.
-  - Nota: `RegoleDiGioco` è un'estensione tipica dell'Iterazione 2. È documentata e implementabile, ma non strettamente necessaria per l'Iterazione 1 (gioco base senza regole speciali). In Java non ho usato il prefisso `I` per le interfacce (nomenclatura più idiomatica).
+  - Motivazione: la logica che decide se una carta è giocabile può cambiare con house rules e abilità passive. Incapsularla in una interfaccia permette di cambiare policy senza modificare `Partita`.
+  - Implementazione attuale: `RegoleStandard`.
 
-- `CarteCatalogo` (static factory)
-  - Attualmente è una utility stateless che restituisce liste di carte (`getCarteNormali()`).
-  - Non è singleton; se sarà necessario mantenere stato condiviso, si potrà convertire in singleton.
+- `PartitaFactory` (Factory / Creator)
+  - Centralizza la creazione della `Partita`, dei `Giocatore`, del `Mazzo` e della `PilaDegliScarti`.
+  - Recupera le carte dalla concrete factory, mescola, distribuisce, costruisce il mazzo residuo, inizializza gli scarti e crea la `Partita` completa.
 
-- `PartitaFactory` (Factory)
-  - Centralizza la creazione della `Partita`, dei `Giocatore` e del `Mazzo`.
-  - Rispettando GRASP Creator: la factory conosce gli ingredienti per costruire `Partita`.
+- `MazzoFactory` (abstract factory)
+  - Definisce il contratto per ottenere il catalogo delle carte della famiglia corrente e costruire un `Mazzo` da una lista già pronta.
+  - `StandardMazzoFactory` è la concrete factory singleton attuale.
+ - `MazzoFactory` (abstract factory)
+   - Definisce il contratto per ottenere il catalogo delle carte della famiglia corrente e costruire un `Mazzo` da una lista già pronta. Le firme principali usate nel codice sono `getCarteNormali()` e `creaMazzo(source, startIndex, size)`.
+   - `StandardMazzoFactory` è la concrete factory singleton attuale; espone `getInstance()` per l'accesso globale.
 
-- `MazzoFactory` (Factory)
-  - Responsabile della creazione del `Mazzo` a partire da una lista di carte. Questo separa la responsabilita' di "costruire" il mazzo (politiche di selezione, opzioni di house rules in futuro) dalla composizione di alto livello effettuata da `PartitaFactory`.
-  - `PartitaFactory` delega a `MazzoFactory` la costruzione del mazzo; questo migliora la coesione e facilita l'estensione.
-
-- `CarteCatalogo` vs `MazzoFactory`
-  - `CarteCatalogo` fornisce i prototipi/blueprint delle carte (es. `CartaNumero`, `CartaSpeciale`, `CartaUnica`). Rappresenta "cosa" esiste nel gioco.
-  - `MazzoFactory` usa queste carte (o cloni/prototipi) per comporre un `Mazzo` concreto seguendo le regole di setup (distribuzione, filtri, house rules). Questa separazione rende semplice aggiungere nuovi tipi di carta senza cambiare la logica di costruzione del mazzo.
+- `CarteCatalogo`
+  - Non esiste più come classe autonoma nel codice corrente.
+  - La sua responsabilità è stata assorbita da `StandardMazzoFactory`.
 
 - `Partita`
-  - Coordinator / Information Expert: orchestrazione del turno; mantiene riferimento a `RegoleDiGioco` per valutare `compatibileCon` in base alle regole.
+  - Coordinator / Information Expert: orchestrazione del turno; mantiene riferimento a `RegoleDiGioco` per valutare se una carta è giocabile.
+  - Stato interno rilevante: `turnoCorrente` (indice del giocatore attivo). Lo stato di runtime visibile al client è rappresentato dalla classe `StatoTurno` che espone, tra gli altri, `nomeGiocatoreAttivo` e `deveGiocareCartaPescata`.
 
 - `UnoLegendsGame`
   - Facade / Controller per la UI.
+  - Facade / Controller per la UI. Nota: `UnoLegendsGame` mantiene un'associazione persistente a `Partita` (multiplicità 1) — non è solo una dipendenza temporanea.
 
 Design evolution notes
 
-- Se vuoi usare singleton per `CarteCatalogo`:
-  - Usalo solo se è necessario mantenere stato condiviso (cache/locale/configurazioni). Le funzioni statiche sono più semplici e testabili.
+- Se in futuro serviranno famiglie di mazzi diverse:
+  - Introduci ulteriori concrete factory, per esempio `NoMercyMazzoFactory`, lasciando invariato il resto del setup.
 
-- Se vuoi separare ulteriormente le responsabilit\u0000:
+- Se vuoi separare ulteriormente le responsabilità:
   - Introduci `DistribuzioneStrategy` (Strategy) per cambiare come distribuisci le carte ai giocatori.
   - Introduci `HouseRulesConfig` per iniettare regole in `PartitaFactory` e `Partita`.
 
 Refactor applicato
 
-- Ho applicato un refactor mirato per introdurre `Carta` (astratta) e `CartaNumero` (concreta). Le modifiche al codice sono minime e mantengono compatibilit\u0000 con l'API attuale:
-  - `CarteCatalogo.getCarteNormali()` ora crea `CartaNumero`.
-  - Tutte le strutture (`Giocatore`, `Mazzo`, `PilaDegliScarti`, `Partita`, `StatoTurno`) continuano a usare `Carta` come tipo comune.
+- La costruzione del mazzo standard è stata spostata in `StandardMazzoFactory`.
+- `PartitaFactory` usa `StandardMazzoFactory` per ottenere il catalogo standard e costruire il mazzo.
+- Tutte le strutture (`Giocatore`, `Mazzo`, `PilaDegliScarti`, `Partita`, `StatoTurno`) continuano a usare `Carta` come tipo comune.
 
 Prossimi passi consigliati
 
-- Aggiungere `RegoleDiGioco` e iniettarle nella `Partita` per supportare house rules e abilità passive.
-- Implementare altre classi di carta (`CartaSpeciale`, `CartaUnica`) estendendo `Carta`.
+- Se servono altri mazzi, aggiungere una nuova concrete factory.
 - Eventualmente estrarre `DistribuzioneStrategy` per rendere `PartitaFactory` configurabile.
 
 File generati / aggiornati
 
 - `docs/domain_class_diagram.puml` — diagramma UML di classi aggiornato.
 - `docs/domain_model.md` — spiegazione aggiornata delle decisioni.
-
-Vuoi che proceda ora a introdurre `RegoleDiGioco` e un'implementazione `RegoleStandard` nel codice sorgente? Questo permette di separare la logica di validazione da `Partita` e rendere il design più estensibile.

@@ -5,20 +5,20 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Factory per creare istanze di {@link Mazzo} a partire da una lista di carte.
- * In futuro potrà ricevere opzioni/house rules per modificare la composizione.
+ * Abstract factory per creare le famiglie di oggetti legate al mazzo.
  */
-public final class MazzoFactory {
-    private MazzoFactory() {
-    }
+public abstract class MazzoFactory {
 
     /**
-     * Crea un {@link Mazzo} prelevando `size` carte a partire da `startIndex` dalla lista fornita.
-     * Nota: il metodo restituisce solo il Mazzo. Se il chiamante necessita dell'indice
-     * della prossima carta libera (per esempio per inizializzare la pila degli scarti),
-     * può calcolarlo come `Math.min(startIndex + size, source.size())`.
+     * Restituisce il catalogo completo delle carte della famiglia corrente.
      */
-    public static Mazzo creaMazzo(List<Carta> source, int startIndex, int size) {
+    public abstract List<Carta> getCarteNormali();
+
+    /**
+     * Crea un {@link Mazzo} prelevando {@code size} carte a partire da {@code startIndex}
+     * dalla lista fornita.
+     */
+    public Mazzo creaMazzo(List<Carta> source, int startIndex, int size) {
         Objects.requireNonNull(source, "source non puo essere null");
         if (startIndex < 0 || startIndex > source.size()) {
             throw new IllegalArgumentException("startIndex non valido");

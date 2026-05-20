@@ -5,10 +5,9 @@ skinparam handwritten true
 actor "Utente\n(CLI)" as Utente
 participant "UnoLegendsCli\n(UI Program)" as CLIProg
 participant "PartitaFactory\n(Factory / Creator)" as Factory
-participant "CarteCatalogo\n(Expert - static)" as Catalogo
+participant "StandardMazzoFactory\n(Concrete Singleton)" as MazzoFactory
 participant "Giocatore\n(Expert)" as Giocatore
 participant "Mazzo\n(Information Expert)" as Mazzo
-participant "MazzoFactory\n(Factory)" as MazzoFactory
 participant "PilaDegliScarti\n(Information Expert)" as Scarti
 participant "Partita\n(Coordinator)" as Partita
 participant "UnoLegendsGame\n(Controller / Facade)" as Game
@@ -19,13 +18,20 @@ activate CLIProg
 CLIProg -> Factory : creaPartitaStandard()
 activate Factory
 note right of Factory
-  Factory delega la creazione del mazzo a `MazzoFactory` per mantenere separazione di responsabilità
+  Setup reale del codice:
+  - usa StandardMazzoFactory singleton
+  - ottiene il catalogo standard
+  - mescola le carte
+  - distribuisce le mani
+  - costruisce il mazzo residuo
+  - inizializza gli scarti
+  - crea Partita con RegoleStandard
 end note
 
-Factory -> Catalogo : getCarteNormali()
-activate Catalogo
-Catalogo --> Factory : List<Carta> (carteTotali)
-deactivate Catalogo
+Factory -> MazzoFactory : getCarteNormali()
+activate MazzoFactory
+MazzoFactory --> Factory : List<Carta> (carteTotali)
+deactivate MazzoFactory
 
 Factory -> Factory : Collections.shuffle(carteTotali)
 note right of Factory
@@ -43,7 +49,7 @@ Factory -> Giocatore : <<create>> new Giocatore(nome, mano)
 
 Factory -> MazzoFactory : creaMazzo(carteMescolate, indicePartenzaMazzo, CARTE_IN_MAZZO_INIZIALE)
 activate MazzoFactory
-MazzoFactory --> Factory : Result(mazzo, nextIndex)
+MazzoFactory --> Factory : mazzo
 deactivate MazzoFactory
 
 Factory -> Scarti : <<create>> new PilaDegliScarti(primaCarta)
@@ -51,7 +57,7 @@ activate Scarti
 Scarti --> Factory : pilaDegliScarti (pronta)
 deactivate Scarti
 
-Factory -> Partita : <<create>> new Partita(giocatori, mazzo, pilaDegliScarti, 0)
+Factory -> Partita : <<create>> new Partita(giocatori, mazzo, pilaDegliScarti, 0, RegoleStandard)
 activate Partita
 Partita --> Factory : Partita (istanza pronta)
 deactivate Partita
@@ -70,12 +76,12 @@ deactivate CLIProg
 note over Utente,Game
   Ruoli/Pattern principali:
   - `PartitaFactory`: Factory / Creator (setup iniziale)
-  - `CarteCatalogo`: Expert (conoscenza del set di carte)
+  - `StandardMazzoFactory`: Concrete Factory singleton (catalogo + mazzo standard)
   - `Mazzo` e `PilaDegliScarti`: Information Experts (gestiscono carte)
   - `Giocatore`: Expert sulla propria mano (oggetto dominio)
   - `Partita`: Coordinator (orchestra il turno)
+  - `RegoleStandard`: policy di default della partita
   - `UnoLegendsGame`: Controller / Facade (espone API per UI)
-  - Nessun Singleton nel modello corrente
   - Nota: l'attore `Utente` rappresenta l'utente esterno che usa la CLI; la `Giocatore` è l'entità del dominio creata dalla factory.
 end note
 
