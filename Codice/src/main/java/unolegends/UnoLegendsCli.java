@@ -12,15 +12,33 @@ public final class UnoLegendsCli {
     }
 
     public static void main(String[] args) {
-        UnoLegendsGame gioco = creaDemo();
-
         System.out.println("UnoLegends - CLI");
-        System.out.println("Demo base: puoi giocare una carta dalla mano oppure pescare; dopo la pesca puoi solo giocare quella carta o passare.");
-        System.out.println("Le carte in mano sono numerate da 0 in poi e vengono mostrate come 'numero colore'.");
-        System.out.println("Il sistema mostra automaticamente lo stato dopo ogni scelta.");
         System.out.println();
 
+        // Menù iniziale indicizzato: scala per future opzioni (0 avvia partita)
         try (Scanner scanner = new Scanner(System.in)) {
+            System.out.println("Menu iniziale:");
+            System.out.println("0) Avvia partita demo standard (2 giocatori)");
+            System.out.println("1) Esci");
+            System.out.print("> ");
+            String sceltaIniziale = scanner.nextLine().trim();
+            if ("1".equals(sceltaIniziale)) {
+                System.out.println("Uscita.");
+                return;
+            }
+            if (!"0".equals(sceltaIniziale)) {
+                System.out.println("Scelta non valida. Digita '0' per avviare oppure '1' per uscire.");
+                return;
+            }
+
+            // GRASP Controller: UnoLegendsGame rimane pura facade per i comandi di gioco
+            Partita partita = PartitaFactory.creaPartitaStandard();
+            UnoLegendsGame gioco = new UnoLegendsGame(partita);
+
+            System.out.println("Demo base: puoi giocare una carta dalla mano oppure pescare; dopo la pesca puoi solo giocare quella carta o passare.");
+            System.out.println("Le carte in mano sono numerate da 0 in poi e vengono mostrate come 'numero colore'.");
+            System.out.println("Il sistema mostra automaticamente lo stato dopo ogni scelta.");
+            System.out.println();
             while (true) {
                 StatoTurno stato = gioco.richiediStato();
                 mostraStato(stato);
@@ -87,37 +105,6 @@ public final class UnoLegendsCli {
                 System.out.println("Comando non riconosciuto.");
             }
         }
-    }
-
-    private static UnoLegendsGame creaDemo() {
-        List<Carta> carteNormali = CarteCatalogo.getCarteNormali();
-
-        List<Carta> mano1 = new ArrayList<>();
-        mano1.add(carteNormali.get(3));
-        mano1.add(carteNormali.get(17));
-
-        List<Carta> mano2 = new ArrayList<>();
-        mano2.add(carteNormali.get(23));
-        mano2.add(carteNormali.get(31));
-
-        Giocatore giocatore1 = new Giocatore("Giocatore1", mano1);
-        Giocatore giocatore2 = new Giocatore("Giocatore2", mano2);
-
-        List<Carta> mazzoIniziale = new ArrayList<>();
-        mazzoIniziale.add(carteNormali.get(34));
-        mazzoIniziale.add(carteNormali.get(9));
-        mazzoIniziale.add(carteNormali.get(11));
-
-        List<Carta> scartiIniziali = new ArrayList<>();
-        scartiIniziali.add(carteNormali.get(1));
-
-        Partita partita = new Partita(
-                List.of(giocatore1, giocatore2),
-                new Mazzo(mazzoIniziale),
-                new PilaDegliScarti(scartiIniziali),
-                0);
-
-        return new UnoLegendsGame(partita);
     }
 
     private static void mostraStato(StatoTurno stato) {

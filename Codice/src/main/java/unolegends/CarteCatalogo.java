@@ -23,7 +23,7 @@ public final class CarteCatalogo {
         for (Colore colore : Colore.values()) {
             for (int numero = 0; numero <= 9; numero++) {
                 String id = generaId(colore, numero, idCounter);
-                carte.add(new Carta(id, colore, numero));
+                carte.add(new CartaNumero(id, colore, numero));
                 idCounter++;
             }
         }

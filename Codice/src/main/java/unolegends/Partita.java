@@ -10,14 +10,19 @@ public class Partita {
     private final List<Giocatore> giocatori;
     private final Mazzo mazzo;
     private final PilaDegliScarti pilaDegliScarti;
+    private final RegoleDiGioco regole;
     private int indiceGiocatoreAttivo;
     private Carta cartaAppenaPescata;
     private boolean cartaPescataDaGiocare;
-
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo) {
+        this(giocatori, mazzo, pilaDegliScarti, indiceGiocatoreAttivo, new RegoleStandard());
+    }
+
+    public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo, RegoleDiGioco regole) {
         this.giocatori = Objects.requireNonNull(giocatori, "giocatori non puo essere null");
         this.mazzo = Objects.requireNonNull(mazzo, "mazzo non puo essere null");
         this.pilaDegliScarti = Objects.requireNonNull(pilaDegliScarti, "pilaDegliScarti non puo essere null");
+        this.regole = Objects.requireNonNull(regole, "regole non puo essere null");
         if (giocatori.isEmpty()) {
             throw new IllegalArgumentException("La lista giocatori non puo essere vuota");
         }
@@ -50,7 +55,7 @@ public class Partita {
         }
 
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
-        if (cartaInCima != null && !cartaSelezionata.compatibileCon(cartaInCima)) {
+        if (cartaInCima != null && !regole.isGiocabile(cartaSelezionata, cartaInCima, this)) {
             return false;
         }
 

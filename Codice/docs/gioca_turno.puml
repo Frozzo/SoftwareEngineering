@@ -1,0 +1,151 @@
+@startuml
+title GiocaTurno - Sequence / Interaction Diagram (continuazione Partita creata)
+skinparam handwritten true
+
+actor "Utente\n(CLI)" as Utente
+participant "UnoLegendsGame\n(Controller / Facade)" as Game
+participant "Partita\n(Coordinator)" as Partita
+participant "UnoLegendsCli\n(UI Program)" as CLIProg
+participant "Giocatore\n(Information Expert)" as Giocatore
+participant "Mazzo\n(Information Expert)" as Mazzo
+participant "PilaDegliScarti\n(Information Expert)" as Scarti
+participant "StatoTurno\n(DTO)" as Stato
+
+== Richiedi stato turno ==
+Utente -> CLIProg : selezionaComando('richiediStato')
+activate CLIProg
+CLIProg -> Game : richiediStato()
+activate Game
+Game -> Partita : getStatoTurno()
+activate Game
+Game -> Partita : getStatoTurno()
+activate Partita
+Partita -> Giocatore : getGiocatoreAttivo() / getNome(), getMano()
+activate Giocatore
+Giocatore --> Partita : nome, mano
+deactivate Giocatore
+Partita -> Scarti : getCartaInCima()
+activate Scarti
+Scarti --> Partita : cartaInCima
+deactivate Scarti
+Partita -> Partita : crea StatoTurno(nome, mano, cartaInCima, flag, cartaAppenaPescata)
+Partita --> Game : StatoTurno
+Partita --> Game : StatoTurno
+deactivate Partita
+Game --> CLIProg : StatoTurno (snapshot)
+deactivate Game
+CLIProg --> Utente : StatoTurno (snapshot)
+deactivate CLIProg
+deactivate Game
+
+== Gioca carta ==
+Utente -> CLIProg : selezionaComando('giocaCarta', indiceCarta)
+activate CLIProg
+CLIProg -> Game : giocaCarta(indiceCarta)
+activate Game
+Game -> Partita : giocaCarta(indiceCarta)
+activate Game
+Game -> Partita : giocaCarta(indiceCarta)
+activate Partita
+Partita -> Giocatore : getCartaInPosizione(indiceCarta)
+activate Giocatore
+Giocatore --> Partita : cartaSelezionata (o null)
+deactivate Giocatore
+alt carta pescata da giocare e indice non corrisponde
+    Partita --> Game : false (mossa non valida)
+else carta compatibile?
+    Partita -> Scarti : getCartaInCima()
+    activate Scarti
+    Scarti --> Partita : cartaInCima
+    deactivate Scarti
+    alt compatibile
+        Partita -> Giocatore : estraiCarta(indiceCarta)
+        activate Giocatore
+        Giocatore --> Partita : cartaDaGiocare
+        deactivate Giocatore
+        Partita -> Scarti : aggiungiCarta(cartaDaGiocare)
+        activate Scarti
+        Scarti --> Partita : ok
+        deactivate Scarti
+        Partita -> Partita : cartaAppenaPescata = null; cartaPescataDaGiocare=false
+        Partita -> Partita : aggiornaGiocatoreAttivo()
+        Partita --> Game : true
+    else non compatibile
+        Partita --> Game : false
+    end
+end
+deactivate Partita
+Game --> Utente : risultato
+Game --> CLIProg : risultato
+deactivate Game
+CLIProg --> Utente : risultato
+deactivate CLIProg
+
+== Pesca carta ==
+Utente -> CLIProg : selezionaComando('pescaCarta')
+activate CLIProg
+CLIProg -> Game : pescaCarta()
+activate Game
+Game -> Partita : pescaCarta()
+activate Game
+Game -> Partita : pescaCarta()
+activate Partita
+alt già pescata e non giocata
+    Partita --> Game : false
+else
+    Partita -> Mazzo : prelevaCarta()
+    activate Mazzo
+    Mazzo --> Partita : cartaPescata (o null)
+    deactivate Mazzo
+    alt carta nulla
+        Partita --> Game : false
+    else
+        Partita -> Giocatore : aggiungiCarta(cartaPescata)
+        activate Giocatore
+        Giocatore --> Partita : ok
+        deactivate Giocatore
+        Partita -> Partita : cartaAppenaPescata = cartaPescata; cartaPescataDaGiocare = true
+        Partita --> Game : true
+    end
+end
+deactivate Partita
+Game --> Utente : risultato
+Game --> CLIProg : risultato
+deactivate Game
+CLIProg --> Utente : risultato
+deactivate CLIProg
+
+== Passa turno ==
+Utente -> CLIProg : selezionaComando('passaTurno')
+activate CLIProg
+CLIProg -> Game : passaTurno()
+activate Game
+Game -> Partita : passaTurno()
+activate Game
+Game -> Partita : passaTurno()
+activate Partita
+alt carta non pescata
+    Partita --> Game : false
+else
+    Partita -> Partita : cartaAppenaPescata=null; cartaPescataDaGiocare=false
+    Partita -> Partita : aggiornaGiocatoreAttivo()
+    Partita --> Game : true
+end
+deactivate Partita
+Game --> Utente : risultato
+Game --> CLIProg : risultato
+deactivate Game
+CLIProg --> Utente : risultato
+deactivate CLIProg
+
+note over Partita, Game
+    Ruoli e pattern principali (ricap):
+    - `Partita`: Coordinator / Information Expert for turn orchestration
+    - `UnoLegendsGame`: Controller / Facade (riceve comandi dalla UI)
+    - `Giocatore`, `Mazzo`, `PilaDegliScarti`: Information Experts
+    - `StatoTurno`: DTO (snapshot dello stato)
+    - Nessun Singleton introducato qui
+    - Nota: l'attore `Utente` rappresenta l'utente esterno (CLI). La classe `Giocatore` è l'entità del dominio, distinta dall'attore esterno.
+end note
+
+@enduml
