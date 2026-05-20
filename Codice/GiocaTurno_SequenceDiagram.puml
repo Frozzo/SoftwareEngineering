@@ -1,0 +1,94 @@
+@startuml GiocaTurno_Iterazione1
+title GiocaTurno - Diagramma di Sequenza (Iterazione 1)
+
+actor Giocatore
+participant "UnoLegendsGame\n(Controller)" as Controller
+participant "Partita\n(Coordinator)" as Partita
+participant "Giocatore\n(Expert)" as GiocatoreExpert
+participant "PilaDegliScarti\n(Expert)" as PilaScarti
+participant "Mazzo\n(Expert)" as Mazzo
+
+== Evento 1: richiediStato() ==
+Giocatore -> Controller: richiediStato()
+activate Controller
+Controller -> Partita: getStatoTurno()
+activate Partita
+Partita -> GiocatoreExpert: getMano()
+activate GiocatoreExpert
+GiocatoreExpert --> Partita: List<Carta> mano
+deactivate GiocatoreExpert
+
+Partita -> PilaScarti: getCartaInCima()
+activate PilaScarti
+PilaScarti --> Partita: Carta cartaInCima
+deactivate PilaScarti
+
+Partita --> Controller: StatoTurno (stato turno corrente)
+deactivate Partita
+Controller --> Giocatore: StatoTurno con mano e carta in cima
+deactivate Controller
+
+== Evento 2: giocaCarta(indiceCarta) ==
+Giocatore -> Controller: giocaCarta(indiceCarta)
+activate Controller
+Controller -> Partita: giocaCarta(indiceCarta)
+activate Partita
+
+Partita -> PilaScarti: getCartaInCima()
+activate PilaScarti
+PilaScarti --> Partita: Carta cartaInCima
+deactivate PilaScarti
+
+alt Carta compatibile
+    Partita -> GiocatoreExpert: estraiCarta(indiceCarta)
+    activate GiocatoreExpert
+    GiocatoreExpert --> Partita: Carta cartaEstratta
+    deactivate GiocatoreExpert
+    
+    Partita -> PilaScarti: aggiungiCarta(cartaEstratta)
+    activate PilaScarti
+    deactivate PilaScarti
+    
+    Partita --> Partita: aggiornaGiocatoreAttivo()
+    Partita --> Controller: boolean true (mossa valida)
+else Carta non compatibile
+    Partita --> Controller: boolean false (mossa non valida)
+end
+deactivate Partita
+Controller --> Giocatore: esito giocata
+deactivate Controller
+
+== Evento 3: pescaCarta() ==
+Giocatore -> Controller: pescaCarta()
+activate Controller
+Controller -> Partita: pescaCarta()
+activate Partita
+
+Partita -> Mazzo: prelevaCarta()
+activate Mazzo
+Mazzo --> Partita: Carta cartaPescata
+deactivate Mazzo
+
+Partita -> GiocatoreExpert: aggiungiCarta(cartaPescata)
+activate GiocatoreExpert
+deactivate GiocatoreExpert
+
+Partita --> Controller: boolean true (pesca riuscita)
+deactivate Partita
+Controller --> Giocatore: esito pesca
+deactivate Controller
+
+== Evento 4: passaTurno() ==
+Giocatore -> Controller: passaTurno()
+activate Controller
+Controller -> Partita: passaTurno()
+activate Partita
+
+Partita --> Partita: aggiornaGiocatoreAttivo()
+
+Partita --> Controller: boolean true (turno passato)
+deactivate Partita
+Controller --> Giocatore: conferma passaggio turno
+deactivate Controller
+
+@enduml
