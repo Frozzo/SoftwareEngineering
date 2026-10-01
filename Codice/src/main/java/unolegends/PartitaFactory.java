@@ -3,7 +3,7 @@ package unolegends;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
+//import java.util.Objects;
 
 /**
  * GRASP Factory (Creator pattern): responsabile della configurazione e creazione di una Partita.
@@ -23,21 +23,21 @@ import java.util.Objects;
  * - SRP: unica responsabilità = configurare il setup iniziale
  */
 public class PartitaFactory {
-    private static final int CARTE_PER_GIOCATORE = 5;
-    private static final int CARTE_IN_MAZZO_INIZIALE = 10;
-    private static final MazzoFactory MAZZO_FACTORY = StandardMazzoFactory.getInstance();
+    private static final int CARTE_PER_GIOCATORE = 5;  //CARTE_PER_GIOCATORE = REGOLE.CARTE_PER_GIOCATORE
+    private static final int CARTE_IN_MAZZO_INIZIALE = 10; //sta cosa mi devasta da modificare
+    private static final MazzoFactory MAZZO_FACTORY = StandardMazzoFactory.getInstance();  //REGOLE.MAZZO
 
     /**
      * Crea una Partita standard con 2 giocatori.
      * Configurazione di default per il prototipo demo.
      */
     public static Partita creaPartitaStandard() {
-        return creaPartita(2);
+        return creaPartita(2); //DA MODIFICARE
     }
 
     /**
-     * Crea una Partita con numero di giocatori specificato.
-     * 
+     * Crea una Partita con numero di giocatori specificato.    //DA MODIFICARE TROPPO SPECIFICO CREARE UN METODO CHE CREA UNA PARTITA SOLO PER DUE PERSONE FA CAGARE
+     *                                                          //DA MODIFICARE AGGIUNGERE I LEGEND PER DIO O LI AGGIUNGIOAMO DOPO????
      * @param numeroDiGiocatori numero di giocatori (per ora solo 2 supportato)
      * @return una Partita completamente configurata e pronta al gioco
      * @throws IllegalArgumentException se numeroDiGiocatori != 2

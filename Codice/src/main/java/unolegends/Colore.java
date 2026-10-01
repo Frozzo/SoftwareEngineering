@@ -7,7 +7,8 @@ public enum Colore {
     ROSSO("Rosso", "\u001B[31m"),
     VERDE("Verde", "\u001B[32m"),
     BLU("Blu", "\u001B[34m"),
-    GIALLO("Giallo", "\u001B[33m");
+    GIALLO("Giallo", "\u001B[33m"),
+    SPECIALE_NERO("Nero", "\u001B[30m"); //COLORE NERO PER JOLLY E JOLLY +4
 
     private static final String ANSI_RESET = "\u001B[0m";
 

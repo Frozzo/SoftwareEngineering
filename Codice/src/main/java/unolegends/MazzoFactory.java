@@ -4,28 +4,79 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Abstract factory per creare le famiglie di oggetti legate al mazzo.
- */
-public abstract class MazzoFactory {
+
+public class MazzoUnoFactory {
+
+    // Costruttore privato: è una classe Factory di utilità, non va istanziata con 'new'
+    private MazzoUnoFactory() {}
 
     /**
-     * Restituisce il catalogo completo delle carte della famiglia corrente.
+     * Metodo Factory principale: decide quale composizione generare
      */
-    public abstract List<Carta> getCarteNormali();
+    public static Mazzo creaMazzo(TipoVariante variante) {
+        return switch (variante) {
+            case CLASSICO -> creaMazzoStandard108();
+            case SENZA_PIETA -> creaMazzoNoMercy();
+        };
+    }
 
-    /**
-     * Crea un {@link Mazzo} prelevando {@code size} carte a partire da {@code startIndex}
-     * dalla lista fornita.
-     */
-    public Mazzo creaMazzo(List<Carta> source, int startIndex, int size) {
-        Objects.requireNonNull(source, "source non puo essere null");
-        if (startIndex < 0 || startIndex > source.size()) {
-            throw new IllegalArgumentException("startIndex non valido");
+    private static Mazzo creaMazzoStandard108() {
+        List<Carta> carte = new ArrayList<>(108);
+        Colore[] coloriStandard = {Colore.ROSSO, Colore.GIALLO, Colore.VERDE, Colore.BLU};
+        int idProg = 1;
+
+        for (Colore col : coloriStandard) {
+            // 1 solo zero per colore
+            carte.add(new Carta("std_" + (idProg++), col, Valore.ZERO));
+
+            // Due carte per ogni numero da 1 a 9
+            Valore[] numeri = {
+                Valore.UNO, Valore.DUE, Valore.TRE, Valore.QUATTRO,
+                Valore.CINQUE, Valore.SEI, Valore.SETTE, Valore.OTTO, Valore.NOVE
+            };
+            for (Valore val : numeri) {
+                carte.add(new Carta("std_" + (idProg++), col, val));
+                carte.add(new Carta("std_" + (idProg++), col, val));
+            }
+
+            // Due carte azione per colore: Salta, Inverti, +2
+            Valore[] azioni = {Valore.SALTA, Valore.INVERTI, Valore.PIU_DUE};
+            for (Valore az : azioni) {
+                carte.add(new Carta("std_" + (idProg++), col, az));
+                carte.add(new Carta("std_" + (idProg++), col, az));
+            }
         }
 
-        int endIndex = Math.min(startIndex + size, source.size());
-        List<Carta> sub = new ArrayList<>(source.subList(startIndex, endIndex));
-        return new Mazzo(sub);
+        // 4 Jolly normali e 4 Jolly Pesca Quattro (Neri)
+        for (int i = 0; i < 4; i++) {
+            carte.add(new Carta("std_" + (idProg++), Colore.SPECIALE_NERO, Valore.JOLLY));
+            carte.add(new Carta("std_" + (idProg++), Colore.SPECIALE_NERO, Valore.JOLLY_PIU_QUATTRO));
+        }
+
+        return new Mazzo(carte);
+    }
+
+    /**
+     * Composizione per variante estrema (include carte aggiuntive)
+     */
+    private static Mazzo creaMazzoNoMercy() {
+        // Parte dal mazzo standard e ci aggiunge penalità folli
+        Mazzo mazzoBase = creaMazzoStandard108();
+        List<Carta> carte = new ArrayList<>();
+        
+        // Svuotiamo il base nella lista per espanderlo
+        while (mazzoBase.carteRimanenti() > 0) {
+            carte.add(mazzoBase.pesca());
+        }
+
+        int idProg = 500;
+        // Aggiungiamo 4 carte +6, 4 carte +10 e 4 Salta Tutti
+        for (int i = 0; i < 4; i++) {
+            carte.add(new Carta("nm_" + (idProg++), Colore.SPECIALE_NERO, Valore.PIU_SEI));
+            carte.add(new Carta("nm_" + (idProg++), Colore.SPECIALE_NERO, Valore.PIU_DIECI));
+            carte.add(new Carta("nm_" + (idProg++), Colore.SPECIALE_NERO, Valore.SALTA_TUTTI));
+        }
+
+        return new Mazzo(carte);
     }
 }
