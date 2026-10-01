@@ -5,10 +5,10 @@ import java.util.List;
 import java.util.Objects;
 
 
-public class MazzoUnoFactory {
+public class MazzoFactory {
 
     // Costruttore privato: è una classe Factory di utilità, non va istanziata con 'new'
-    private MazzoUnoFactory() {}
+    private MazzoFactory() {}
 
     /**
      * Metodo Factory principale: decide quale composizione generare
