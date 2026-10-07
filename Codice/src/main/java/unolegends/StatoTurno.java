@@ -44,4 +44,6 @@ public class StatoTurno {
     public Carta getCartaAppenaPescata() {
         return cartaAppenaPescata;
     }
+    
+    
 }

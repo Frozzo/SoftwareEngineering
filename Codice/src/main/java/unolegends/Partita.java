@@ -14,6 +14,7 @@ public class Partita {
     private int indiceGiocatoreAttivo;
     private Carta cartaAppenaPescata;
     private boolean cartaPescataDaGiocare;
+    private boolean sensoOrario = true; // Variabile per tenere traccia del senso di gioco
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo) {
         this(giocatori, mazzo, pilaDegliScarti, indiceGiocatoreAttivo, new RegoleStandard());
     }
@@ -38,6 +39,9 @@ public class Partita {
     public StatoTurno getStatoTurno() {
         Giocatore attivo = getGiocatoreAttivo();
         return new StatoTurno(attivo.getNome(), attivo.getMano(), pilaDegliScarti.getCartaInCima(), cartaPescataDaGiocare, cartaAppenaPescata);
+    }
+    public int getIndiceGiocatoreAttivo() {
+        return indiceGiocatoreAttivo;
     }
 
     /**
@@ -67,6 +71,7 @@ public class Partita {
         pilaDegliScarti.aggiungiCarta(cartaDaGiocare);
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
+        cartaDaGiocare.getEffetto().attivaeffetto(this); //attiva eventuali effetti della carta
         aggiornaGiocatoreAttivo();
         return true;
     }
@@ -115,7 +120,14 @@ public class Partita {
         return giocatori.get(indiceGiocatoreAttivo);
     }
 
-    private void aggiornaGiocatoreAttivo() {
-        indiceGiocatoreAttivo = (indiceGiocatoreAttivo + 1) % giocatori.size();
+    public void aggiornaGiocatoreAttivo() {
+        if (sensoOrario) {
+            indiceGiocatoreAttivo = (indiceGiocatoreAttivo + 1) % giocatori.size();
+        } else {
+            indiceGiocatoreAttivo = (indiceGiocatoreAttivo - 1 + giocatori.size()) % giocatori.size();
+        }
+    }
+    public void cambioGiro(){
+        this.sensoOrario = !sensoOrario; // Inverte il senso di gioco
     }
 }

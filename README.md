@@ -19,3 +19,6 @@ Comandi disponibili nella demo:
 - `esci`: termina la demo.
 
 Lo stato del turno viene mostrato automaticamente dopo ogni comando.
+
+
+aggiungere una classe mano?
