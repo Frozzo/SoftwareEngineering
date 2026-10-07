@@ -6,16 +6,14 @@ package unolegends;
  */
 public abstract class Carta {
 
-    private Ieffetto effetto;
     /**
      * Determina se questa carta e' compatibile con la carta in cima agli scarti.
      * Implementazione specifica nelle sottoclassi (polimorfismo).
      */
     public abstract boolean compatibileCon(Carta cartaInCima);
-
-    public Ieffetto getEffetto() {
-        return effetto;
-    }
+    public abstract Colore getColore();
+    public abstract ValoreCarta getValoreCarta();
+    public abstract Ieffetto getEffetto();
 
     /**
      * Rappresentazione testuale per la CLI. Implementazione specifica.

@@ -7,38 +7,39 @@ import java.util.Locale;
  */
 public class CartaNumero extends Carta {
     private final Colore colore;
-    private final int numero;
+    private final ValoreCarta valore;
     private final int id;
     private final Ieffetto effetto;
 
-    public CartaNumero(int id, Colore colore, Numero numero) {
+    public CartaNumero(int id, Colore colore, ValoreCarta valore) {
         this.id = id;
         this.colore = java.util.Objects.requireNonNull(colore, "colore non puo essere null");
-        this.numero = java.util.Objects.requireNonNull(numero, "numero non puo essere null").valore;
+        this.valore = java.util.Objects.requireNonNull(valore, "valore non puo essere null");
         this.effetto = new Effetto_Nullo();
+        
     }
 
     public Colore getColore() {
         return colore;
     }
 
-    public int getNumero() {
-        return numero;
+    public ValoreCarta getValoreCarta() {
+        return this.valore;
+    }
+
+    @Override
+    public Ieffetto getEffetto() {
+        return effetto;
     }
 
     public boolean compatibileCon(Carta cartaInCima) {
-        if (cartaInCima == null) return true;
-        if (cartaInCima instanceof CartaNumero other) {
-            return this.colore == other
-            .colore || this
-            .numero == other.numero;
-        }
-        // Altri tipi di carta possono implementare proprie regole
-        return false;
+        return cartaInCima == null
+                || colore == cartaInCima.getColore()
+                || valore == cartaInCima.getValoreCarta();
     }
 
     public String toTestoBase() {
-        return numero + " " + colore.getNome().toLowerCase(Locale.ROOT);
+        return valore.getValore() + " " + colore.getNome().toLowerCase(Locale.ROOT);
     }
 
     public String toCliString() {

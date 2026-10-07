@@ -30,7 +30,9 @@ Il diagramma di sequenza è in `docs/gioca_turno.puml`.
   - Interroga il `Giocatore` attivo per ottenere la carta in quella posizione (`getCartaInPosizione`) — potrebbe essere `null`.
   - Se è presente la regola "deve giocare la carta appena pescata" (`cartaPescataDaGiocare`) controlla che la carta selezionata sia appunto la `cartaAppenaPescata`.
   - Recupera la `cartaInCima` dagli scarti e verifica la compatibilità (`compatibileCon`).
+  - Se la carta selezionata ha un `Effetto_Cambia_colore`, la CLI richiede uno dei quattro colori base e assegna la scelta all'effetto.
   - Se valida: ordina al `Giocatore` di estrarre la carta (`estraiCarta`) e la passa alla `PilaDegliScarti` (`aggiungiCarta`).
+  - L'effetto della carta viene attivato dopo averla aggiunta agli scarti, quindi il colore scelto diventa il colore della carta in cima per il turno successivo.
   - Ripristina gli stati relativi alla pesca e invoca `aggiornaGiocatoreAttivo()`.
   - Ritorna `true` se la mossa è avvenuta, `false` altrimenti.
 
@@ -82,4 +84,3 @@ Nota sulla terminologia
 Interazione UI indicizzata
 
 L'interfaccia CLI (`UnoLegendsCli`) espone un menù indicizzato iniziale (es. `0` avvia partita). L'attore `Utente` seleziona l'indice; il programma CLI interpreta la scelta e inoltra il comando a `PartitaFactory` o a `UnoLegendsGame`. Questo rende facile estendere il menù con nuove opzioni in futuro.
-

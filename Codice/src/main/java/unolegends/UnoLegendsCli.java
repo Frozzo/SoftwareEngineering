@@ -63,6 +63,7 @@ public final class UnoLegendsCli {
                         continue;
                     }
 
+                    preparaEffettoCambioColore(stato, indiceCarta, scanner);
                     if (gioco.giocaCarta(indiceCarta)) {
                         System.out.println("Carta giocata.");
                     } else {
@@ -86,6 +87,7 @@ public final class UnoLegendsCli {
                         System.out.println("Valore non valido.");
                         continue;
                     }
+                    preparaEffettoCambioColore(stato, indiceCarta, scanner);
                     if (gioco.giocaCarta(indiceCarta)) {
                         System.out.println("Carta giocata.");
                     } else {
@@ -117,6 +119,43 @@ public final class UnoLegendsCli {
             System.out.println(i + ") " + mano.get(i).toCliString());
         }
         System.out.println();
+    }
+
+    private static void preparaEffettoCambioColore(StatoTurno stato, int indiceCarta, Scanner scanner) {
+        List<Carta> mano = stato.getManoGiocatoreAttivo();
+        if (indiceCarta >= mano.size()) {
+            return;
+        }
+
+        Ieffetto effetto = mano.get(indiceCarta).getEffetto();
+        if (effetto instanceof Effetto_Cambia_colore effettoCambioColore) {
+            Colore nuovoColore = scegliColore(scanner);
+            effettoCambioColore.setNuovoColore(nuovoColore);
+        }
+    }
+
+    private static Colore scegliColore(Scanner scanner) {
+        while (true) {
+            System.out.println("Scegli colore:");
+            System.out.println("0) Rosso");
+            System.out.println("1) Verde");
+            System.out.println("2) Blu");
+            System.out.println("3) Giallo");
+            System.out.print("> ");
+
+            switch (scanner.nextLine().trim()) {
+                case "0":
+                    return Colore.ROSSO;
+                case "1":
+                    return Colore.VERDE;
+                case "2":
+                    return Colore.BLU;
+                case "3":
+                    return Colore.GIALLO;
+                default:
+                    System.out.println("Scelta non valida. Scegli un colore da 0 a 3.");
+            }
+        }
     }
 
     private static Integer parseIndice(String valore) {

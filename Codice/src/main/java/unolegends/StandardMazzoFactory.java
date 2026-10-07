@@ -21,18 +21,20 @@ public final class StandardMazzoFactory extends MazzoFactory {
         List<Carta> carte = new ArrayList<>();
         int idCounter = 0;
 
-        for (Colore colore : Colore.values()) {
+        for (Colore colore : List.of(Colore.ROSSO, Colore.VERDE, Colore.BLU, Colore.GIALLO)) {
             for (int numero = 0; numero <= 9; numero++) {
-                String id = generaId(colore, numero, idCounter);
-                carte.add(new CartaNumero(id, colore, numero));
-                idCounter++;
+                ValoreCarta numeroEnum = ValoreCarta.fromInt(numero);
+                carte.add(new CartaNumero(idCounter++, colore, numeroEnum));
             }
         }
 
-        return carte;
-    }
+        for (int i = 0; i < 4; i++) {
+            carte.add(new CartaSpeciale(
+                    Colore.NERO,
+                    ValoreCarta.CAMBIA_COLORE,
+                    new Effetto_Cambia_colore()));
+        }
 
-    private static String generaId(Colore colore, int numero, int contatore) {
-        return String.format("N%d_%s_%d", contatore, colore.getNome().substring(0, 1), numero);
+        return carte;
     }
 }

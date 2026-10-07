@@ -94,6 +94,15 @@ public class Partita {
         cartaPescataDaGiocare = true;
         return true;
     }
+    public boolean pescaCartaForzata(Giocatore giocatore) {
+        Carta cartaPescata = mazzo.prelevaCarta();
+        if (cartaPescata == null) {
+            return false;
+        }
+
+        giocatore.aggiungiCarta(cartaPescata);
+        return true;
+    }
 
     /**
      * GRASP Coordinator: gestisce il cambio turno tramite self-message dedicato.
@@ -129,5 +138,12 @@ public class Partita {
     }
     public void cambioGiro(){
         this.sensoOrario = !sensoOrario; // Inverte il senso di gioco
+    }
+    public Giocatore getProssimoGiocatore() {
+        if (sensoOrario) {
+            return giocatori.get((indiceGiocatoreAttivo + 1) % giocatori.size());
+        } else {
+            return giocatori.get((indiceGiocatoreAttivo - 1 + giocatori.size()) % giocatori.size());
+        }
     }
 }
