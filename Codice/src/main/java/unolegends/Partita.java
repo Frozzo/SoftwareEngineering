@@ -1,5 +1,6 @@
 package unolegends;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -20,7 +21,7 @@ public class Partita {
     }
 
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo, RegoleDiGioco regole) {
-        this.giocatori = Objects.requireNonNull(giocatori, "giocatori non puo essere null");
+        this.giocatori = new ArrayList<>(Objects.requireNonNull(giocatori, "giocatori non puo essere null"));
         this.mazzo = Objects.requireNonNull(mazzo, "mazzo non puo essere null");
         this.pilaDegliScarti = Objects.requireNonNull(pilaDegliScarti, "pilaDegliScarti non puo essere null");
         this.regole = Objects.requireNonNull(regole, "regole non puo essere null");

@@ -25,14 +25,13 @@ import java.util.Objects;
 public class PartitaFactory {
     private static final int CARTE_PER_GIOCATORE = 5;
     private static final int CARTE_IN_MAZZO_INIZIALE = 10;
-    private static final MazzoFactory MAZZO_FACTORY = StandardMazzoFactory.getInstance();
 
     /**
      * Crea una Partita standard con 2 giocatori.
      * Configurazione di default per il prototipo demo.
      */
     public static Partita creaPartitaStandard() {
-        return creaPartita(2);
+        return creaPartita(TipoMazzo.STANDARD, 2);
     }
 
     /**
@@ -43,12 +42,26 @@ public class PartitaFactory {
      * @throws IllegalArgumentException se numeroDiGiocatori != 2
      */
     public static Partita creaPartita(int numeroDiGiocatori) {
+        return creaPartita(TipoMazzo.STANDARD, numeroDiGiocatori);
+    }
+
+    /**
+     * Crea una partita usando il tipo di mazzo selezionato.
+     *
+     * @param tipoMazzo tipo di mazzo della partita
+     * @param numeroDiGiocatori numero di giocatori (per ora solo 2 supportato)
+     * @return una Partita completamente configurata e pronta al gioco
+     */
+    public static Partita creaPartita(TipoMazzo tipoMazzo, int numeroDiGiocatori) {
+        Objects.requireNonNull(tipoMazzo, "tipoMazzo non puo essere null");
         if (numeroDiGiocatori != 2) {
             throw new IllegalArgumentException("Attualmente solo 2 giocatori sono supportati");
         }
 
+        MazzoFactory mazzoFactory = selezionaMazzoFactory(tipoMazzo);
+
         // 1. Obtain complete deck from the concrete MazzoFactory (Expert: knows which cards exist)
-        List<Carta> carteTotali = MAZZO_FACTORY.getCarteNormali();
+        List<Carta> carteTotali = mazzoFactory.getCarteNormali();
 
         // 2. Shuffle (randomize distribution)
         List<Carta> carteMescolate = new ArrayList<>(carteTotali);
@@ -59,7 +72,7 @@ public class PartitaFactory {
 
         // 4. Crea il Mazzo tramite MazzoFactory (estendibile per house rules in futuro)
         int indicePartenzaMazzo = numeroDiGiocatori * CARTE_PER_GIOCATORE;
-        Mazzo mazzo = MAZZO_FACTORY.creaMazzo(carteMescolate, indicePartenzaMazzo, CARTE_IN_MAZZO_INIZIALE);
+        Mazzo mazzo = mazzoFactory.creaMazzo(carteMescolate, indicePartenzaMazzo, CARTE_IN_MAZZO_INIZIALE);
 
         // 5. Discard pile initialization (first card from remaining deck)
         int indicePartenzaScarti = Math.min(indicePartenzaMazzo + CARTE_IN_MAZZO_INIZIALE, carteMescolate.size());
@@ -71,6 +84,18 @@ public class PartitaFactory {
         }
 
         throw new IllegalStateException("Non ci sono carte sufficienti per inizializzare gli scarti");
+    }
+
+    private static MazzoFactory selezionaMazzoFactory(TipoMazzo tipoMazzo) {
+        switch (tipoMazzo) {
+            case STANDARD -> {
+                return StandardMazzoFactory.getInstance();
+            }
+            case NO_MERCY -> {
+                throw new UnsupportedOperationException("Il mazzo No Mercy non e ancora implementato");
+            }
+            default -> throw new IllegalArgumentException("Tipo di mazzo non supportato: " + tipoMazzo);
+        }
     }
 
     /**
