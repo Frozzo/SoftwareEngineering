@@ -27,6 +27,17 @@ public final class StandardMazzoFactory extends MazzoFactory {
                 ValoreCarta numeroEnum = ValoreCarta.fromInt(numero);
                 carte.add(new CartaNumero(idCounter++, colore, numeroEnum));
             }
+
+            for (int i = 0; i < 2; i++) {
+                carte.add(new CartaSpeciale(
+                        colore,
+                        ValoreCarta.BLOCCA_TURNO,
+                        new Effetto_Blocca_Turno()));
+                carte.add(new CartaSpeciale(
+                        colore,
+                        ValoreCarta.PIU_DUE,
+                        new Effetto_pescata_carte(2)));
+            }
         }
 
         for (int i = 0; i < 4; i++) {

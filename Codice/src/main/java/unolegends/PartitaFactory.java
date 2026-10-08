@@ -24,7 +24,7 @@ import java.util.Objects;
  */
 public class PartitaFactory {
     private static final int CARTE_PER_GIOCATORE = 5;
-    private static final int CARTE_IN_MAZZO_INIZIALE = 10;
+    private static final int CARTE_IN_MAZZO_INIZIALE = 40;
 
     /**
      * Crea una Partita standard con 2 giocatori.
@@ -80,7 +80,10 @@ public class PartitaFactory {
             Carta primaCarta = carteMescolate.get(indicePartenzaScarti);
             PilaDegliScarti pilaDegliScarti = new PilaDegliScarti(List.of(primaCarta));
             // Default rules: RegoleStandard. In futuro PartitaFactory può accettare configurazioni.
-            return new Partita(giocatori, mazzo, pilaDegliScarti, 0, new RegoleStandard());
+            Partita NewPartita = new Partita(giocatori, mazzo, pilaDegliScarti, (-1 + giocatori.size()) % giocatori.size(), new RegoleStandard()); //sembra strano il primo turno ma serve ad ativare l'effeto sul primo giocatore
+            primaCarta.getEffetto().attivaeffetto(NewPartita);//attiva l'effetto della prima carta in cima agli scarti
+            NewPartita.aggiornaGiocatoreAttivo(); 
+            return NewPartita;
         }
 
         throw new IllegalStateException("Non ci sono carte sufficienti per inizializzare gli scarti");

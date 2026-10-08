@@ -1,5 +1,7 @@
 package unolegends;
 
+import java.util.Locale;
+
 public class CartaSpeciale extends Carta {
 
     private Colore colore;
@@ -48,10 +50,12 @@ public class CartaSpeciale extends Carta {
     public void attivaEffetto(Partita partita) {
         effetto.attivaeffetto(partita);
     }
+        public String toTestoBase() {
+        return ValoreCarta.getValore() + " " + colore.getNome().toLowerCase(Locale.ROOT);
+    }
+
     public String toCliString() {
-        return "CartaSpeciale{" +
-                "colore=" + colore +
-                ", ValoreCarta=" + ValoreCarta +
-                '}';
-    }   
+        String base = toTestoBase();
+        return colore.formatta(base);
+    }
 }
