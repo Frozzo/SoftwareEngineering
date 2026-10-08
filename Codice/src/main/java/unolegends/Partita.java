@@ -50,6 +50,9 @@ public class Partita {
     public int getIndiceGiocatoreAttivo() {
         return indiceGiocatoreAttivo;
     }
+    public List<Carta> getMazzo() {
+        return mazzo.getCarte();
+    }
 
     /**
      * GRASP Coordinator: valida la mossa e orchestra estrazione carta + inserimento negli scarti.

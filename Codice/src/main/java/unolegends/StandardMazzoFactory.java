@@ -22,7 +22,7 @@ public final class StandardMazzoFactory extends MazzoFactory {
         List<Carta> carte = new ArrayList<>();
         int idCounter = 0;
 
-        for (Colore colore : List.of(Colore.ROSSO, Colore.VERDE, Colore.BLU, Colore.GIALLO)) {
+        for (Colore colore : List.of(Colore.ROSSO, Colore.GIALLO, Colore.VERDE, Colore.BLU)) {
             for (int numero = 0; numero <= 9; numero++) {
                 ValoreCarta numeroEnum = ValoreCarta.fromInt(numero);
                 carte.add(new CartaNumero(idCounter++, colore, numeroEnum));
@@ -45,17 +45,6 @@ public final class StandardMazzoFactory extends MazzoFactory {
                         ValoreCarta.CAMBIA_GIRO,
                         new Effetto_cambio_giro()));
             }
-
-            for (int i = 0; i < 2; i++) {
-                carte.add(new CartaSpeciale(
-                        colore,
-                        ValoreCarta.BLOCCA_TURNO,
-                        new Effetto_Blocca_Turno()));
-                carte.add(new CartaSpeciale(
-                        colore,
-                        ValoreCarta.PIU_DUE,
-                        new Effetto_pescata_carte(2)));
-            }
         }
 
         for (int i = 0; i < 4; i++) {
@@ -63,7 +52,7 @@ public final class StandardMazzoFactory extends MazzoFactory {
                     Colore.NERO,
                     ValoreCarta.CAMBIA_COLORE,
                     new Effetto_Cambia_colore()));
-                carte.add(new CartaSpeciale(
+            carte.add(new CartaSpeciale(
                     Colore.NERO,
                     ValoreCarta.PIU_QUATTRO,
                     new EffettoComposito(List.of(

@@ -83,6 +83,7 @@ public final class UnoLegendsCli {
 
                 System.out.println("Scegli: 0) gioca carta  1) pesca carta  2) esci");
                 System.out.print("> ");
+                System.out.print("Ecco tutte le carte del mazzo: " + partita.getMazzo().size() + " carte rimanenti.");
                 String scelta = scanner.nextLine().trim();
 
                 if ("2".equals(scelta)) {
