@@ -4,6 +4,8 @@ import java.util.Objects;
 
 public class Effetto_Cambia_colore implements Ieffetto {
 
+    private Colore nuovoColore;
+
     public Effetto_Cambia_colore() {
     }
 
