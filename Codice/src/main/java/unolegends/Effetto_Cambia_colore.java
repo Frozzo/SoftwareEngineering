@@ -9,13 +9,14 @@ public class Effetto_Cambia_colore implements Ieffetto {
     }
 
     public Effetto_Cambia_colore(Colore nuovoColore) {
-        setNuovoColore(nuovoColore);
-    }
-
-    public void setNuovoColore(Colore nuovoColore) {
         this.nuovoColore = Objects.requireNonNull(nuovoColore, "nuovoColore non puo essere null");
     }
 
+    void setNuovoColore(Colore nuovoColore) {
+        this.nuovoColore = Objects.requireNonNull(nuovoColore, "nuovoColore non puo essere null");
+    }
+
+    @Override
     public void attivaeffetto(Partita partita) {
         if (nuovoColore == null) {
             throw new IllegalStateException("Il colore da impostare deve essere scelto prima di attivare l'effetto");

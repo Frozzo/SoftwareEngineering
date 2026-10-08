@@ -1,53 +1,47 @@
 package unolegends;
 
+import java.util.Objects;
+
 public class CartaSpeciale extends Carta {
 
     private Colore colore;
-    private ValoreCarta ValoreCarta;
-    private Ieffetto effetto;
+    private final ValoreCarta ValoreCarta;
+    private final Ieffetto effetto;
 
+    @Override
     public boolean compatibileCon(Carta cartaInCima) {
-
-        if (this.colore == Colore.NERO || this.ValoreCarta == cartaInCima.getValoreCarta() || this.colore == cartaInCima.getColore()  ) { //se il colore è nero, o il ValoreCarta è uguale o il colore è uguale allora la carta è compatibile
-            return true; 
-
-        }
-        else {
-            return false; 
-        }
+        return this.colore == Colore.NERO
+                || this.ValoreCarta == cartaInCima.getValoreCarta()
+                || this.colore == cartaInCima.getColore();
     }
 
     public CartaSpeciale(Colore colore, ValoreCarta ValoreCarta, Ieffetto effetto) {
-        this.colore = colore;
-        this.ValoreCarta = ValoreCarta;
-        this.effetto = effetto;
+        this.colore = Objects.requireNonNull(colore, "colore non puo essere null");
+        this.ValoreCarta = Objects.requireNonNull(ValoreCarta, "valoreCarta non puo essere null");
+        this.effetto = Objects.requireNonNull(effetto, "effetto non puo essere null");
     }
     
+    @Override
     public Colore getColore() {
         return colore;
     }
-    public void setColore(Colore colore) {
-        this.colore = colore;
+    void setColore(Colore colore) {
+        this.colore = Objects.requireNonNull(colore, "colore non puo essere null");
     }
     
+    @Override
     public ValoreCarta getValoreCarta() {
         return ValoreCarta;
     }
-    public void setValoreCarta(ValoreCarta ValoreCarta) {
-        this.ValoreCarta = ValoreCarta;
-    }
-    
-
     @Override
     public Ieffetto getEffetto() {
         return effetto;
     }
-    public void setEffetto(Ieffetto effetto) {
-        this.effetto = effetto;
-    }
+
     public void attivaEffetto(Partita partita) {
         effetto.attivaeffetto(partita);
     }
+    @Override
     public String toCliString() {
         return "CartaSpeciale{" +
                 "colore=" + colore +

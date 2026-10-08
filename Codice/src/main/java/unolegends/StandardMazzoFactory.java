@@ -26,6 +26,24 @@ public final class StandardMazzoFactory extends MazzoFactory {
             for (int numero = 0; numero <= 9; numero++) {
                 ValoreCarta numeroEnum = ValoreCarta.fromInt(numero);
                 carte.add(new CartaNumero(idCounter++, colore, numeroEnum));
+                if (numero != 0) {
+                    carte.add(new CartaNumero(idCounter++, colore, numeroEnum));
+                }
+            }
+
+            for (int copia = 0; copia < 2; copia++) {
+                carte.add(new CartaSpeciale(
+                        colore,
+                        ValoreCarta.PIU_DUE,
+                        new Effetto_pescata_carte(2)));
+                carte.add(new CartaSpeciale(
+                        colore,
+                        ValoreCarta.BLOCCA_TURNO,
+                        new Effetto_Blocca_Turno()));
+                carte.add(new CartaSpeciale(
+                        colore,
+                        ValoreCarta.CAMBIA_GIRO,
+                        new Effetto_cambio_giro()));
             }
         }
 
@@ -34,6 +52,12 @@ public final class StandardMazzoFactory extends MazzoFactory {
                     Colore.NERO,
                     ValoreCarta.CAMBIA_COLORE,
                     new Effetto_Cambia_colore()));
+                carte.add(new CartaSpeciale(
+                    Colore.NERO,
+                    ValoreCarta.PIU_QUATTRO,
+                    new EffettoComposito(List.of(
+                        new Effetto_Cambia_colore(),
+                        new Effetto_pescata_carte(4)))));
         }
 
         return Collections.unmodifiableList(carte);
