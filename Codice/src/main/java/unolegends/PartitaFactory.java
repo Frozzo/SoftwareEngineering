@@ -80,7 +80,8 @@ public class PartitaFactory {
             Carta primaCarta = carteMescolate.get(indicePartenzaScarti);
             PilaDegliScarti pilaDegliScarti = new PilaDegliScarti(List.of(primaCarta));
             // Default rules: RegoleStandard. In futuro PartitaFactory può accettare configurazioni.
-            boolean richiedeSceltaColore = primaCarta.getEffetto() instanceof Effetto_Cambia_colore;
+            boolean richiedeSceltaColore = EffettoComposito.contieneEffetto(
+                    primaCarta.getEffetto(), Effetto_Cambia_colore.class);
             int indiceGiocatoreIniziale = richiedeSceltaColore
                     ? 0
                     : (giocatori.size() - 1) % giocatori.size();

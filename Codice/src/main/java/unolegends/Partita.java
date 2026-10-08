@@ -36,7 +36,7 @@ public class Partita {
         this.indiceGiocatoreAttivo = indiceGiocatoreAttivo;
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
         this.deveScegliereColoreIniziale = cartaInCima != null
-                && cartaInCima.getEffetto() instanceof Effetto_Cambia_colore;
+                && EffettoComposito.contieneEffetto(cartaInCima.getEffetto(), Effetto_Cambia_colore.class);
     }
 
     /**
@@ -66,7 +66,8 @@ public class Partita {
             return false;
         }
 
-        boolean richiedeSceltaColore = cartaSelezionata.getEffetto() instanceof Effetto_Cambia_colore;
+        boolean richiedeSceltaColore = EffettoComposito.contieneEffetto(
+                cartaSelezionata.getEffetto(), Effetto_Cambia_colore.class);
         if (richiedeSceltaColore && coloreScelto == null) {
             return false;
         }

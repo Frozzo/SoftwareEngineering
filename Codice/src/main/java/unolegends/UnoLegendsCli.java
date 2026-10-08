@@ -141,7 +141,7 @@ public final class UnoLegendsCli {
         }
 
         Ieffetto effetto = mano.get(indiceCarta).getEffetto();
-        if (effetto instanceof Effetto_Cambia_colore) {
+        if (EffettoComposito.contieneEffetto(effetto, Effetto_Cambia_colore.class)) {
             return gioco.scegliColore(scegliColore(scanner));
         }
         return true;
