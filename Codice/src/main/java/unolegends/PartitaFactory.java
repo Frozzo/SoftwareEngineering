@@ -80,10 +80,17 @@ public class PartitaFactory {
             Carta primaCarta = carteMescolate.get(indicePartenzaScarti);
             PilaDegliScarti pilaDegliScarti = new PilaDegliScarti(List.of(primaCarta));
             // Default rules: RegoleStandard. In futuro PartitaFactory può accettare configurazioni.
-            Partita NewPartita = new Partita(giocatori, mazzo, pilaDegliScarti, (-1 + giocatori.size()) % giocatori.size(), new RegoleStandard()); //sembra strano il primo turno ma serve ad ativare l'effeto sul primo giocatore
-            primaCarta.getEffetto().attivaeffetto(NewPartita);//attiva l'effetto della prima carta in cima agli scarti
-            NewPartita.aggiornaGiocatoreAttivo(); 
-            return NewPartita;
+            boolean richiedeSceltaColore = primaCarta.getEffetto() instanceof Effetto_Cambia_colore;
+            int indiceGiocatoreIniziale = richiedeSceltaColore
+                    ? 0
+                    : (giocatori.size() - 1) % giocatori.size();
+            Partita nuovaPartita = new Partita(giocatori, mazzo, pilaDegliScarti,
+                    indiceGiocatoreIniziale, new RegoleStandard());
+            if (!richiedeSceltaColore) {
+                primaCarta.getEffetto().attivaeffetto(nuovaPartita);
+                nuovaPartita.aggiornaGiocatoreAttivo();
+            }
+            return nuovaPartita;
         }
 
         throw new IllegalStateException("Non ci sono carte sufficienti per inizializzare gli scarti");

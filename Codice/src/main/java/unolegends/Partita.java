@@ -15,6 +15,8 @@ public class Partita {
     private int indiceGiocatoreAttivo;
     private Carta cartaAppenaPescata;
     private boolean cartaPescataDaGiocare;
+    private boolean deveScegliereColoreIniziale;
+    private Colore coloreScelto;
     private boolean sensoOrario = true; // Variabile per tenere traccia del senso di gioco
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo) {
         this(giocatori, mazzo, pilaDegliScarti, indiceGiocatoreAttivo, new RegoleStandard());
@@ -32,6 +34,9 @@ public class Partita {
             throw new IllegalArgumentException("indiceGiocatoreAttivo non valido");
         }
         this.indiceGiocatoreAttivo = indiceGiocatoreAttivo;
+        Carta cartaInCima = pilaDegliScarti.getCartaInCima();
+        this.deveScegliereColoreIniziale = cartaInCima != null
+                && cartaInCima.getEffetto() instanceof Effetto_Cambia_colore;
     }
 
     /**
@@ -39,7 +44,8 @@ public class Partita {
      */
     public StatoTurno getStatoTurno() {
         Giocatore attivo = getGiocatoreAttivo();
-        return new StatoTurno(attivo.getNome(), attivo.getMano(), pilaDegliScarti.getCartaInCima(), cartaPescataDaGiocare, cartaAppenaPescata);
+        return new StatoTurno(attivo.getNome(), attivo.getMano(), pilaDegliScarti.getCartaInCima(),
+                cartaPescataDaGiocare, cartaAppenaPescata, deveScegliereColoreIniziale);
     }
     public int getIndiceGiocatoreAttivo() {
         return indiceGiocatoreAttivo;
@@ -49,13 +55,27 @@ public class Partita {
      * GRASP Coordinator: valida la mossa e orchestra estrazione carta + inserimento negli scarti.
      */
     public boolean giocaCarta(int indiceCarta) {
-        Giocatore giocatoreAttivo = getGiocatoreAttivo();
-        Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
-        if (cartaSelezionata == null) {
+        if (deveScegliereColoreIniziale) {
             return false;
         }
 
+        Giocatore giocatoreAttivo = getGiocatoreAttivo();
+        Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
+        if (cartaSelezionata == null) {
+            coloreScelto = null;
+            return false;
+        }
+
+        boolean richiedeSceltaColore = cartaSelezionata.getEffetto() instanceof Effetto_Cambia_colore;
+        if (richiedeSceltaColore && coloreScelto == null) {
+            return false;
+        }
+        if (!richiedeSceltaColore) {
+            coloreScelto = null;
+        }
+
         if (cartaPescataDaGiocare && cartaSelezionata != cartaAppenaPescata) {
+            coloreScelto = null;
             return false;
         }
 
@@ -72,9 +92,37 @@ public class Partita {
         pilaDegliScarti.aggiungiCarta(cartaDaGiocare);
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
-        cartaDaGiocare.getEffetto().attivaeffetto(this); //attiva eventuali effetti della carta
+        cartaDaGiocare.getEffetto().attivaeffetto(this);
         aggiornaGiocatoreAttivo();
         return true;
+    }
+
+    public boolean scegliColore(Colore colore) {
+        if (colore == null || colore == Colore.NERO) {
+            return false;
+        }
+
+        if (deveScegliereColoreIniziale) {
+            coloreScelto = colore;
+            pilaDegliScarti.getCartaInCima().getEffetto().attivaeffetto(this);
+            deveScegliereColoreIniziale = false;
+            return true;
+        }
+
+        coloreScelto = colore;
+        return true;
+    }
+
+    void applicaColoreScelto() {
+        if (coloreScelto == null) {
+            throw new IllegalStateException("Il colore deve essere scelto prima di attivare l'effetto");
+        }
+        Carta cartaInCima = pilaDegliScarti.getCartaInCima();
+        if (!(cartaInCima instanceof CartaSpeciale cartaSpeciale)) {
+            throw new IllegalStateException("La carta in cima agli scarti non supporta il cambio colore");
+        }
+        cartaSpeciale.setColore(coloreScelto);
+        coloreScelto = null;
     }
 
     /**

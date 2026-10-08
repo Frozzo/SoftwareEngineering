@@ -10,7 +10,9 @@ public class CartaSpeciale extends Carta {
 
     public boolean compatibileCon(Carta cartaInCima) {
 
-        if (this.colore == Colore.NERO || this.ValoreCarta == cartaInCima.getValoreCarta() || this.colore == cartaInCima.getColore()  ) { //se il colore è nero, o il ValoreCarta è uguale o il colore è uguale allora la carta è compatibile
+        if (this.colore == Colore.NERO ||
+            this.ValoreCarta == cartaInCima.getValoreCarta() ||
+            this.colore == cartaInCima.getColore()  ) { //se il colore è nero, o il ValoreCarta è uguale o il colore è uguale allora la carta è compatibile
             return true; 
 
         }

@@ -1,6 +1,5 @@
 package unolegends;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
@@ -41,6 +40,13 @@ public final class UnoLegendsCli {
             System.out.println();
             while (true) {
                 StatoTurno stato = gioco.richiediStato();
+                if (stato.isDeveScegliereColoreIniziale()) {
+                    System.out.println("La prima carta richiede un colore: sceglie il giocatore iniziale.");
+                    if (!gioco.scegliColore(scegliColore(scanner))) {
+                        throw new IllegalStateException("Impossibile impostare il colore iniziale");
+                    }
+                    continue;
+                }
                 mostraStato(stato);
 
                 if (stato.isDeveGiocareCartaPescata()) {
@@ -63,7 +69,10 @@ public final class UnoLegendsCli {
                         continue;
                     }
 
-                    preparaEffettoCambioColore(stato, indiceCarta, scanner);
+                    if (!preparaColorePerCarta(stato, indiceCarta, gioco, scanner)) {
+                        System.out.println("Scelta del colore non valida.");
+                        continue;
+                    }
                     if (gioco.giocaCarta(indiceCarta)) {
                         System.out.println("Carta giocata.");
                     } else {
@@ -87,7 +96,10 @@ public final class UnoLegendsCli {
                         System.out.println("Valore non valido.");
                         continue;
                     }
-                    preparaEffettoCambioColore(stato, indiceCarta, scanner);
+                    if (!preparaColorePerCarta(stato, indiceCarta, gioco, scanner)) {
+                        System.out.println("Scelta del colore non valida.");
+                        continue;
+                    }
                     if (gioco.giocaCarta(indiceCarta)) {
                         System.out.println("Carta giocata.");
                     } else {
@@ -121,17 +133,18 @@ public final class UnoLegendsCli {
         System.out.println();
     }
 
-    private static void preparaEffettoCambioColore(StatoTurno stato, int indiceCarta, Scanner scanner) {
+    private static boolean preparaColorePerCarta(StatoTurno stato, int indiceCarta,
+                                                  UnoLegendsGame gioco, Scanner scanner) {
         List<Carta> mano = stato.getManoGiocatoreAttivo();
         if (indiceCarta >= mano.size()) {
-            return;
+            return true;
         }
 
         Ieffetto effetto = mano.get(indiceCarta).getEffetto();
-        if (effetto instanceof Effetto_Cambia_colore effettoCambioColore) {
-            Colore nuovoColore = scegliColore(scanner);
-            effettoCambioColore.setNuovoColore(nuovoColore);
+        if (effetto instanceof Effetto_Cambia_colore) {
+            return gioco.scegliColore(scegliColore(scanner));
         }
+        return true;
     }
 
     private static Colore scegliColore(Scanner scanner) {

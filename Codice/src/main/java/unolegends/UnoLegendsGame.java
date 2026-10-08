@@ -26,6 +26,10 @@ public class UnoLegendsGame {
         return partita.giocaCarta(indiceCarta);
     }
 
+    public boolean scegliColore(Colore colore) {
+        return partita.scegliColore(colore);
+    }
+
     /**
      * GRASP Controller: inoltra il comando di pesca carta alla radice del dominio.
      */

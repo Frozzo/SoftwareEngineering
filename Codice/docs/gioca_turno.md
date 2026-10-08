@@ -5,7 +5,7 @@ Questo documento descrive il flusso dettagliato del caso d'uso *GiocaTurno* come
 ## Panoramica
 
 - Entry point UI: `UnoLegendsCli` (client)
-- Controller / Facade: `UnoLegendsGame` — espone API: `richiediStato()`, `giocaCarta(indice)`, `pescaCarta()`, `passaTurno()`
+- Controller / Facade: `UnoLegendsGame` — espone API: `richiediStato()`, `giocaCarta(indice)`, `scegliColore(colore)`, `pescaCarta()`, `passaTurno()`
 - Domain root / Coordinator: `Partita` — orchestration delle azioni del turno
 - Information Experts: `Giocatore`, `Mazzo`, `PilaDegliScarti`
 - DTO: `StatoTurno` — snapshot immutabile dello stato utile alla UI
@@ -21,20 +21,26 @@ Il diagramma di sequenza è in `docs/gioca_turno.puml`.
   - `Giocatore` (nome, mano)
   - `PilaDegliScarti` (carta in cima)
   - vari flag interni (`cartaPescataDaGiocare`, `cartaAppenaPescata`)
+  - l'eventuale scelta del colore richiesta dalla prima carta degli scarti
 - `Partita` costruisce `StatoTurno` e lo ritorna alla UI tramite `UnoLegendsGame`.
 
 ### 2) `giocaCarta(indice)`
-- `UnoLegendsCli` chiede a `UnoLegendsGame.giocaCarta(indice)`
-- `UnoLegendsGame` chiama `Partita.giocaCarta(indice)`
+- `UnoLegendsCli` raccoglie l'eventuale colore scelto e lo passa a `UnoLegendsGame.scegliColore(colore)`, poi invoca `giocaCarta(indice)`
+- `UnoLegendsGame` inoltra separatamente le due operazioni a `Partita`
 - `Partita`:
   - Interroga il `Giocatore` attivo per ottenere la carta in quella posizione (`getCartaInPosizione`) — potrebbe essere `null`.
   - Se è presente la regola "deve giocare la carta appena pescata" (`cartaPescataDaGiocare`) controlla che la carta selezionata sia appunto la `cartaAppenaPescata`.
   - Recupera la `cartaInCima` dagli scarti e verifica la compatibilità (`compatibileCon`).
-  - Se la carta selezionata ha un `Effetto_Cambia_colore`, la CLI richiede uno dei quattro colori base e assegna la scelta all'effetto.
+  - Se l'effetto richiede un colore, `Partita` verifica che il giocatore abbia effettuato la scelta prima di modificare lo stato della partita.
   - Se valida: ordina al `Giocatore` di estrarre la carta (`estraiCarta`) e la passa alla `PilaDegliScarti` (`aggiungiCarta`).
   - L'effetto della carta viene attivato dopo averla aggiunta agli scarti, quindi il colore scelto diventa il colore della carta in cima per il turno successivo.
   - Ripristina gli stati relativi alla pesca e invoca `aggiornaGiocatoreAttivo()`.
   - Ritorna `true` se la mossa è avvenuta, `false` altrimenti.
+
+### Scelta del colore per la prima carta
+- Se la prima carta degli scarti richiede un colore, la factory lascia la scelta in sospeso e rende attivo il primo giocatore.
+- La CLI mostra la richiesta e passa il colore scelto a `UnoLegendsGame.scegliColore(colore)`.
+- `Partita` delega all'effetto l'applicazione del colore sulla carta in cima; solo dopo la scelta permette di proseguire con il turno.
 
 ### 3) `pescaCarta()`
 - `UnoLegendsCli` -> `UnoLegendsGame.pescaCarta()` -> `Partita.pescaCarta()`

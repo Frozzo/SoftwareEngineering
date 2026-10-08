@@ -14,15 +14,18 @@ public class StatoTurno {
     private final Carta cartaInCima;
     private final boolean deveGiocareCartaPescata;
     private final Carta cartaAppenaPescata;
+    private final boolean deveScegliereColoreIniziale;
 
     public StatoTurno(String nomeGiocatoreAttivo, List<Carta> manoGiocatoreAttivo, Carta cartaInCima,
-                      boolean deveGiocareCartaPescata, Carta cartaAppenaPescata) {
+                      boolean deveGiocareCartaPescata, Carta cartaAppenaPescata,
+                      boolean deveScegliereColoreIniziale) {
         this.nomeGiocatoreAttivo = Objects.requireNonNull(nomeGiocatoreAttivo, "nomeGiocatoreAttivo non puo essere null");
         this.manoGiocatoreAttivo = Collections.unmodifiableList(new ArrayList<>(
                 Objects.requireNonNull(manoGiocatoreAttivo, "manoGiocatoreAttivo non puo essere null")));
         this.cartaInCima = cartaInCima;
         this.deveGiocareCartaPescata = deveGiocareCartaPescata;
         this.cartaAppenaPescata = cartaAppenaPescata;
+        this.deveScegliereColoreIniziale = deveScegliereColoreIniziale;
     }
 
     public String getNomeGiocatoreAttivo() {
@@ -43,6 +46,10 @@ public class StatoTurno {
 
     public Carta getCartaAppenaPescata() {
         return cartaAppenaPescata;
+    }
+
+    public boolean isDeveScegliereColoreIniziale() {
+        return deveScegliereColoreIniziale;
     }
     
     
