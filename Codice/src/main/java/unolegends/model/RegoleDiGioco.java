@@ -1,4 +1,4 @@
-package unolegends;
+package unolegends.model;
 
 /**
  * Interfaccia che rappresenta la policy delle regole di gioco.

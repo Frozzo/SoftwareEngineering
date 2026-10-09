@@ -1,6 +1,10 @@
-package unolegends;
+package unolegends.controller;
 
 import java.util.Objects;
+
+import unolegends.model.Colore;
+import unolegends.model.Partita;
+import unolegends.model.StatoTurno;
 
 /**
  * GRASP Controller (Facade): punto di ingresso per la UI CLI.

@@ -1,4 +1,4 @@
-package unolegends;
+package unolegends.model;
 
 public interface Ieffetto {
 

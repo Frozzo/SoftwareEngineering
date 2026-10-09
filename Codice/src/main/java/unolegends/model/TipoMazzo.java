@@ -1,4 +1,4 @@
-package unolegends;
+package unolegends.model;
 
 /**
  * Tipi di mazzo selezionabili all'avvio di una partita.

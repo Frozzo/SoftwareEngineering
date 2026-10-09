@@ -1,4 +1,4 @@
-package unolegends;
+package unolegends.model;
 
 import java.util.Locale;
 import java.util.Objects;

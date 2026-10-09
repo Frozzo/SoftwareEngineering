@@ -1,4 +1,4 @@
-package unolegends;
+package unolegends.model;
 
 /**
  * Rappresenta i colori base delle carte UNO con formattazione ANSI per la CLI.

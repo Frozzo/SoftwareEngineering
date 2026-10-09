@@ -1,4 +1,4 @@
-package unolegends;
+package unolegends.model;
 
 /**
  * Entita base del dominio: carta con id.

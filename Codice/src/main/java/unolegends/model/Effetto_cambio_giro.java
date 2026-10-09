@@ -1,4 +1,4 @@
-package unolegends;
+package unolegends.model;
 
 public class Effetto_cambio_giro implements Ieffetto {
 

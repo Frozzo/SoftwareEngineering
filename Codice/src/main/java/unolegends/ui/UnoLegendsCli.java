@@ -1,7 +1,17 @@
-package unolegends;
+package unolegends.ui;
 
 import java.util.List;
 import java.util.Scanner;
+
+import unolegends.controller.UnoLegendsGame;
+import unolegends.model.Carta;
+import unolegends.model.Colore;
+import unolegends.model.EffettoComposito;
+import unolegends.model.Effetto_Cambia_colore;
+import unolegends.model.Ieffetto;
+import unolegends.model.Partita;
+import unolegends.model.PartitaFactory;
+import unolegends.model.StatoTurno;
 
 /**
  * Punto di avvio CLI per provare il caso d'uso GiocaTurno in una partita demo.

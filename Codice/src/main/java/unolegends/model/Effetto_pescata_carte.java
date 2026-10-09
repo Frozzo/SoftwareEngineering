@@ -1,4 +1,4 @@
-package unolegends;
+package unolegends.model;
 
 public class Effetto_pescata_carte implements Ieffetto {
     private int numeroCarteDaPescare;

@@ -1,4 +1,4 @@
-package unolegends;
+package unolegends.model;
 
 public class Effetto_Blocca_Turno implements Ieffetto {
 

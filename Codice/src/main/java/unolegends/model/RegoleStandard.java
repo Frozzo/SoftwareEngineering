@@ -1,4 +1,4 @@
-package unolegends;
+package unolegends.model;
 
 /**
  * Implementazione base delle regole di gioco: una carta è giocabile se è compatibile
