@@ -1,8 +1,10 @@
 package unolegends;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -21,5 +23,8 @@ public class Mazzo {
      */
     public Carta prelevaCarta() {
         return carte.pollFirst();
+    }
+    public List<Carta> getCarte() {
+        return new ArrayList<>(carte);
     }
 }

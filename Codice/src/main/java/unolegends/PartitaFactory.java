@@ -24,7 +24,6 @@ import java.util.Objects;
  */
 public class PartitaFactory {
     private static final int CARTE_PER_GIOCATORE = 5;
-    private static final int CARTE_IN_MAZZO_INIZIALE = 40;
 
     /**
      * Crea una Partita standard con 2 giocatori.
@@ -70,17 +69,20 @@ public class PartitaFactory {
         // 3. Distribute cards to players
         List<Giocatore> giocatori = distribuisciCarteAiGiocatori(carteMescolate, numeroDiGiocatori);
 
-        // 4. Crea il Mazzo tramite MazzoFactory (estendibile per house rules in futuro)
+        // 4. La prima carta rimanente va negli scarti; tutte le altre restano nel mazzo.
         int indicePartenzaMazzo = numeroDiGiocatori * CARTE_PER_GIOCATORE;
-        Mazzo mazzo = mazzoFactory.creaMazzo(carteMescolate, indicePartenzaMazzo, CARTE_IN_MAZZO_INIZIALE);
-
-        // 5. Discard pile initialization (first card from remaining deck)
-        int indicePartenzaScarti = Math.min(indicePartenzaMazzo + CARTE_IN_MAZZO_INIZIALE, carteMescolate.size());
+        int indicePartenzaScarti = indicePartenzaMazzo;
         if (indicePartenzaScarti < carteMescolate.size()) {
             Carta primaCarta = carteMescolate.get(indicePartenzaScarti);
+            int indicePartenzaMazzoDiPesca = indicePartenzaScarti + 1;
+            Mazzo mazzo = mazzoFactory.creaMazzo(
+                    carteMescolate,
+                    indicePartenzaMazzoDiPesca,
+                    carteMescolate.size() - indicePartenzaMazzoDiPesca);
             PilaDegliScarti pilaDegliScarti = new PilaDegliScarti(List.of(primaCarta));
             // Default rules: RegoleStandard. In futuro PartitaFactory può accettare configurazioni.
-            boolean richiedeSceltaColore = primaCarta.getEffetto() instanceof Effetto_Cambia_colore;
+            boolean richiedeSceltaColore = EffettoComposito.contieneEffetto(
+                    primaCarta.getEffetto(), Effetto_Cambia_colore.class);
             int indiceGiocatoreIniziale = richiedeSceltaColore
                     ? 0
                     : (giocatori.size() - 1) % giocatori.size();

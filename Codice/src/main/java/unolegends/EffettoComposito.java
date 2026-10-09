@@ -30,4 +30,18 @@ public final class EffettoComposito implements Ieffetto {
             effetto.attivaeffetto(partita);
         }
     }
+
+    public static boolean contieneEffetto(Ieffetto effetto, Class<? extends Ieffetto> tipoEffetto) {
+        Objects.requireNonNull(effetto, "effetto non puo essere null");
+        Objects.requireNonNull(tipoEffetto, "tipoEffetto non puo essere null");
+
+        if (tipoEffetto.isInstance(effetto)) {
+            return true;
+        }
+        if (effetto instanceof EffettoComposito composto) {
+            return composto.effetti.stream()
+                    .anyMatch(effettoComponente -> contieneEffetto(effettoComponente, tipoEffetto));
+        }
+        return false;
+    }
 }

@@ -83,6 +83,7 @@ public final class UnoLegendsCli {
 
                 System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci");
                 System.out.print("> ");
+                System.out.print("Ecco tutte le carte del mazzo: " + partita.getMazzo().size() + " carte rimanenti.");
                 String scelta = scanner.nextLine().trim();
 
                 if ("2".equals(scelta)) {
@@ -141,7 +142,7 @@ public final class UnoLegendsCli {
         }
 
         Ieffetto effetto = mano.get(indiceCarta).getEffetto();
-        if (effetto instanceof Effetto_Cambia_colore) {
+        if (EffettoComposito.contieneEffetto(effetto, Effetto_Cambia_colore.class)) {
             return gioco.scegliColore(scegliColore(scanner));
         }
         return true;
