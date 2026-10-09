@@ -81,7 +81,7 @@ public final class UnoLegendsCli {
                     continue;
                 }
 
-                System.out.println("Scegli: 0) gioca carta  1) pesca carta  2) esci");
+                System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci");
                 System.out.print("> ");
                 String scelta = scanner.nextLine().trim();
 
