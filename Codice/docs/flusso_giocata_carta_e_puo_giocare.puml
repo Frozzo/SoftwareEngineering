@@ -1,0 +1,75 @@
+@startuml
+title UNO Legends - Giocata carta e controllo puoGiocare
+
+|Utente|
+start
+:Sceglie l'opzione "gioca carta";
+
+|UnoLegendsCli|
+:Invoca parseIndice(scanner.nextLine().trim());
+:Invoca preparaColorePerCarta(...);
+
+if (Carta con effetto cambio colore?) then (si)
+  :Invoca scegliColore(scanner);
+  |UnoLegendsGame|
+  :Invoca scegliColore(colore);
+  |Partita|
+  :Valida colore != null e != NERO;
+endif
+
+|UnoLegendsGame|
+:Invoca giocaCarta(indiceCarta);
+
+|Partita|
+:Invoca getGiocatoreAttivo();
+:Invoca Giocatore.getCartaInPosizione(indiceCarta);
+
+if (Carta non presente?) then (si)
+  :Restituisce false;
+  |UnoLegendsCli|
+  :Mostra "Mossa non valida";
+  stop
+endif
+
+if (Carta pescata da giocare\ne carta diversa?) then (si)
+  :Restituisce false;
+  stop
+endif
+
+:Invoca PilaDegliScarti.getCartaInCima();
+:Invoca RegoleDiGioco.isGiocabile(cartaSelezionata, cartaInCima, this);
+
+|RegoleDiGioco|
+:Invoca strategiaCorrispondenza.puoGiocare(...);
+
+|StrategiaCompatibilitaCarte|
+:Controlla carta nulla;
+:Controlla eventuale carta nera/jolly;
+:Confronta colore attivo o carta in cima;
+:Confronta valore/tipo;
+:Restituisce boolean;
+
+|RegoleDiGioco|
+:Restituisce esito;
+
+|Partita|
+if (Carta non giocabile?) then (si)
+  :Restituisce false;
+  stop
+endif
+
+:Invoca Giocatore.estraiCarta(indiceCarta);
+:Invoca PilaDegliScarti.aggiungiCarta(cartaDaGiocare);
+:Imposta cartaAppenaPescata = null;
+:Imposta cartaPescataDaGiocare = false;
+:Invoca cartaDaGiocare.getEffetto().attivaeffetto(this);
+:Invoca aggiornaGiocatoreAttivo();
+:Restituisce true;
+
+|UnoLegendsGame|
+:Restituisce esito;
+
+|UnoLegendsCli|
+:Mostra "Carta giocata" o "Mossa non valida";
+stop
+@enduml

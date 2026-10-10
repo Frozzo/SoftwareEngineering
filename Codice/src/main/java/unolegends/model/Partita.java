@@ -19,7 +19,7 @@ public class Partita {
     private Colore coloreScelto;
     private boolean sensoOrario = true; // Variabile per tenere traccia del senso di gioco
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo) {
-        this(giocatori, mazzo, pilaDegliScarti, indiceGiocatoreAttivo, new RegoleStandard());
+        this(giocatori, mazzo, pilaDegliScarti, indiceGiocatoreAttivo, RegoleDiGioco.standard());
     }
 
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo, RegoleDiGioco regole) {
@@ -52,6 +52,14 @@ public class Partita {
     }
     public List<Carta> getMazzo() {
         return mazzo.getCarte();
+    }
+
+    public Mazzo getMazzoDaPesca() {
+        return mazzo;
+    }
+
+    public PilaDegliScarti getPilaDegliScarti() {
+        return pilaDegliScarti;
     }
 
     /**

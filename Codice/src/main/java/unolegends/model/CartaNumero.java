@@ -32,12 +32,6 @@ public class CartaNumero extends Carta {
         return effetto;
     }
 
-    public boolean compatibileCon(Carta cartaInCima) {
-        return cartaInCima == null
-                || colore == cartaInCima.getColore()
-                || valore == cartaInCima.getValoreCarta();
-    }
-
     public String toTestoBase() {
         return valore.getValore() + " " + colore.getNome().toLowerCase(Locale.ROOT);
     }

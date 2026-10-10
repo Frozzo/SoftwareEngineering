@@ -1,0 +1,62 @@
+@startuml
+title UNO Legends - Pesca carta e mazzo esaurito
+
+|Giocatore attivo|
+start
+:Seleziona l'opzione "pesca carta";
+
+|UnoLegendsCli|
+:Invoca UnoLegendsGame.pescaCarta();
+
+|UnoLegendsGame|
+:Invoca Partita.pescaCarta();
+
+|Partita|
+if (cartaPescataDaGiocare?) then (si)
+  :Restituisce false;
+  |UnoLegendsCli|
+  :Mostra "Mazzo esaurito" o\npesca non consentita;
+  stop
+endif
+
+:Invoca Mazzo.prelevaCarta();
+
+|Mazzo|
+if (Carta disponibile?) then (si)
+  :Restituisce cartaPescata;
+else (no)
+  :Restituisce null;
+endif
+
+|Partita|
+if (cartaPescata == null?) then (si)
+  :Restituisce false;
+  |UnoLegendsCli|
+  :Mostra "Mazzo esaurito.";
+  stop
+endif
+
+:Invoca Giocatore.aggiungiCarta(cartaPescata);
+:Imposta cartaAppenaPescata = cartaPescata;
+:Imposta cartaPescataDaGiocare = true;
+:Restituisce true;
+
+|UnoLegendsGame|
+:Restituisce true;
+
+|UnoLegendsCli|
+:Mostra "Puoi giocare solo la carta\npescata oppure passare";
+
+if (Utente sceglie "passa") then (si)
+  |UnoLegendsGame|
+  :Invoca passaTurno();
+  |Partita|
+  :Azzera cartaAppenaPescata;
+  :Imposta cartaPescataDaGiocare = false;
+  :Invoca aggiornaGiocatoreAttivo();
+  :Restituisce true;
+else (gioca carta)
+  :Invoca il flusso giocaCarta(indice);
+endif
+stop
+@enduml

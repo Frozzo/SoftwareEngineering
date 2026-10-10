@@ -8,11 +8,11 @@ Sintesi delle scelte
 
 - `Carta` (abstract)
   - Motivazione: `Carta` è la superclasse astratta che fornisce l'identificativo comune (`id`) e il contratto polimorfo per il comportamento delle carte.
-  - Metodi chiave: `getId()`, `compatibileCon(Carta cartaInCima)`, `toCliString()`.
+  - Metodi chiave: `getId()`, `toCliString()`.
 
 - `CartaNumero` (concrete)
   - Attributi: `colore`, `numero`.
-  - Implementa `compatibileCon` con la logica standard (stesso colore o stesso numero) e `toCliString` per la rappresentazione CLI.
+  - La compatibilità è verificata dalla strategia `StrategiaCompatibilitaCarte`, mentre `toCliString` gestisce la rappresentazione CLI.
 
 - `CartaSpeciale` (future)
   - Potrà estendere `Carta` per effetti speciali o regole passive.

@@ -9,20 +9,6 @@ public class CartaSpeciale extends Carta {
     private final ValoreCarta ValoreCarta;
     private final Ieffetto effetto;
 
-    @Override
-    public boolean compatibileCon(Carta cartaInCima) {
-
-        if (this.colore == Colore.NERO ||
-            this.ValoreCarta == cartaInCima.getValoreCarta() ||
-            this.colore == cartaInCima.getColore()  ) { //se il colore è nero, o il ValoreCarta è uguale o il colore è uguale allora la carta è compatibile
-            return true; 
-
-        }
-        else {
-            return false; 
-        }
-    }
-
     public CartaSpeciale(Colore colore, ValoreCarta ValoreCarta, Ieffetto effetto) {
         this.colore = Objects.requireNonNull(colore, "colore non puo essere null");
         this.ValoreCarta = Objects.requireNonNull(ValoreCarta, "valoreCarta non puo essere null");

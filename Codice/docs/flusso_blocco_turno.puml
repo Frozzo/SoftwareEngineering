@@ -1,0 +1,45 @@
+@startuml
+title UNO Legends - Effetto Blocca Turno
+
+|Giocatore attivo|
+start
+:Seleziona carta BLOCCA_TURNO;
+
+|UnoLegendsCli|
+:Invoca UnoLegendsGame.giocaCarta(indice);
+
+|UnoLegendsGame|
+:Invoca Partita.giocaCarta(indice);
+
+|Partita|
+:Invoca RegoleDiGioco.isGiocabile(...);
+:Invoca Giocatore.estraiCarta(indice);
+:Invoca PilaDegliScarti.aggiungiCarta(carta);
+:Invoca carta.getEffetto().attivaeffetto(this);
+
+|Effetto_Blocca_Turno|
+:Invoca Partita.aggiornaGiocatoreAttivo();
+:Stampa "Effetto Blocca Turno attivato";
+
+|Partita|
+:Invoca aggiornaGiocatoreAttivo();
+:Il primo avanzamento salta il prossimo giocatore;
+:Il secondo avanzamento porta al giocatore seguente;
+:Restituisce true;
+
+|UnoLegendsGame|
+:Restituisce true;
+
+|UnoLegendsCli|
+:Mostra "Carta giocata";
+
+note right
+  Il doppio avanzamento è il comportamento
+  effettivo del codice:
+  1. Effetto_Blocca_Turno.attivaeffetto()
+     invoca aggiornaGiocatoreAttivo();
+  2. Partita.giocaCarta() invoca comunque
+     aggiornaGiocatoreAttivo() dopo l'effetto.
+end note
+stop
+@enduml

@@ -1,0 +1,73 @@
+@startuml
+title UNO Legends - Flusso giocata carta dello stesso valore
+
+|Giocatore 1|
+start
+:Seleziona una carta;
+
+|UnoLegendsCli|
+:Raccoglie l'indice;
+
+|UnoLegendsGame|
+:Invoca Partita.giocaCarta(indice);
+
+|Partita|
+:Legge la carta dalla mano;
+:Invoca RegoleDiGioco.isGiocabile(...);
+
+|RegoleDiGioco|
+:Invoca StrategiaCompatibilitaCarte.puoGiocare(...);
+
+|StrategiaCompatibilitaCarte|
+if (Penalità pendente > 0?) then (si)
+  :Restituisce false;
+elseif (Stesso valore/tipo?) then (si)
+  :Restituisce true;
+elseif (Stesso colore attivo\no carta nera?) then (si)
+  :Restituisce true;
+else (no)
+  :Restituisce false;
+endif
+
+|RegoleDiGioco|
+:Restituisce l'esito;
+
+|Partita|
+if (Carta giocabile?) then (no)
+  :Rifiuta la carta;
+  |UnoLegendsGame|
+  :Restituisce false;
+  |UnoLegendsCli|
+  :Mostra "Mossa non valida";
+  stop
+endif
+
+:Rimuove una carta dalla mano;
+:Inserisce una carta negli scarti;
+:Attiva l'effetto;
+:Passa il turno;
+
+|UnoLegendsGame|
+:Restituisce true;
+
+|UnoLegendsCli|
+:Mostra "Carta giocata";
+
+note right
+  Nel modello attuale viene giocata
+  una sola carta per invocazione.
+
+  Dopo l'inserimento, Partita aggiorna
+  il giocatore attivo: non è quindi
+  supportata la giocata consecutiva di
+  più carte dello stesso numero nello
+  stesso turno.
+
+  La condizione "penalità pendente"
+  rappresenta l'eventuale stato di una
+  variante con penalità differita.
+  Nella modalità standard attuale il
+  +2/+4 risolve subito la pesca.
+end note
+stop
+@enduml

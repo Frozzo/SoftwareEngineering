@@ -1,0 +1,84 @@
+@startuml
+title UNO Legends - Inizializzazione partita demo standard
+
+|Utente|
+start
+:Seleziona "Avvia partita demo standard";
+note right
+  Nella CLI attuale la scelta reale è:
+  0) Avvia partita demo standard
+  Il testo "crea partitademo" rappresenta
+  lo stesso comando a livello concettuale.
+end note
+
+|UnoLegendsCli|
+:Legge scanner.nextLine().trim();
+:Verifica scelta iniziale == "0";
+
+|UnoLegendsGame|
+:Invoca avviaPartitaStandard();
+
+|PartitaFactory|
+:Invoca creaPartitaStandard();
+:Invoca creaPartita(TipoMazzo.STANDARD, 2);
+:Invoca selezionaMazzoFactory(TipoMazzo.STANDARD);
+
+|StandardMazzoFactory|
+:Invoca getInstance();
+:Invoca getCarteNormali();
+:Crea il catalogo delle carte standard;
+
+|PartitaFactory|
+:Copia il catalogo in carteMescolate;
+:Invoca Collections.shuffle(carteMescolate);
+:Invoca distribuisciCarteAiGiocatori(carteMescolate, 2);
+
+|Giocatore|
+:Crea Giocatore1 e Giocatore2;
+:Riceve 5 carte ciascuno;
+
+|PartitaFactory|
+:Seleziona la prima carta rimanente;
+:Invoca creaMazzo(...);
+
+|MazzoFactory|
+:Crea Mazzo;
+
+|PartitaFactory|
+:Crea PilaDegliScarti(List.of(primaCarta));
+:Invoca EffettoComposito.contieneEffetto(...);
+
+if (Prima carta richiede cambio colore?) then (si)
+  :indiceGiocatoreIniziale = 0;
+else (no)
+  :indiceGiocatoreIniziale = ultimo giocatore;
+endif
+
+:Invoca creaRegoleStandard();
+
+|RegoleDiGioco|
+:Invoca standard();
+:Assembla le quattro strategie standard;
+
+|PartitaFactory|
+:Invoca new Partita(giocatori, mazzo,\npilaDegliScarti, indice, regole);
+
+|Partita|
+:Costruisce lo stato iniziale;
+:Determina deveScegliereColoreIniziale;
+
+if (Prima carta richiede colore?) then (si)
+  :Restituisce Partita;
+else (no)
+  :Invoca primaCarta.getEffetto().attivaeffetto(nuovaPartita);
+  :Invoca aggiornaGiocatoreAttivo();
+  :Restituisce Partita;
+endif
+
+|UnoLegendsGame|
+:Costruisce new UnoLegendsGame(partita);
+
+|UnoLegendsCli|
+:Avvia il ciclo di gioco;
+stop
+@enduml

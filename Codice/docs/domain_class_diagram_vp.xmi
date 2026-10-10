@@ -10,9 +10,6 @@
     <packagedElement xmi:type="uml:Class" xmi:id="class_carta_vp" name="Carta">
       <ownedAttribute xmi:id="attr_carta_id_vp" name="id" visibility="private"/>
       <ownedOperation xmi:id="op_carta_getId_vp" name="getId" visibility="public"/>
-      <ownedOperation xmi:id="op_carta_compatibileCon_vp" name="compatibileCon" visibility="public">
-        <ownedParameter xmi:id="param_compatibileCon_cartaInCima" name="cartaInCima"/>
-      </ownedOperation>
       <ownedOperation xmi:id="op_carta_toCliString_vp" name="toCliString" visibility="public"/>
     </packagedElement>
 

@@ -1,0 +1,56 @@
+@startuml
+title UNO Legends - Cambio colore per Jolly e +4
+
+|Giocatore attivo|
+start
+:Seleziona Jolly o +4;
+
+|UnoLegendsCli|
+:Invoca preparaColorePerCarta(stato, indice, gioco, scanner);
+:Invoca EffettoComposito.contieneEffetto(...);
+
+if (Effetto cambio colore presente?) then (si)
+  :Invoca scegliColore(scanner);
+
+  |UnoLegendsGame|
+  :Invoca scegliColore(colore);
+
+  |Partita|
+  if (colore == null o colore == NERO?) then (si)
+    :Restituisce false;
+    |UnoLegendsCli|
+    :Mostra "Scelta colore non valida";
+    stop
+  endif
+  :Memorizza coloreScelto;
+else (no)
+  :Prosegue senza scelta colore;
+endif
+
+|UnoLegendsGame|
+:Invoca giocaCarta(indice);
+
+|Partita|
+:Verifica carta selezionata;
+:Verifica coloreScelto per carte jolly;
+:Invoca RegoleDiGioco.isGiocabile(...);
+:Invoca StrategiaCompatibilitaCarte.puoGiocare(...);
+:Invoca Giocatore.estraiCarta(indice);
+:Invoca PilaDegliScarti.aggiungiCarta(carta);
+:Invoca carta.getEffetto().attivaeffetto(this);
+
+|Effetto_Cambia_colore|
+:Invoca Partita.applicaColoreScelto();
+
+|Partita|
+:Invoca CartaSpeciale.setColore(coloreScelto);
+:Azzera coloreScelto;
+:Invoca aggiornaGiocatoreAttivo();
+
+|UnoLegendsGame|
+:Restituisce true;
+
+|UnoLegendsCli|
+:Mostra "Carta giocata";
+stop
+@enduml

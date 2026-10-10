@@ -6,7 +6,6 @@
     <packagedElement xmi:type="uml:Class" xmi:id="class_carta" name="Carta">
       <ownedAttribute xmi:id="attr_carta_id" name="id" visibility="private"/>
       <ownedOperation xmi:id="op_carta_getId" name="getId" visibility="public"/>
-      <ownedOperation xmi:id="op_carta_compatibileCon" name="compatibileCon" visibility="public"/>
       <ownedOperation xmi:id="op_carta_toCliString" name="toCliString" visibility="public"/>
     </packagedElement>
 

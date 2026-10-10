@@ -9,8 +9,6 @@ import unolegends.model.Colore;
 import unolegends.model.EffettoComposito;
 import unolegends.model.Effetto_Cambia_colore;
 import unolegends.model.Ieffetto;
-import unolegends.model.Partita;
-import unolegends.model.PartitaFactory;
 import unolegends.model.StatoTurno;
 
 /**
@@ -41,8 +39,7 @@ public final class UnoLegendsCli {
             }
 
             // GRASP Controller: UnoLegendsGame rimane pura facade per i comandi di gioco
-            Partita partita = PartitaFactory.creaPartitaStandard();
-            UnoLegendsGame gioco = new UnoLegendsGame(partita);
+            UnoLegendsGame gioco = UnoLegendsGame.avviaPartitaStandard();
 
             System.out.println("Demo base: puoi giocare una carta dalla mano oppure pescare; dopo la pesca puoi solo giocare quella carta o passare.");
             System.out.println("Le carte in mano sono numerate da 0 in poi e vengono mostrate come 'numero colore'.");
@@ -93,7 +90,7 @@ public final class UnoLegendsCli {
 
                 System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci");
                 System.out.print("> ");
-                System.out.print("Ecco tutte le carte del mazzo: " + partita.getMazzo().size() + " carte rimanenti.");
+                System.out.print("Ecco tutte le carte del mazzo: " + gioco.carteNelMazzo() + " carte rimanenti.");
                 String scelta = scanner.nextLine().trim();
 
                 if ("2".equals(scelta)) {

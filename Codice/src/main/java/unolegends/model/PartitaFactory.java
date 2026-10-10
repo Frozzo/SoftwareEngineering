@@ -26,6 +26,13 @@ public class PartitaFactory {
     private static final int CARTE_PER_GIOCATORE = 5;
 
     /**
+     * Crea il compositore delle quattro strategie delle regole standard.
+     */
+    public static RegoleDiGioco creaRegoleStandard() {
+        return RegoleDiGioco.standard();
+    }
+
+    /**
      * Crea una Partita standard con 2 giocatori.
      * Configurazione di default per il prototipo demo.
      */
@@ -87,7 +94,7 @@ public class PartitaFactory {
                     ? 0
                     : (giocatori.size() - 1) % giocatori.size();
             Partita nuovaPartita = new Partita(giocatori, mazzo, pilaDegliScarti,
-                    indiceGiocatoreIniziale, new RegoleStandard());
+                    indiceGiocatoreIniziale, creaRegoleStandard());
             if (!richiedeSceltaColore) {
                 primaCarta.getEffetto().attivaeffetto(nuovaPartita);
                 nuovaPartita.aggiornaGiocatoreAttivo();

@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import unolegends.model.Colore;
 import unolegends.model.Partita;
+import unolegends.model.PartitaFactory;
 import unolegends.model.StatoTurno;
 
 /**
@@ -11,6 +12,14 @@ import unolegends.model.StatoTurno;
  */
 public class UnoLegendsGame {
     private final Partita partita;
+
+    /**
+     * Avvia una partita standard e costruisce la Facade del caso d'uso.
+     * La View non deve conoscere la factory del dominio.
+     */
+    public static UnoLegendsGame avviaPartitaStandard() {
+        return new UnoLegendsGame(PartitaFactory.creaPartitaStandard());
+    }
 
     public UnoLegendsGame(Partita partita) {
         this.partita = Objects.requireNonNull(partita, "partita non puo essere null");
@@ -21,6 +30,10 @@ public class UnoLegendsGame {
      */
     public StatoTurno richiediStato() {
         return partita.getStatoTurno();
+    }
+
+    public int carteNelMazzo() {
+        return partita.getMazzo().size();
     }
 
     /**

@@ -1,0 +1,75 @@
+@startuml
+title UNO Legends - Effetto carta +2 e stacking
+
+|Giocatore 1|
+start
+:Seleziona carta +2;
+
+|UnoLegendsCli|
+:Invoca preparaColorePerCarta(...);
+:Invoca UnoLegendsGame.giocaCarta(indice);
+
+|UnoLegendsGame|
+:Invoca Partita.giocaCarta(indice);
+
+|Partita|
+:Invoca RegoleDiGioco.isGiocabile(...);
+
+|RegoleDiGioco|
+:Invoca IStrategiaCompatibilitaCarte.puoGiocare(...);
+
+|StrategiaCompatibilitaCarte|
+:Verifica colore o valore;
+:Restituisce true se il +2 è giocabile;
+
+|Partita|
+:Invoca Giocatore.estraiCarta(indice);
+:Invoca PilaDegliScarti.aggiungiCarta(+2);
+:Invoca +2.getEffetto().attivaeffetto(this);
+
+|Effetto_pescata_carte|
+:Invoca Partita.getProssimoGiocatore();
+:Ripete per numeroCarteDaPescare = 2;
+
+|Partita|
+:Invoca pescaCartaForzata(Giocatore 2);
+
+|Mazzo|
+:Invoca prelevaCarta();
+
+|Giocatore|
+:Invoca aggiungiCarta(cartaPescata);
+:Giocatore 2 riceve 2 carte;
+
+|Partita|
+:Invoca aggiornaGiocatoreAttivo();
+
+|UnoLegendsGame|
+:Restituisce true;
+
+|UnoLegendsCli|
+:Mostra "Carta giocata";
+
+|Giocatore 2|
+:Tenta una carta +2 durante una\npenalità pendente o dopo la pesca;
+
+|UnoLegendsGame|
+:Invoca giocaCarta(indice);
+
+|Partita|
+:Invoca RegoleDiGioco.isGiocabile(...);
+
+|StrategiaCompatibilitaCarte|
+if (Penalità pendente > 0?) then (si)
+  :Restituisce false;
+  note right
+    Stacking vietato:
+    Giocatore 2 non può rispondere
+    al +2 con un altro +2.
+  end note
+else (no)
+  :Confronta normalmente colore e valore;
+  :Il +2 in cima non blocca per sempre;
+endif
+stop
+@enduml

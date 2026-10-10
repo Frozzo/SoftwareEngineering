@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
+import java.util.Collections;
 
 /**
  * GRASP Information Expert: responsabile del prelievo carte dal mazzo.
@@ -26,5 +27,15 @@ public class Mazzo {
     }
     public List<Carta> getCarte() {
         return new ArrayList<>(carte);
+    }
+
+    /**
+     * Ricostituisce il mazzo usando gli scarti, preservando la carta in cima.
+     */
+    public void rimescolaDaScarti(PilaDegliScarti pilaDegliScarti) {
+        Objects.requireNonNull(pilaDegliScarti, "pilaDegliScarti non puo essere null");
+        List<Carta> carteDaRimescolare = pilaDegliScarti.estraiCartePerRimescolamento();
+        Collections.shuffle(carteDaRimescolare);
+        carte.addAll(carteDaRimescolare);
     }
 }

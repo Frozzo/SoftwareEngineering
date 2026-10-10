@@ -6,7 +6,6 @@ skinparam classAttributeIconSize 0
 abstract class Carta {
   -id : String
   +getId() : String
-  +compatibileCon(cartaInCima : Carta) : boolean
   +toCliString() : String
 }
 

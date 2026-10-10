@@ -1,0 +1,81 @@
+@startuml
+title UNO Legends - Flusso verifica carta giocabile
+
+|Utente|
+start
+:Sceglie "gioca carta";
+
+|UnoLegendsCli|
+:Raccoglie l'indice della carta;
+
+|UnoLegendsGame|
+:Invoca Partita.giocaCarta(indice);
+
+|Partita|
+if (Colore iniziale ancora da scegliere?) then (si)
+  :Restituisce false;
+  stop
+endif
+
+:Chiede la carta al Giocatore;
+if (Carta presente?) then (no)
+  :Restituisce false;
+  stop
+endif
+
+if (Jolly o +4 senza colore scelto?) then (si)
+  |UnoLegendsCli|
+  :Richiede il nuovo colore;
+  |UnoLegendsGame|
+  :Invoca scegliColore(colore);
+  |Partita|
+  if (Colore valido?) then (no)
+    :Restituisce false;
+    stop
+  endif
+endif
+
+|Partita|
+if (Carta pescata diversa\nda quella appena pescata?) then (si)
+  :Restituisce false;
+  stop
+endif
+
+:Legge la carta in cima agli scarti;
+:Invoca RegoleDiGioco.isGiocabile(...);
+
+|RegoleDiGioco|
+:Invoca StrategiaCompatibilitaCarte.puoGiocare(...);
+
+|StrategiaCompatibilitaCarte|
+if (Carta nera/jolly?) then (si)
+  :Restituisce true;
+elseif (Penalità pendente > 0?) then (si)
+  :Restituisce false;
+elseif (Stesso colore attivo\no stesso valore/tipo?) then (si)
+  :Restituisce true;
+else (no)
+  :Restituisce false;
+endif
+
+|RegoleDiGioco|
+:Restituisce l'esito a Partita;
+
+|Partita|
+if (Carta giocabile?) then (no)
+  :Restituisce false;
+  stop
+endif
+
+:Estrae la carta dalla mano;
+:Aggiunge la carta agli scarti;
+:Attiva l'effetto;
+:Aggiorna il giocatore attivo;
+
+|UnoLegendsGame|
+:Restituisce true;
+
+|UnoLegendsCli|
+:Mostra l'esito all'utente;
+stop
+@enduml

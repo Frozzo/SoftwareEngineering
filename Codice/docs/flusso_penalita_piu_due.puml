@@ -1,0 +1,102 @@
+@startuml
+title UNO Legends - Flusso carta +2 senza stacking
+
+|Giocatore 1|
+start
+:Seleziona carta +2;
+
+|UnoLegendsCli|
+:Raccoglie l'indice;
+
+|UnoLegendsGame|
+:Invoca Partita.giocaCarta(indice);
+
+|Partita|
+:Invoca RegoleDiGioco.isGiocabile(...);
+
+|RegoleDiGioco|
+:Invoca StrategiaCompatibilitaCarte.puoGiocare(...);
+
+|StrategiaCompatibilitaCarte|
+if (Penalità pendente > 0?) then (si)
+  :Restituisce false;
+  |RegoleDiGioco|
+  :Restituisce carta non giocabile;
+  |Partita|
+  :Rifiuta il +2;
+  stop
+else (no)
+  :Verifica colore o valore;
+  :Restituisce true se compatibile;
+endif
+
+|Partita|
+:Inserisce il +2 negli scarti;
+:Attiva Effetto_pescata_carte(2);
+
+|Effetto_pescata_carte|
+:Individua il prossimo giocatore;
+:Richiede due pescate forzate;
+
+|Partita|
+:Aggiunge due carte alla mano del Giocatore 2;
+:Considera la penalità assolta;
+:Aggiorna il giocatore attivo;
+
+|UnoLegendsGame|
+:Restituisce true;
+
+|UnoLegendsCli|
+:Mostra l'esito al Giocatore 1;
+
+|Giocatore 2|
+:Riceve il turno e sceglie una carta;
+
+|UnoLegendsCli|
+:Raccoglie l'indice del Giocatore 2;
+
+|UnoLegendsGame|
+:Invoca Partita.giocaCarta(indice);
+
+|Partita|
+:Invoca RegoleDiGioco.isGiocabile(...);
+
+|RegoleDiGioco|
+:Invoca StrategiaCompatibilitaCarte.puoGiocare(...);
+
+|StrategiaCompatibilitaCarte|
+if (Penalità pendente > 0?) then (si)
+  :Restituisce false;\nstacking vietato;
+else (no)
+  :Il +2 in cima è una carta normale;
+  :Verifica colore attivo o valore +2;
+  :Restituisce l'esito;
+endif
+
+|RegoleDiGioco|
+:Restituisce l'esito;
+
+|Partita|
+if (Carta giocabile?) then (si)
+  :Gioca la carta e aggiorna il turno;
+else (no)
+  :Rifiuta la carta;
+endif
+
+note right
+  Regole standard:
+  - il +2 fa pescare subito due carte;
+  - dopo la pesca non resta una penalità pendente;
+  - Giocatore 2 non può concatenare il
+    proprio +2 durante una penalità;
+  - una volta assolta la penalità, una
+    carta +2 in cima è confrontabile per
+    colore o valore come una carta normale.
+
+  Nel codice attuale la pesca è immediata:
+  la condizione "Penalità pendente > 0?"
+  documenta il punto di estensione per
+  varianti con penalità differita.
+end note
+stop
+@enduml

@@ -30,7 +30,7 @@ Il diagramma di sequenza è in `docs/gioca_turno.puml`.
 - `Partita`:
   - Interroga il `Giocatore` attivo per ottenere la carta in quella posizione (`getCartaInPosizione`) — potrebbe essere `null`.
   - Se è presente la regola "deve giocare la carta appena pescata" (`cartaPescataDaGiocare`) controlla che la carta selezionata sia appunto la `cartaAppenaPescata`.
-  - Recupera la `cartaInCima` dagli scarti e verifica la compatibilità (`compatibileCon`).
+  - Recupera la `cartaInCima` dagli scarti e verifica la compatibilità tramite `StrategiaCompatibilitaCarte`.
   - Se l'effetto richiede un colore, `Partita` verifica che il giocatore abbia effettuato la scelta prima di modificare lo stato della partita.
   - Se valida: ordina al `Giocatore` di estrarre la carta (`estraiCarta`) e la passa alla `PilaDegliScarti` (`aggiungiCarta`).
   - L'effetto della carta viene attivato dopo averla aggiunta agli scarti, quindi il colore scelto diventa il colore della carta in cima per il turno successivo.

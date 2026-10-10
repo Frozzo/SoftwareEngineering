@@ -30,4 +30,16 @@ public class PilaDegliScarti {
     public void aggiungiCarta(Carta carta) {
         scarti.add(Objects.requireNonNull(carta, "carta non puo essere null"));
     }
+
+    /**
+     * Rimuove gli scarti rimescolabili, mantenendo la carta in cima.
+     */
+    public List<Carta> estraiCartePerRimescolamento() {
+        if (scarti.size() <= 1) {
+            return new ArrayList<>();
+        }
+        List<Carta> carteDaRimescolare = new ArrayList<>(scarti.subList(0, scarti.size() - 1));
+        scarti.subList(0, scarti.size() - 1).clear();
+        return carteDaRimescolare;
+    }
 }
