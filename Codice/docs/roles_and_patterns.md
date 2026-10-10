@@ -45,12 +45,12 @@ Classi e responsabilità
 
 - UnoLegendsGame
   - Pattern: Facade / Controller (GRASP)
-  - Responsabilità: esporre API semplici alla UI (`giocaCarta`, `pescaCarta`, `richiediStato`). Non esegue setup.
-  - Responsabilità: esporre API semplici alla UI (`giocaCarta`, `pescaCarta`, `richiediStato`). Mantiene un riferimento persistente a `Partita` (associazione 1), quindi agisce come facciata delegando le chiamate direttamente all'istanza di `Partita`.
+  - Responsabilità: esporre API semplici alla UI, tradurre lo stato in `StatoPartita` e coordinare i comandi di gioco con la `Partita`.
+  - Mantiene un riferimento persistente a `Partita` (associazione 1); la UI non riceve oggetti del model.
 
 - UnoLegendsCli
-  - Pattern: Client / UI
-  - Responsabilità: entry point che richiede a `PartitaFactory` una `Partita` pronta e costruisce `UnoLegendsGame`.
+  - Pattern: View / UI
+  - Responsabilità: raccogliere input e presentare lo stato usando esclusivamente l'API e i DTO esposti da `UnoLegendsGame`.
 
 Note architetturali
 
@@ -67,5 +67,4 @@ Nota sulla terminologia — attore vs oggetto dominio
 
 Nota sull'interazione UI
 
-- L'interfaccia CLI (`UnoLegendsCli`) espone un semplice menù indicizzato. L'attore `Utente` seleziona un indice; il programma CLI interpreta l'indice e invoca la factory o il controller appropriato. Questo rende il flusso estendibile per future opzioni.
-
+- L'interfaccia CLI (`UnoLegendsCli`) espone un semplice menù indicizzato. L'attore `Utente` seleziona un indice; la CLI inoltra le operazioni esclusivamente a `UnoLegendsGame`, mantenendo la factory e il model fuori dalla view.

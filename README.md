@@ -1,24 +1,18 @@
 # SoftwareEngineering
 
-## UnoLegends - Iterazione 1
+## UnoLegends
 
-La demo CLI avvia una partita minima hotseat con stato iniziale già popolato.
+La demo CLI avvia una partita hotseat standard per due giocatori. La UI comunica
+esclusivamente con `UnoLegendsGame`, che coordina i casi d'uso e traduce i dati
+del dominio in uno snapshot adatto alla presentazione.
 
-Avvio da cartella `Codice`:
+Avvio da PowerShell nella cartella `Codice`:
 
 ```powershell
-javac -d out src\main\java\unolegends\*.java
-java -cp out unolegends.UnoLegendsCli
+javac -d out (Get-ChildItem -Recurse src\main\java -Filter *.java).FullName
+java -cp out unolegends.ui.UnoLegendsCli
 ```
 
-Comandi disponibili nella demo:
-
-- `gioca <idCarta>`: prova a giocare una carta compatibile con il colore o il numero della carta in cima.
-- `pesca`: pesca una carta dal mazzo e la aggiunge alla mano del giocatore attivo.
-- `passa`: passa automaticamente il turno al giocatore successivo.
-- `esci`: termina la demo.
-
-Lo stato del turno viene mostrato automaticamente dopo ogni comando.
-
-
-aggiungere una classe mano?
+Nel menu iniziale scegli `0` per avviare la partita o `1` per uscire. Durante
+la partita puoi giocare una carta, pescare, passare dopo aver pescato oppure
+uscire; la CLI mostra lo stato del turno dopo ogni azione.

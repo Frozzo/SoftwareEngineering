@@ -5,10 +5,11 @@ Questo documento descrive il flusso dettagliato del caso d'uso *GiocaTurno* come
 ## Panoramica
 
 - Entry point UI: `UnoLegendsCli` (client)
-- Controller / Facade: `UnoLegendsGame` — espone API: `richiediStato()`, `giocaCarta(indice)`, `scegliColore(colore)`, `pescaCarta()`, `passaTurno()`
+- Controller / Facade: `UnoLegendsGame` — espone API di stato e comandi, coordina la scelta del colore e non restituisce oggetti del dominio alla UI
 - Domain root / Coordinator: `Partita` — orchestration delle azioni del turno
 - Information Experts: `Giocatore`, `Mazzo`, `PilaDegliScarti`
-- DTO: `StatoTurno` — snapshot immutabile dello stato utile alla UI
+- DTO di dominio: `StatoTurno` — snapshot interno usato dal dominio e dal controller
+- DTO per la UI: `StatoPartita` — snapshot immutabile con stringhe e flag, senza riferimenti a classi del model
 
 Il diagramma di sequenza è in `docs/gioca_turno.puml`.
 
@@ -22,11 +23,13 @@ Il diagramma di sequenza è in `docs/gioca_turno.puml`.
   - `PilaDegliScarti` (carta in cima)
   - vari flag interni (`cartaPescataDaGiocare`, `cartaAppenaPescata`)
   - l'eventuale scelta del colore richiesta dalla prima carta degli scarti
-- `Partita` costruisce `StatoTurno` e lo ritorna alla UI tramite `UnoLegendsGame`.
+- `Partita` costruisce `StatoTurno`; il controller trasforma le carte in stringhe e crea `StatoPartita`.
+- La CLI riceve solo `StatoPartita`, senza importare o navigare classi del model.
 
 ### 2) `giocaCarta(indice)`
-- `UnoLegendsCli` raccoglie l'eventuale colore scelto e lo passa a `UnoLegendsGame.scegliColore(colore)`, poi invoca `giocaCarta(indice)`
-- `UnoLegendsGame` inoltra separatamente le due operazioni a `Partita`
+- `UnoLegendsCli` chiede al controller se la carta selezionata richiede un colore e raccoglie l'eventuale indice colore.
+- `UnoLegendsCli` invoca `UnoLegendsGame.giocaCarta(indice, sceltaColore)`.
+- `UnoLegendsGame` converte l'indice colore nell'enum di dominio e coordina scelta colore e giocata sulla `Partita`.
 - `Partita`:
   - Interroga il `Giocatore` attivo per ottenere la carta in quella posizione (`getCartaInPosizione`) — potrebbe essere `null`.
   - Se è presente la regola "deve giocare la carta appena pescata" (`cartaPescataDaGiocare`) controlla che la carta selezionata sia appunto la `cartaAppenaPescata`.
@@ -39,7 +42,7 @@ Il diagramma di sequenza è in `docs/gioca_turno.puml`.
 
 ### Scelta del colore per la prima carta
 - Se la prima carta degli scarti richiede un colore, la factory lascia la scelta in sospeso e rende attivo il primo giocatore.
-- La CLI mostra la richiesta e passa il colore scelto a `UnoLegendsGame.scegliColore(colore)`.
+- La CLI mostra la richiesta e passa l'indice colore a `UnoLegendsGame.scegliColore(indice)`.
 - `Partita` delega all'effetto l'applicazione del colore sulla carta in cima; solo dopo la scelta permette di proseguire con il turno.
 
 ### 3) `pescaCarta()`
@@ -57,7 +60,8 @@ Il diagramma di sequenza è in `docs/gioca_turno.puml`.
 ## Ruoli GRASP e pattern GOF rilevanti
 
 - `UnoLegendsGame` — Controller / Facade (GRASP)
-  - Non crea `Partita`; espone solo API per l'interazione UI→dominio.
+  - Crea la partita standard tramite la factory, converte lo stato di dominio in un DTO per la UI e coordina i comandi UI→dominio.
+  - Non espone alla UI `Carta`, `Colore`, `StatoTurno` o altre classi del model.
 
 - `Partita` — Coordinator (GRASP)
   - Ha la responsabilità di orchestrare il turno e delegare agli expert appropriati.
@@ -68,8 +72,9 @@ Il diagramma di sequenza è in `docs/gioca_turno.puml`.
 - `PartitaFactory` — Factory / Creator (GOF / GRASP)
   - Creato separatamente (setup), non parte del flow di turno.
 
-- `StatoTurno` — DTO / Snapshot
-  - Ha alta coesione: solo getter e dati immutabili per la UI.
+- `StatoTurno` — snapshot interno del dominio.
+- `StatoPartita` — DTO / Snapshot del controller
+  - Espone alla UI solo stringhe e flag immutabili, senza riferimenti agli oggetti del dominio.
 
 ## Considerazioni di design e estendibilità
 
@@ -89,4 +94,4 @@ Nota sulla terminologia
 
 Interazione UI indicizzata
 
-L'interfaccia CLI (`UnoLegendsCli`) espone un menù indicizzato iniziale (es. `0` avvia partita). L'attore `Utente` seleziona l'indice; il programma CLI interpreta la scelta e inoltra il comando a `PartitaFactory` o a `UnoLegendsGame`. Questo rende facile estendere il menù con nuove opzioni in futuro.
+L'interfaccia CLI (`UnoLegendsCli`) espone un menù indicizzato iniziale (es. `0` avvia partita). L'attore `Utente` seleziona l'indice; la CLI inoltra le operazioni esclusivamente a `UnoLegendsGame`, mantenendo la factory e il model fuori dalla view.

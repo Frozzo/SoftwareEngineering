@@ -9,7 +9,8 @@ participant "UnoLegendsCli\n(UI Program)" as CLIProg
 participant "Giocatore\n(Information Expert)" as Giocatore
 participant "Mazzo\n(Information Expert)" as Mazzo
 participant "PilaDegliScarti\n(Information Expert)" as Scarti
-participant "StatoTurno\n(DTO)" as Stato
+participant "StatoTurno\n(DTO dominio)" as StatoDominio
+participant "StatoPartita\n(DTO UI)" as StatoUI
 
 == Richiedi stato turno ==
 Utente -> CLIProg : selezionaComando('richiediStato')
@@ -31,18 +32,27 @@ activate Scarti
 Scarti --> Partita : cartaInCima
 deactivate Scarti
 Partita -> Partita : crea StatoTurno(nome, mano, cartaInCima, flag, cartaAppenaPescata)
+Partita -> StatoDominio : snapshot dello stato di dominio
 Partita --> Game : StatoTurno
 deactivate Partita
-Game --> CLIProg : StatoTurno (snapshot)
+Game -> StatoUI : crea snapshot con stringhe e flag
+Game --> CLIProg : StatoPartita (snapshot senza tipi del model)
 deactivate Game
-CLIProg --> Utente : StatoTurno (snapshot)
+CLIProg --> Utente : StatoPartita (snapshot)
 deactivate CLIProg
 
 == Gioca carta ==
 Utente -> CLIProg : selezionaComando('giocaCarta', indiceCarta)
 activate CLIProg
-CLIProg -> Game : giocaCarta(indiceCarta)
+CLIProg -> Game : cartaRichiedeSceltaColore(indiceCarta)
+Game -> Partita : cartaRichiedeSceltaColore(indiceCarta)
+Partita --> Game : richiedeColore
+Game --> CLIProg : richiedeColore
+CLIProg -> Game : giocaCarta(indiceCarta, sceltaColore)
 activate Game
+opt sceltaColore presente
+    Game -> Partita : scegliColore(colore convertito)
+end
 Game -> Partita : giocaCarta(indiceCarta)
 activate Partita
 Partita -> Giocatore : getCartaInPosizione(indiceCarta)
@@ -137,7 +147,8 @@ note over Partita, Game
     - `Partita`: Coordinator / Information Expert for turn orchestration
     - `UnoLegendsGame`: Controller / Facade (riceve comandi dalla UI)
     - `Giocatore`, `Mazzo`, `PilaDegliScarti`: Information Experts
-    - `StatoTurno`: DTO (snapshot dello stato)
+    - `StatoTurno`: snapshot interno al dominio
+    - `StatoPartita`: DTO di presentazione esposto alla UI
     - `RegoleStandard`: policy di default usata dalla partita configurata
     - Nota: l'attore `Utente` rappresenta l'utente esterno (CLI). La classe `Giocatore` è l'entità del dominio, distinta dall'attore esterno.
 end note

@@ -54,6 +54,16 @@ public class Partita {
         return mazzo.getCarte();
     }
 
+    public int getNumeroCarteNelMazzo() {
+        return mazzo.getCarte().size();
+    }
+
+    public boolean cartaRichiedeSceltaColore(int indiceCarta) {
+        Carta carta = getGiocatoreAttivo().getCartaInPosizione(indiceCarta);
+        return carta != null && EffettoComposito.contieneEffetto(
+                carta.getEffetto(), Effetto_Cambia_colore.class);
+    }
+
     public Mazzo getMazzoDaPesca() {
         return mazzo;
     }

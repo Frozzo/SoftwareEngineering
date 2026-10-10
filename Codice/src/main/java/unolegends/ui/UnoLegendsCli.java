@@ -3,13 +3,8 @@ package unolegends.ui;
 import java.util.List;
 import java.util.Scanner;
 
+import unolegends.controller.StatoPartita;
 import unolegends.controller.UnoLegendsGame;
-import unolegends.model.Carta;
-import unolegends.model.Colore;
-import unolegends.model.EffettoComposito;
-import unolegends.model.Effetto_Cambia_colore;
-import unolegends.model.Ieffetto;
-import unolegends.model.StatoTurno;
 
 /**
  * Punto di avvio CLI per provare il caso d'uso GiocaTurno in una partita demo.
@@ -38,18 +33,18 @@ public final class UnoLegendsCli {
                 return;
             }
 
-            // GRASP Controller: UnoLegendsGame rimane pura facade per i comandi di gioco
-            UnoLegendsGame gioco = UnoLegendsGame.avviaPartitaStandard();
+            // GRASP Controller: UnoLegendsGame rimane pura facade per i comandi di controller
+            UnoLegendsGame controller = UnoLegendsGame.avviaPartitaStandard();
 
             System.out.println("Demo base: puoi giocare una carta dalla mano oppure pescare; dopo la pesca puoi solo giocare quella carta o passare.");
             System.out.println("Le carte in mano sono numerate da 0 in poi e vengono mostrate come 'numero colore'.");
             System.out.println("Il sistema mostra automaticamente lo stato dopo ogni scelta.");
             System.out.println();
             while (true) {
-                StatoTurno stato = gioco.richiediStato();
+                StatoPartita stato = controller.richiediStato();
                 if (stato.isDeveScegliereColoreIniziale()) {
                     System.out.println("La prima carta richiede un colore: sceglie il giocatore iniziale.");
-                    if (!gioco.scegliColore(scegliColore(scanner))) {
+                    if (!controller.scegliColore(scegliColore(scanner))) {
                         throw new IllegalStateException("Impossibile impostare il colore iniziale");
                     }
                     continue;
@@ -57,12 +52,12 @@ public final class UnoLegendsCli {
                 mostraStato(stato);
 
                 if (stato.isDeveGiocareCartaPescata()) {
-                    System.out.println("Carta pescata: " + stato.getCartaAppenaPescata().toCliString());
+                    System.out.println("Carta pescata: " + stato.getCartaAppenaPescata());
                     System.out.println("Scegli: indica l'indice della carta pescata oppure 'p' per passare il turno.");
                     System.out.print("> ");
                     String scelta = scanner.nextLine().trim();
                     if ("p".equalsIgnoreCase(scelta)) {
-                        if (gioco.passaTurno()) {
+                        if (controller.passaTurno()) {
                             System.out.println("Turno passato.");
                         } else {
                             System.out.println("Passaggio turno non consentito.");
@@ -76,11 +71,7 @@ public final class UnoLegendsCli {
                         continue;
                     }
 
-                    if (!preparaColorePerCarta(stato, indiceCarta, gioco, scanner)) {
-                        System.out.println("Scelta del colore non valida.");
-                        continue;
-                    }
-                    if (gioco.giocaCarta(indiceCarta)) {
+                    if (giocaCarta(indiceCarta, controller, scanner)) {
                         System.out.println("Carta giocata.");
                     } else {
                         System.out.println("Mossa non valida.");
@@ -90,7 +81,6 @@ public final class UnoLegendsCli {
 
                 System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci");
                 System.out.print("> ");
-                System.out.print("Ecco tutte le carte del mazzo: " + gioco.carteNelMazzo() + " carte rimanenti.");
                 String scelta = scanner.nextLine().trim();
 
                 if ("2".equals(scelta)) {
@@ -104,11 +94,7 @@ public final class UnoLegendsCli {
                         System.out.println("Valore non valido.");
                         continue;
                     }
-                    if (!preparaColorePerCarta(stato, indiceCarta, gioco, scanner)) {
-                        System.out.println("Scelta del colore non valida.");
-                        continue;
-                    }
-                    if (gioco.giocaCarta(indiceCarta)) {
+                    if (giocaCarta(indiceCarta, controller, scanner)) {
                         System.out.println("Carta giocata.");
                     } else {
                         System.out.println("Mossa non valida.");
@@ -116,7 +102,7 @@ public final class UnoLegendsCli {
                     continue;
                 }
                 if ("1".equals(scelta)) {
-                    if (!gioco.pescaCarta()) {
+                    if (!controller.pescaCarta()) {
                         System.out.println("Mazzo esaurito.");
                     } else {
                         System.out.println("Hai pescato una carta: ora puoi solo giocare quella carta oppure passare.");
@@ -129,33 +115,26 @@ public final class UnoLegendsCli {
         }
     }
 
-    private static void mostraStato(StatoTurno stato) {
+    private static void mostraStato(StatoPartita stato) {
         System.out.println();
         System.out.println("Giocatore attivo: " + stato.getNomeGiocatoreAttivo());
-        System.out.println("Carta in cima: " + (stato.getCartaInCima() == null ? "nessuna" : stato.getCartaInCima().toCliString()));
+        System.out.println("Carta in cima: " + (stato.getCartaInCima() == null ? "nessuna" : stato.getCartaInCima()));
         System.out.println("Mano:");
-        List<Carta> mano = stato.getManoGiocatoreAttivo();
+        List<String> mano = stato.getManoGiocatoreAttivo();
         for (int i = 0; i < mano.size(); i++) {
-            System.out.println(i + ") " + mano.get(i).toCliString());
+            System.out.println(i + ") " + mano.get(i));
         }
         System.out.println();
     }
 
-    private static boolean preparaColorePerCarta(StatoTurno stato, int indiceCarta,
-                                                  UnoLegendsGame gioco, Scanner scanner) {
-        List<Carta> mano = stato.getManoGiocatoreAttivo();
-        if (indiceCarta >= mano.size()) {
-            return true;
-        }
-
-        Ieffetto effetto = mano.get(indiceCarta).getEffetto();
-        if (EffettoComposito.contieneEffetto(effetto, Effetto_Cambia_colore.class)) {
-            return gioco.scegliColore(scegliColore(scanner));
-        }
-        return true;
+    private static boolean giocaCarta(int indiceCarta, UnoLegendsGame controller, Scanner scanner) {
+        Integer sceltaColore = controller.cartaRichiedeSceltaColore(indiceCarta)
+                ? scegliColore(scanner)
+                : null;
+        return controller.giocaCarta(indiceCarta, sceltaColore);
     }
 
-    private static Colore scegliColore(Scanner scanner) {
+    private static int scegliColore(Scanner scanner) {
         while (true) {
             System.out.println("Scegli colore:");
             System.out.println("0) Rosso");
@@ -166,13 +145,13 @@ public final class UnoLegendsCli {
 
             switch (scanner.nextLine().trim()) {
                 case "0":
-                    return Colore.ROSSO;
+                    return 0;
                 case "1":
-                    return Colore.VERDE;
+                    return 1;
                 case "2":
-                    return Colore.BLU;
+                    return 2;
                 case "3":
-                    return Colore.GIALLO;
+                    return 3;
                 default:
                     System.out.println("Scelta non valida. Scegli un colore da 0 a 3.");
             }

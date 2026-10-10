@@ -38,7 +38,7 @@ Sintesi delle scelte
 
 - `Partita`
   - Coordinator / Information Expert: orchestrazione del turno; mantiene riferimento a `RegoleDiGioco` per valutare se una carta è giocabile.
-  - Stato interno rilevante: `turnoCorrente` (indice del giocatore attivo). Lo stato di runtime visibile al client è rappresentato dalla classe `StatoTurno` che espone, tra gli altri, `nomeGiocatoreAttivo` e `deveGiocareCartaPescata`.
+  - Stato interno rilevante: l'indice del giocatore attivo. `StatoTurno` è uno snapshot interno del model; il controller lo converte in `StatoPartita`, che espone alla UI solo valori presentabili e non riferimenti alle entità del dominio.
 
 - `UnoLegendsGame`
   - Facade / Controller per la UI.
