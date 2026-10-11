@@ -59,7 +59,15 @@ public class PartitaFactory {
      * @return una Partita completamente configurata e pronta al gioco
      */
     public static Partita creaPartita(TipoMazzo tipoMazzo, int numeroDiGiocatori) {
+        return creaPartita(tipoMazzo, numeroDiGiocatori, creaRegoleStandard());
+    }
+
+    /**
+     * Crea una partita usando esplicitamente il profilo di regole richiesto.
+     */
+    public static Partita creaPartita(TipoMazzo tipoMazzo, int numeroDiGiocatori, RegoleDiGioco regole) {
         Objects.requireNonNull(tipoMazzo, "tipoMazzo non puo essere null");
+        Objects.requireNonNull(regole, "regole non puo essere null");
         if (numeroDiGiocatori != 2) {
             throw new IllegalArgumentException("Attualmente solo 2 giocatori sono supportati");
         }
@@ -94,7 +102,7 @@ public class PartitaFactory {
                     ? 0
                     : (giocatori.size() - 1) % giocatori.size();
             Partita nuovaPartita = new Partita(giocatori, mazzo, pilaDegliScarti,
-                    indiceGiocatoreIniziale, creaRegoleStandard());
+                    indiceGiocatoreIniziale, regole);
             if (!richiedeSceltaColore) {
                 primaCarta.getEffetto().attivaeffetto(nuovaPartita);
                 nuovaPartita.aggiornaGiocatoreAttivo();

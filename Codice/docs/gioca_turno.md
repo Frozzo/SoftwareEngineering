@@ -28,17 +28,27 @@ Il diagramma di sequenza è in `docs/gioca_turno.puml`.
 
 ### 2) `giocaCarta(indice)`
 - `UnoLegendsCli` chiede al controller se la carta selezionata richiede un colore e raccoglie l'eventuale indice colore.
-- `UnoLegendsCli` invoca `UnoLegendsGame.giocaCarta(indice, sceltaColore)`.
+- `UnoLegendsCli` invoca `UnoLegendsGame.giocaCarta(indice, sceltaColore, unoDichiarato)`.
 - `UnoLegendsGame` converte l'indice colore nell'enum di dominio e coordina scelta colore e giocata sulla `Partita`.
 - `Partita`:
   - Interroga il `Giocatore` attivo per ottenere la carta in quella posizione (`getCartaInPosizione`) — potrebbe essere `null`.
+  - Se il giocatore ha due carte e gioca una carta, la chiamata include l'eventuale dichiarazione di UNO. Se non è stata dichiarata, `RegoleDiGioco` applica la strategia di penalità dopo la giocata valida.
+  - La strategia standard pesca due carte per il giocatore che non ha dichiarato UNO; la pesca forzata riutilizza la strategia di pesca configurata, incluso il rimescolamento degli scarti.
   - Se è presente la regola "deve giocare la carta appena pescata" (`cartaPescataDaGiocare`) controlla che la carta selezionata sia appunto la `cartaAppenaPescata`.
   - Recupera la `cartaInCima` dagli scarti e verifica la compatibilità tramite `StrategiaCompatibilitaCarte`.
   - Se l'effetto richiede un colore, `Partita` verifica che il giocatore abbia effettuato la scelta prima di modificare lo stato della partita.
   - Se valida: ordina al `Giocatore` di estrarre la carta (`estraiCarta`) e la passa alla `PilaDegliScarti` (`aggiungiCarta`).
   - L'effetto della carta viene attivato dopo averla aggiunta agli scarti, quindi il colore scelto diventa il colore della carta in cima per il turno successivo.
-  - Ripristina gli stati relativi alla pesca e invoca `aggiornaGiocatoreAttivo()`.
+  - Ripristina gli stati relativi alla pesca e chiede a `RegoleDiGioco` di verificare la vittoria del giocatore che ha appena giocato.
+  - Se ha vinto, conserva il risultato senza avanzare il turno; altrimenti invoca `aggiornaGiocatoreAttivo()`.
   - Ritorna `true` se la mossa è avvenuta, `false` altrimenti.
+
+### Condizioni di vittoria
+- `RegoleDiGioco.standard()` usa `StrategiaVittoriaStandard`: vince chi rimane senza carte in mano.
+- `RegoleDiGioco.noMercy()` usa `StrategiaVittoriaNoMercy`: mantiene la vittoria per mano vuota e permette inoltre di vincere quando tutti gli avversari hanno più di 25 carte.
+- La strategia No Mercy accetta anche una soglia esplicita con `RegoleDiGioco.noMercy(soglia)`.
+- `PartitaFactory.creaPartita(tipoMazzo, numeroGiocatori, regole)` permette di associare alla partita il profilo scelto; la factory del mazzo `NO_MERCY` resta non implementata.
+- L'esito è incluso in `StatoTurno`; il controller lo converte in `StatoPartita` e la CLI annuncia il vincitore senza accedere al model.
 
 ### Scelta del colore per la prima carta
 - Se la prima carta degli scarti richiede un colore, la factory lascia la scelta in sospeso e rende attivo il primo giocatore.
@@ -64,7 +74,13 @@ Il diagramma di sequenza è in `docs/gioca_turno.puml`.
   - Non espone alla UI `Carta`, `Colore`, `StatoTurno` o altre classi del model.
 
 - `Partita` — Coordinator (GRASP)
-  - Ha la responsabilità di orchestrare il turno e delegare agli expert appropriati.
+  - Ha la responsabilità di orchestrare il turno, chiedere a `RegoleDiGioco` di valutare la vittoria e conservare l'esito della partita.
+
+- `StrategiaVittoriaStandard` e `StrategiaVittoriaNoMercy` — strategie della condizione di vittoria
+  - Sono selezionate attraverso `RegoleDiGioco`; il controller e la CLI non implementano le regole.
+
+- `StrategiaPenalitaMancatoUno` — strategia della penalità di mancata dichiarazione
+  - Regola standard: pesca due carte; è iniettabile e configurabile separatamente nelle `RegoleDiGioco`.
 
 - `Giocatore`, `Mazzo`, `PilaDegliScarti` — Information Experts (GRASP)
   - Ognuno gestisce il proprio stato e le proprie operazioni.

@@ -40,7 +40,9 @@ public class UnoLegendsGame {
                 formattaCarta(stato.getCartaInCima()),
                 stato.isDeveGiocareCartaPescata(),
                 formattaCarta(stato.getCartaAppenaPescata()),
-                stato.isDeveScegliereColoreIniziale());
+                stato.isDeveScegliereColoreIniziale(),
+                stato.isPartitaTerminata(),
+                stato.getNomeVincitore());
     }
 
     public int carteNelMazzo() {
@@ -57,18 +59,14 @@ public class UnoLegendsGame {
     /**
      * Coordina la scelta opzionale del colore e la successiva giocata.
      */
-    public boolean giocaCarta(int indiceCarta) {
-        return giocaCarta(indiceCarta, null);
-    }
-
-    public boolean giocaCarta(int indiceCarta, Integer sceltaColore) {
+    public boolean giocaCarta(int indiceCarta, Integer sceltaColore, boolean unoDichiarato) {
         if (sceltaColore != null) {
             Colore colore = convertiColore(sceltaColore);
             if (colore == null || !partita.scegliColore(colore)) {
                 return false;
             }
         }
-        return partita.giocaCarta(indiceCarta);
+        return partita.giocaCarta(indiceCarta, unoDichiarato);
     }
 
     /**

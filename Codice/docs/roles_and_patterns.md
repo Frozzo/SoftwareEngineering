@@ -7,6 +7,7 @@ Classi e responsabilità
 - PartitaFactory
   - Pattern: Factory (GOF), Creator (GRASP)
   - Responsabilità: orchestrare la creazione di `Partita` e degli oggetti necessari (Giocatore, Mazzo, PilaDegliScarti).
+  - Accetta un `RegoleDiGioco` esplicito per configurare le strategie usate dalla partita.
   - Step reali del codice: invoca `StandardMazzoFactory.getInstance()` per ottenere il catalogo (`getCarteNormali()`), mescola, distribuisce 5 carte a testa, costruisce il mazzo residuo usando `creaMazzo(source, startIndex, size)`, inizializza gli scarti con la prima carta disponibile e crea `Partita` con `RegoleStandard`.
 
 - MazzoFactory
@@ -41,7 +42,16 @@ Classi e responsabilità
 
 - RegoleStandard
   - Pattern: Strategy / Policy di default
-  - Responsabilità: validare la giocata base in modo coerente con la `RegoleDiGioco`.
+  - Responsabilità: configurare le strategie delle regole standard; `StrategiaVittoriaStandard` dichiara vincitore chi rimane senza carte.
+  - `RegoleDiGioco.noMercy()` usa `StrategiaVittoriaNoMercy`, che aggiunge la vittoria quando tutti gli avversari hanno più di 25 carte.
+
+- StrategiaVittoriaStandard / StrategiaVittoriaNoMercy
+  - Pattern: Strategy (GOF)
+  - Responsabilità: valutare la condizione di vittoria in base alle regole configurate, senza coinvolgere la UI.
+
+- StrategiaPenalitaMancatoUno
+  - Pattern: Strategy (GOF)
+  - Responsabilità: applicare la penalità configurata quando una giocata valida lascia due carte in mano ridotte a una senza dichiarazione UNO.
 
 - UnoLegendsGame
   - Pattern: Facade / Controller (GRASP)

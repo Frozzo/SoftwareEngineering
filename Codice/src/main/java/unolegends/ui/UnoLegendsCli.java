@@ -42,6 +42,10 @@ public final class UnoLegendsCli {
             System.out.println();
             while (true) {
                 StatoPartita stato = controller.richiediStato();
+                if (stato.isPartitaTerminata()) {
+                    System.out.println("Partita terminata. Vince " + stato.getNomeVincitore() + "!");
+                    return;
+                }
                 if (stato.isDeveScegliereColoreIniziale()) {
                     System.out.println("La prima carta richiede un colore: sceglie il giocatore iniziale.");
                     if (!controller.scegliColore(scegliColore(scanner))) {
@@ -71,7 +75,8 @@ public final class UnoLegendsCli {
                         continue;
                     }
 
-                    if (giocaCarta(indiceCarta, controller, scanner)) {
+                    if (giocaCarta(indiceCarta, controller, scanner,
+                            stato.getManoGiocatoreAttivo().size() == 2)) {
                         System.out.println("Carta giocata.");
                     } else {
                         System.out.println("Mossa non valida.");
@@ -94,7 +99,8 @@ public final class UnoLegendsCli {
                         System.out.println("Valore non valido.");
                         continue;
                     }
-                    if (giocaCarta(indiceCarta, controller, scanner)) {
+                    if (giocaCarta(indiceCarta, controller, scanner,
+                            stato.getManoGiocatoreAttivo().size() == 2)) {
                         System.out.println("Carta giocata.");
                     } else {
                         System.out.println("Mossa non valida.");
@@ -127,11 +133,22 @@ public final class UnoLegendsCli {
         System.out.println();
     }
 
-    private static boolean giocaCarta(int indiceCarta, UnoLegendsGame controller, Scanner scanner) {
+    private static boolean giocaCarta(int indiceCarta, UnoLegendsGame controller, Scanner scanner,
+                                      boolean richiedeDichiarazioneUno) {
         Integer sceltaColore = controller.cartaRichiedeSceltaColore(indiceCarta)
                 ? scegliColore(scanner)
                 : null;
-        return controller.giocaCarta(indiceCarta, sceltaColore);
+        boolean unoDichiarato = richiedeDichiarazioneUno && dichiaraUno(scanner);
+        boolean giocataValida = controller.giocaCarta(indiceCarta, sceltaColore, unoDichiarato);
+        if (giocataValida && richiedeDichiarazioneUno && !unoDichiarato) {
+            System.out.println("UNO non dichiarato: hai pescato due carte di penalita.");
+        }
+        return giocataValida;
+    }
+
+    private static boolean dichiaraUno(Scanner scanner) {
+        System.out.print("Dichiara UNO insieme alla giocata digitando 'uno'; altrimenti premi Invio: ");
+        return "uno".equalsIgnoreCase(scanner.nextLine().trim());
     }
 
     private static int scegliColore(Scanner scanner) {

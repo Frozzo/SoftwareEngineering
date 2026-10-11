@@ -5,6 +5,7 @@ skinparam handwritten true
 actor "Utente\n(CLI)" as Utente
 participant "UnoLegendsGame\n(Controller / Facade)" as Game
 participant "Partita\n(Coordinator)" as Partita
+participant "RegoleDiGioco\n(Strategy Context)" as Regole
 participant "UnoLegendsCli\n(UI Program)" as CLIProg
 participant "Giocatore\n(Information Expert)" as Giocatore
 participant "Mazzo\n(Information Expert)" as Mazzo
@@ -48,12 +49,12 @@ CLIProg -> Game : cartaRichiedeSceltaColore(indiceCarta)
 Game -> Partita : cartaRichiedeSceltaColore(indiceCarta)
 Partita --> Game : richiedeColore
 Game --> CLIProg : richiedeColore
-CLIProg -> Game : giocaCarta(indiceCarta, sceltaColore)
+CLIProg -> Game : giocaCarta(indiceCarta, sceltaColore, unoDichiarato)
 activate Game
 opt sceltaColore presente
     Game -> Partita : scegliColore(colore convertito)
 end
-Game -> Partita : giocaCarta(indiceCarta)
+Game -> Partita : giocaCarta(indiceCarta, unoDichiarato)
 activate Partita
 Partita -> Giocatore : getCartaInPosizione(indiceCarta)
 activate Giocatore
@@ -76,7 +77,18 @@ else carta compatibile?
         Scarti --> Partita : ok
         deactivate Scarti
         Partita -> Partita : cartaAppenaPescata = null; cartaPescataDaGiocare=false
-        Partita -> Partita : aggiornaGiocatoreAttivo()
+        opt mano prima della giocata di due carte e UNO non dichiarato
+            Partita -> Regole : applicaPenalitaMancatoUno(giocatoreAttivo)
+            loop due carte di penalita
+                Regole -> Partita : pescaCartaForzata(giocatoreAttivo)
+            end
+        end
+        Partita -> Regole : isVincitore(giocatoreAttivo, partita)
+        alt vittoria secondo il profilo configurato
+            Partita -> Partita : registra vincitore e termina partita
+        else nessuna vittoria
+            Partita -> Partita : aggiornaGiocatoreAttivo()
+        end
         Partita --> Game : true
     else non compatibile
         Partita --> Game : false

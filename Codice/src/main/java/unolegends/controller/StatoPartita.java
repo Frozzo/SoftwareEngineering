@@ -13,10 +13,13 @@ public final class StatoPartita {
     private final boolean deveGiocareCartaPescata;
     private final String cartaAppenaPescata;
     private final boolean deveScegliereColoreIniziale;
+    private final boolean partitaTerminata;
+    private final String nomeVincitore;
 
     public StatoPartita(String nomeGiocatoreAttivo, List<String> manoGiocatoreAttivo,
                         String cartaInCima, boolean deveGiocareCartaPescata,
-                        String cartaAppenaPescata, boolean deveScegliereColoreIniziale) {
+                        String cartaAppenaPescata, boolean deveScegliereColoreIniziale,
+                        boolean partitaTerminata, String nomeVincitore) {
         this.nomeGiocatoreAttivo = Objects.requireNonNull(nomeGiocatoreAttivo, "nomeGiocatoreAttivo non puo essere null");
         this.manoGiocatoreAttivo = List.copyOf(
                 Objects.requireNonNull(manoGiocatoreAttivo, "manoGiocatoreAttivo non puo essere null"));
@@ -24,6 +27,8 @@ public final class StatoPartita {
         this.deveGiocareCartaPescata = deveGiocareCartaPescata;
         this.cartaAppenaPescata = cartaAppenaPescata;
         this.deveScegliereColoreIniziale = deveScegliereColoreIniziale;
+        this.partitaTerminata = partitaTerminata;
+        this.nomeVincitore = nomeVincitore;
     }
 
     public String getNomeGiocatoreAttivo() {
@@ -48,5 +53,13 @@ public final class StatoPartita {
 
     public boolean isDeveScegliereColoreIniziale() {
         return deveScegliereColoreIniziale;
+    }
+
+    public boolean isPartitaTerminata() {
+        return partitaTerminata;
+    }
+
+    public String getNomeVincitore() {
+        return nomeVincitore;
     }
 }

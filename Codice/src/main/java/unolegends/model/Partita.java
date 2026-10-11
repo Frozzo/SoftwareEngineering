@@ -17,6 +17,7 @@ public class Partita {
     private boolean cartaPescataDaGiocare;
     private boolean deveScegliereColoreIniziale;
     private Colore coloreScelto;
+    private Giocatore vincitore;
     private boolean sensoOrario = true; // Variabile per tenere traccia del senso di gioco
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo) {
         this(giocatori, mazzo, pilaDegliScarti, indiceGiocatoreAttivo, RegoleDiGioco.standard());
@@ -45,7 +46,8 @@ public class Partita {
     public StatoTurno getStatoTurno() {
         Giocatore attivo = getGiocatoreAttivo();
         return new StatoTurno(attivo.getNome(), attivo.getMano(), pilaDegliScarti.getCartaInCima(),
-                cartaPescataDaGiocare, cartaAppenaPescata, deveScegliereColoreIniziale);
+                cartaPescataDaGiocare, cartaAppenaPescata, deveScegliereColoreIniziale,
+                vincitore != null, vincitore == null ? null : vincitore.getNome());
     }
     public int getIndiceGiocatoreAttivo() {
         return indiceGiocatoreAttivo;
@@ -59,6 +61,9 @@ public class Partita {
     }
 
     public boolean cartaRichiedeSceltaColore(int indiceCarta) {
+        if (vincitore != null) {
+            return false;
+        }
         Carta carta = getGiocatoreAttivo().getCartaInPosizione(indiceCarta);
         return carta != null && EffettoComposito.contieneEffetto(
                 carta.getEffetto(), Effetto_Cambia_colore.class);
@@ -75,12 +80,13 @@ public class Partita {
     /**
      * GRASP Coordinator: valida la mossa e orchestra estrazione carta + inserimento negli scarti.
      */
-    public boolean giocaCarta(int indiceCarta) {
-        if (deveScegliereColoreIniziale) {
+    public boolean giocaCarta(int indiceCarta, boolean unoDichiarato) {
+        if (vincitore != null || deveScegliereColoreIniziale) {
             return false;
         }
 
         Giocatore giocatoreAttivo = getGiocatoreAttivo();
+        boolean penultimaCartaGiocata = giocatoreAttivo.getMano().size() == 2;
         Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
         if (cartaSelezionata == null) {
             coloreScelto = null;
@@ -115,12 +121,19 @@ public class Partita {
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
         cartaDaGiocare.getEffetto().attivaeffetto(this);
+        if (penultimaCartaGiocata && !unoDichiarato) {
+            regole.applicaPenalitaMancatoUno(giocatoreAttivo, this);
+        }
+        if (regole.isVincitore(giocatoreAttivo, this)) {
+            vincitore = giocatoreAttivo;
+            return true;
+        }
         aggiornaGiocatoreAttivo();
         return true;
     }
 
     public boolean scegliColore(Colore colore) {
-        if (colore == null || colore == Colore.NERO) {
+        if (vincitore != null || colore == null || colore == Colore.NERO) {
             return false;
         }
 
@@ -151,7 +164,7 @@ public class Partita {
      * GRASP Coordinator: richiede al Mazzo una carta e delega al Giocatore l'aggiornamento della mano.
      */
     public boolean pescaCarta() {
-        if (cartaPescataDaGiocare) {
+        if (vincitore != null || cartaPescataDaGiocare) {
             return false;
         }
 
@@ -166,20 +179,15 @@ public class Partita {
         return true;
     }
     public boolean pescaCartaForzata(Giocatore giocatore) {
-        Carta cartaPescata = mazzo.prelevaCarta();
-        if (cartaPescata == null) {
-            return false;
-        }
-
-        giocatore.aggiungiCarta(cartaPescata);
-        return true;
+        Objects.requireNonNull(giocatore, "giocatore non puo essere null");
+        return !regole.pesca(giocatore, this).isEmpty();
     }
 
     /**
      * GRASP Coordinator: gestisce il cambio turno tramite self-message dedicato.
      */
     public boolean passaTurno() {
-        if (!cartaPescataDaGiocare) {
+        if (vincitore != null || !cartaPescataDaGiocare) {
             return false;
         }
 
@@ -194,6 +202,23 @@ public class Partita {
      */
     public boolean deveGiocareCartaPescata() {
         return cartaPescataDaGiocare;
+    }
+
+    public boolean tuttiGliAltriGiocatoriHannoPiuDi(Giocatore giocatore, int sogliaCarte) {
+        if (giocatore == null || sogliaCarte < 0) {
+            return false;
+        }
+
+        boolean trovatoAvversario = false;
+        for (Giocatore altroGiocatore : giocatori) {
+            if (altroGiocatore != giocatore) {
+                trovatoAvversario = true;
+                if (altroGiocatore.getMano().size() <= sogliaCarte) {
+                    return false;
+                }
+            }
+        }
+        return trovatoAvversario;
     }
 
     private Giocatore getGiocatoreAttivo() {
