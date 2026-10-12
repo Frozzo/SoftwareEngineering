@@ -12,7 +12,6 @@ import unolegends.domain.rules.impl.StrategiaCompatibilitaCarte;
 import unolegends.domain.rules.impl.StrategiaPenalitaMancatoUno;
 import unolegends.domain.rules.impl.StrategiaPescaSingola;
 import unolegends.domain.rules.impl.StrategiaSconfittaStandard;
-import unolegends.domain.rules.impl.StrategiaVittoriaNoMercy;
 import unolegends.domain.rules.impl.StrategiaVittoriaStandard;
 
 /**
@@ -48,8 +47,9 @@ public class RegoleDiGioco {
         this.strategiaPenalitaUno = Objects.requireNonNull(strategiaPenalitaUno);
     }
 
-    public boolean isGiocabile(Carta candidata, Carta inCima) {
-        return strategiaCompatibilitaCarte.puoGiocare(candidata, inCima, null);
+    public boolean isGiocabile(Carta candidata, Carta inCima, Partita partita) {
+        return strategiaCompatibilitaCarte.puoGiocare(candidata, inCima,
+                partita == null ? null : partita.getColoreAttuale());
     }
 
     public boolean isVincitore(Giocatore giocatore, Partita partita) {
@@ -76,15 +76,5 @@ public class RegoleDiGioco {
                 new StrategiaPescaSingola());
     }
 
-    public static RegoleDiGioco noMercy() {
-        return noMercy(StrategiaVittoriaNoMercy.SOGLIA_STANDARD);
-    }
 
-    public static RegoleDiGioco noMercy(int sogliaCarteAvversari) {
-        return new RegoleDiGioco(
-                new StrategiaVittoriaNoMercy(sogliaCarteAvversari),
-                new StrategiaSconfittaStandard(),
-                new StrategiaCompatibilitaCarte(true),
-                new StrategiaPescaSingola());
-    }
 }

@@ -5,13 +5,13 @@ import java.util.Objects;
 
 public class CartaSpeciale extends Carta {
 
-    private Colore colore;
-    private final ValoreCarta ValoreCarta;
+    private final Colore colore;
+    private final ValoreCarta valoreCarta;
     private final Ieffetto effetto;
 
-    public CartaSpeciale(Colore colore, ValoreCarta ValoreCarta, Ieffetto effetto) {
+    public CartaSpeciale(Colore colore, ValoreCarta valoreCarta, Ieffetto effetto) {
         this.colore = Objects.requireNonNull(colore, "colore non puo essere null");
-        this.ValoreCarta = Objects.requireNonNull(ValoreCarta, "valoreCarta non puo essere null");
+        this.valoreCarta = Objects.requireNonNull(valoreCarta, "valoreCarta non puo essere null");
         this.effetto = Objects.requireNonNull(effetto, "effetto non puo essere null");
     }
     
@@ -19,13 +19,9 @@ public class CartaSpeciale extends Carta {
     public Colore getColore() {
         return colore;
     }
-    void setColore(Colore colore) {
-        this.colore = Objects.requireNonNull(colore, "colore non puo essere null");
-    }
-    
     @Override
     public ValoreCarta getValoreCarta() {
-        return ValoreCarta;
+        return valoreCarta;
     }
     @Override
     public Ieffetto getEffetto() {
@@ -33,13 +29,13 @@ public class CartaSpeciale extends Carta {
     }
 
     public void attivaEffetto(Partita partita) {
-        effetto.attivaeffetto(partita);
+        effetto.attivaEffetto(partita);
     }
         public String toTestoBase() {
-        return ValoreCarta.getValore() + " " + colore.getNome().toLowerCase(Locale.ROOT);
+        return valoreCarta.getValore() + " " + colore.getNome().toLowerCase(Locale.ROOT);
     }
 
-    public String toCliString() {
+    public String getDescrizioneBreve() {
         String base = toTestoBase();
         return colore.formatta(base);
     }

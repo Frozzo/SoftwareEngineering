@@ -39,9 +39,9 @@ public final class EffettoComposito implements Ieffetto {
         return numeroRichieste;
     }
 
-    public void attivaeffetto(Partita partita) { //non so se qua co override va bene che vittoria ha detto che la prof si tilta
+    public void attivaEffetto(Partita partita) {
         for (Ieffetto effetto : effetti) {
-            effetto.attivaeffetto(partita);
+            effetto.attivaEffetto(partita);
         }
     }
 
@@ -67,14 +67,14 @@ public final class EffettoComposito implements Ieffetto {
     }
 
     @Override
-    public void attivaeffetto(Partita partita, String risposta) {
+    public void attivaEffetto(Partita partita, String risposta) {
         boolean rispostaInoltrata = false;
         for (Ieffetto effetto : effetti) {
             if (!rispostaInoltrata && effetto.getRichiestaInput() != null) {
-                effetto.attivaeffetto(partita, risposta);
+                effetto.attivaEffetto(partita, risposta);
                 rispostaInoltrata = true;
             } else {
-                effetto.attivaeffetto(partita);
+                effetto.attivaEffetto(partita);
             }
         }
     }

@@ -1,7 +1,6 @@
 package unolegends.model;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -33,120 +32,65 @@ public class PartitaFactory {
     }
 
     /**
-     * Crea una Partita standard con 2 giocatori.
-     * Configurazione di default per il prototipo demo.
-     */
-    public static Partita creaPartitaStandard() {
-        return creaPartita(TipoMazzo.STANDARD, 2);
-    }
-
-    /**
-     * Crea una Partita con numero di giocatori specificato.
-     * 
-     * @param numeroDiGiocatori numero di giocatori (per ora solo 2 supportato)
-     * @return una Partita completamente configurata e pronta al gioco
-     * @throws IllegalArgumentException se numeroDiGiocatori != 2
-     */
-    public static Partita creaPartita(int numeroDiGiocatori) {
-        return creaPartita(TipoMazzo.STANDARD, numeroDiGiocatori);
-    }
-
-    /**
-     * Crea una partita usando il tipo di mazzo selezionato.
+     * Crea una partita usando esplicitamente tutte le dipendenze di configurazione.
      *
-     * @param tipoMazzo tipo di mazzo della partita
+     * @param mazzoFactory factory responsabile della creazione del mazzo
      * @param numeroDiGiocatori numero di giocatori (per ora solo 2 supportato)
-     * @return una Partita completamente configurata e pronta al gioco
+     * @param regole profilo di regole della partita
+     * @return una Partita completamente configurata e pronta per essere avviata
      */
-    public static Partita creaPartita(TipoMazzo tipoMazzo, int numeroDiGiocatori) {
-        return creaPartita(tipoMazzo, numeroDiGiocatori, creaRegoleStandard());
-    }
-
-    /**
-     * Crea una partita usando esplicitamente il profilo di regole richiesto.
-     */
-    public static Partita creaPartita(TipoMazzo tipoMazzo, int numeroDiGiocatori, RegoleDiGioco regole) {
-        Objects.requireNonNull(tipoMazzo, "tipoMazzo non puo essere null");
+    public static Partita creaPartita(MazzoFactory mazzoFactory, int numeroDiGiocatori, RegoleDiGioco regole) {
+        Objects.requireNonNull(mazzoFactory, "mazzoFactory non puo essere null");
         Objects.requireNonNull(regole, "regole non puo essere null");
         if (numeroDiGiocatori != 2) {
             throw new IllegalArgumentException("Attualmente solo 2 giocatori sono supportati");
         }
 
-        MazzoFactory mazzoFactory = selezionaMazzoFactory(tipoMazzo);
+        Mazzo mazzo = mazzoFactory.creaMazzo();
+        List<Giocatore> giocatori = distribuisciCarteAiGiocatori(mazzo, numeroDiGiocatori);
 
-        // 1. Obtain complete deck from the concrete MazzoFactory (Expert: knows which cards exist)
-        List<Carta> carteTotali = mazzoFactory.getCarteNormali();
-
-        // 2. Shuffle (randomize distribution)
-        List<Carta> carteMescolate = new ArrayList<>(carteTotali);
-        Collections.shuffle(carteMescolate);
-
-        // 3. Distribute cards to players
-        List<Giocatore> giocatori = distribuisciCarteAiGiocatori(carteMescolate, numeroDiGiocatori);
-
-        // 4. La prima carta rimanente va negli scarti; tutte le altre restano nel mazzo.
-        int indicePartenzaMazzo = numeroDiGiocatori * CARTE_PER_GIOCATORE;
-        int indicePartenzaScarti = indicePartenzaMazzo;
-        if (indicePartenzaScarti < carteMescolate.size()) {
-            Carta primaCarta = carteMescolate.get(indicePartenzaScarti);
-            int indicePartenzaMazzoDiPesca = indicePartenzaScarti + 1;
-            Mazzo mazzo = mazzoFactory.creaMazzo(
-                    carteMescolate,
-                    indicePartenzaMazzoDiPesca,
-                    carteMescolate.size() - indicePartenzaMazzoDiPesca);
+        Carta primaCarta = mazzo.prelevaCarta();
+        if (primaCarta != null) {
             PilaDegliScarti pilaDegliScarti = new PilaDegliScarti(List.of(primaCarta));
-            // Default rules: RegoleStandard. In futuro PartitaFactory può accettare configurazioni.
             boolean richiedeInput = primaCarta.getEffetto().getRichiestaInput() != null;
             int indiceGiocatoreIniziale = richiedeInput
                     ? 0
                     : (giocatori.size() - 1) % giocatori.size();
-            Partita nuovaPartita = new Partita(giocatori, mazzo, pilaDegliScarti,
+            return new Partita(giocatori, mazzo, pilaDegliScarti,
                     indiceGiocatoreIniziale, regole);
-            if (!richiedeInput) {
-                primaCarta.getEffetto().attivaeffetto(nuovaPartita);
-                nuovaPartita.aggiornaGiocatoreAttivo();
-            }
-            return nuovaPartita;
         }
 
         throw new IllegalStateException("Non ci sono carte sufficienti per inizializzare gli scarti");
-    }
-
-    private static MazzoFactory selezionaMazzoFactory(TipoMazzo tipoMazzo) {
-        switch (tipoMazzo) {
-            case STANDARD -> {
-                return StandardMazzoFactory.getInstance();
-            }
-            case NO_MERCY -> {
-                throw new UnsupportedOperationException("Il mazzo No Mercy non e ancora implementato");
-            }
-            default -> throw new IllegalArgumentException("Tipo di mazzo non supportato: " + tipoMazzo);
-        }
     }
 
     /**
      * Distribuisce le carte equamente tra i giocatori.
      * GRASP Expert: sa come distribuire carte ai giocatori.
      * 
-     * @param carteMescolate lista mescolata di tutte le carte
+     * @param mazzo mazzo già mescolato da cui prelevare le carte
      * @param numeroDiGiocatori numero di giocatori
      * @return lista di Giocatori con le loro carte distribuite
      */
-    private static List<Giocatore> distribuisciCarteAiGiocatori(List<Carta> carteMescolate, int numeroDiGiocatori) {
-        List<Giocatore> giocatori = new ArrayList<>();
-
+    private static List<Giocatore> distribuisciCarteAiGiocatori(Mazzo mazzo, int numeroDiGiocatori) {
+        Objects.requireNonNull(mazzo, "mazzo non puo essere null");
+        List<List<Carta>> mani = new ArrayList<>();
         for (int indiceGiocatore = 0; indiceGiocatore < numeroDiGiocatori; indiceGiocatore++) {
-            List<Carta> mano = new ArrayList<>();
-
-            for (int i = 0; i < CARTE_PER_GIOCATORE; i++) {
-                int indiceCartaGlobale = indiceGiocatore + (i * numeroDiGiocatori);
-                mano.add(carteMescolate.get(indiceCartaGlobale));
-            }
-
-            String nomePredefinito = "Giocatore" + (indiceGiocatore + 1);
-            giocatori.add(new Giocatore(nomePredefinito, mano));
+            mani.add(new ArrayList<>());
         }
 
+        for (int indiceCarta = 0; indiceCarta < numeroDiGiocatori * CARTE_PER_GIOCATORE; indiceCarta++) {
+            Carta carta = mazzo.prelevaCarta();
+            if (carta == null) {
+                throw new IllegalStateException("Non ci sono carte sufficienti per distribuire le mani");
+            }
+            mani.get(indiceCarta % numeroDiGiocatori).add(carta);
+        }
+
+        List<Giocatore> giocatori = new ArrayList<>();
+        for (int indiceGiocatore = 0; indiceGiocatore < numeroDiGiocatori; indiceGiocatore++) {
+            String nomePredefinito = "Giocatore" + (indiceGiocatore + 1);
+            giocatori.add(new Giocatore(nomePredefinito, mani.get(indiceGiocatore)));
+        }
         return giocatori;
     }
 }

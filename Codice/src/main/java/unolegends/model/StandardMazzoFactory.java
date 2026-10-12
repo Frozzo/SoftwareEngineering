@@ -1,13 +1,12 @@
 package unolegends.model;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
  * Concrete singleton factory per il mazzo standard.
  */
-public final class StandardMazzoFactory extends MazzoFactory {
+public class StandardMazzoFactory implements MazzoFactory {
     private static final StandardMazzoFactory INSTANCE = new StandardMazzoFactory();
 
     private StandardMazzoFactory() {
@@ -17,8 +16,8 @@ public final class StandardMazzoFactory extends MazzoFactory {
         return INSTANCE;
     }
 
-    @Override
-    public List<Carta> getCarteNormali() {
+    
+    public Mazzo creaMazzo() {
         List<Carta> carte = new ArrayList<>();
         int idCounter = 0;
 
@@ -60,6 +59,8 @@ public final class StandardMazzoFactory extends MazzoFactory {
                         new Effetto_pescata_carte(4)))));
         }
 
-        return Collections.unmodifiableList(carte);
+        Mazzo mazzo = new Mazzo(carte);
+        mazzo.mischia();
+        return mazzo;
     }
 }

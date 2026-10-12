@@ -22,30 +22,39 @@ public enum ValoreCarta {
     CAMBIA_COLORE("cambia colore"),
     PIU_QUATTRO("+4");
 
-    private final String Valore;
+    private final String valore;
 
-    // Costruttore
-    ValoreCarta(String Valore) {
-        this.Valore = Valore;
+    ValoreCarta(String valore) {
+        this.valore = valore;
     }
 
     // Restituisce la stringa associata (es: "+2", "blocca turno")
     public String getValore() {
-        return this.Valore;
+        return this.valore;
     }
 
     public static ValoreCarta fromInt(int numero) {
-        if (numero < 0 || numero > 9) {
-            throw new IllegalArgumentException("Il numero deve essere compreso tra 0 e 9");
-        }
-        return values()[numero];
+        return switch (numero) {
+            case 0 -> ZERO;
+            case 1 -> UNO;
+            case 2 -> DUE;
+            case 3 -> TRE;
+            case 4 -> QUATTRO;
+            case 5 -> CINQUE;
+            case 6 -> SEI;
+            case 7 -> SETTE;
+            case 8 -> OTTO;
+            case 9 -> NOVE;
+            default -> throw new IllegalArgumentException(
+                    "Il numero deve essere compreso tra 0 e 9");
+        };
     }
 
     /**
      * Converte una stringa nel corrispondente valore dell'Enum.
      * È case-insensitive (es: "Blocca Turno" o "blocca turno" funzionano entrambi).
      */
-    public static ValoreCarta getValoreAsAString(String testo) {
+    public static ValoreCarta fromString(String testo) {
         if (testo == null) {
             throw new IllegalArgumentException("La stringa non può essere nulla");
         }

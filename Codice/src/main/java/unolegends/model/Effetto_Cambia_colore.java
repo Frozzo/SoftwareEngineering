@@ -5,7 +5,7 @@ import java.util.List;
 public class Effetto_Cambia_colore implements Ieffetto {
 
     @Override
-    public void attivaeffetto(Partita partita) {
+    public void attivaEffetto(Partita partita) {
         throw new IllegalStateException("L'effetto richiede la scelta di un colore"); //controlla che l'effetto non venga attivato senza input
     }
 
@@ -22,7 +22,7 @@ public class Effetto_Cambia_colore implements Ieffetto {
     }
 
     @Override
-    public void attivaeffetto(Partita partita, String risposta) { //attiva l'effetto con la risposta dell'utente
+    public void attivaEffetto(Partita partita, String risposta) {
         Colore colore = coloreDaRisposta(risposta); // uguale null se la risposta non è valida
         if (colore == null) {
             throw new IllegalArgumentException("Colore non valido: " + risposta);

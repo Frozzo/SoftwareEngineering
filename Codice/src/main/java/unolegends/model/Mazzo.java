@@ -25,17 +25,32 @@ public class Mazzo {
     public Carta prelevaCarta() {
         return carte.pollFirst();
     }
-    public List<Carta> getCarte() {
-        return new ArrayList<>(carte);
+
+    public boolean isVuoto() {
+        return carte.isEmpty();
+    }
+
+    public int getNumeroCarteRestanti() {
+        return carte.size();
     }
 
     /**
-     * Ricostituisce il mazzo usando gli scarti, preservando la carta in cima.
+     * GRASP Information Expert: il mazzo sa come mescolare se stesso.
+     */
+    public void mischia() {
+        List<Carta> listaTemporanea = new ArrayList<>(carte);
+        Collections.shuffle(listaTemporanea);
+        carte.clear();
+        carte.addAll(listaTemporanea);
+    }
+
+    /**
+     * Ricostituisce e mescola il mazzo usando gli scarti, preservando la carta in cima.
      */
     public void rimescolaDaScarti(PilaDegliScarti pilaDegliScarti) {
         Objects.requireNonNull(pilaDegliScarti, "pilaDegliScarti non puo essere null");
         List<Carta> carteDaRimescolare = pilaDegliScarti.estraiCartePerRimescolamento();
-        Collections.shuffle(carteDaRimescolare);
         carte.addAll(carteDaRimescolare);
+        mischia();
     }
 }

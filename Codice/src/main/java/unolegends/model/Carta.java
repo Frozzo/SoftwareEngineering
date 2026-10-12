@@ -10,10 +10,5 @@ public abstract class Carta {
     public abstract ValoreCarta getValoreCarta();
     public abstract Ieffetto getEffetto();
 
-    /**
-     * Rappresentazione testuale per la CLI. Implementazione specifica.
-     */
-    public abstract String toCliString();
-
-
+    public abstract String getDescrizioneBreve();
 }

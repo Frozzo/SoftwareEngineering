@@ -6,11 +6,11 @@ public class Effetto_pescata_carte implements Ieffetto {
         this.numeroCarteDaPescare = numeroCarteDaPescare;
     }
 
-    public void attivaeffetto(Partita partita) {
-         // nota non fa saltare il turno.
+    public void attivaEffetto(Partita partita) {
         Giocatore prossimoGiocatore = partita.getProssimoGiocatore();
         for (int i = 0; i < numeroCarteDaPescare; i++) {
             partita.pescaCartaForzata(prossimoGiocatore);
         }
+        partita.segnalaSaltoTurno();
     }
 }

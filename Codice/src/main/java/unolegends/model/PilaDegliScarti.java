@@ -38,8 +38,11 @@ public class PilaDegliScarti {
         if (scarti.size() <= 1) {
             return new ArrayList<>();
         }
-        List<Carta> carteDaRimescolare = new ArrayList<>(scarti.subList(0, scarti.size() - 1));
-        scarti.subList(0, scarti.size() - 1).clear();
+
+        Carta cartaInCima = scarti.remove(scarti.size() - 1);
+        List<Carta> carteDaRimescolare = new ArrayList<>(scarti);
+        scarti.clear();
+        scarti.add(cartaInCima);
         return carteDaRimescolare;
     }
 }

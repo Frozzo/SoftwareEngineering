@@ -7,6 +7,8 @@ import unolegends.model.Carta;
 import unolegends.model.EsitoGiocata;
 import unolegends.model.Partita;
 import unolegends.model.PartitaFactory;
+import unolegends.model.RegoleDiGioco;
+import unolegends.model.StandardMazzoFactory;
 
 /**
  * GRASP Controller (Facade): punto di ingresso per la UI CLI.
@@ -19,7 +21,12 @@ public class UnoLegendsGame {
      * La View non deve conoscere la factory del dominio.
      */
     public static UnoLegendsGame avviaPartitaStandard() {
-        return new UnoLegendsGame(PartitaFactory.creaPartitaStandard());
+        Partita partita = PartitaFactory.creaPartita(
+                StandardMazzoFactory.getInstance(),
+                2,
+                RegoleDiGioco.standard());
+        partita.iniziaGioco();
+        return new UnoLegendsGame(partita);
     }
 
     public UnoLegendsGame(Partita partita) {
@@ -33,7 +40,7 @@ public class UnoLegendsGame {
         return new StatoPartita(
                 partita.getNomeGiocatoreAttivo(),
                 partita.getManoGiocatoreAttivo().stream()
-                        .map(carta -> carta.toCliString())
+                        .map(carta -> carta.getDescrizioneBreve())
                         .collect(Collectors.toList()),
                 formattaCarta(partita.getPilaDegliScarti().getCartaInCima()),
                 partita.isCartaPescataDaGiocare(),
@@ -76,6 +83,6 @@ public class UnoLegendsGame {
     }
 
     private static String formattaCarta(Carta carta) {
-        return carta == null ? null : carta.toCliString();
+        return carta == null ? null : carta.getDescrizioneBreve();
     }
 }

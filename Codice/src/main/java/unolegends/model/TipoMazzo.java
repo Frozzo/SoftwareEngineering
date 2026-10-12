@@ -1,9 +1,8 @@
 package unolegends.model;
 
 /**
- * Tipi di mazzo selezionabili all'avvio di una partita.
+ * Tipi di mazzo predisposti per le configurazioni future della partita.
  */
 public enum TipoMazzo {
-    STANDARD,
-    NO_MERCY
+    STANDARD
 }

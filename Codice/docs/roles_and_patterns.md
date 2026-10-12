@@ -8,21 +8,17 @@ Classi e responsabilità
   - Pattern: Factory (GOF), Creator (GRASP)
   - Responsabilità: orchestrare la creazione di `Partita` e degli oggetti necessari (Giocatore, Mazzo, PilaDegliScarti).
   - Accetta un `RegoleDiGioco` esplicito per configurare le strategie usate dalla partita.
-  - Step reali del codice: invoca `StandardMazzoFactory.getInstance()` per ottenere il catalogo (`getCarteNormali()`), mescola, distribuisce 5 carte a testa, costruisce il mazzo residuo usando `creaMazzo(source, startIndex, size)`, inizializza gli scarti con la prima carta disponibile e crea `Partita` con `RegoleStandard`.
+  - Step reali del codice: invoca `StandardMazzoFactory.getInstance()` per creare un mazzo già mescolato, distribuisce 5 carte a testa tramite `prelevaCarta()`, inizializza gli scarti con la prima carta disponibile e crea `Partita` con `RegoleStandard`.
 
 - MazzoFactory
   - Pattern: Abstract Factory (GOF)
-  - Responsabilità: fornire il catalogo delle carte della famiglia corrente e costruire il `Mazzo` a partire da una lista già pronta.
-  - Firma/contratto attuale nel codice: `getCarteNormali()` restituisce la lista catalogo; `creaMazzo(source, startIndex, size)` costruisce il `Mazzo` da una porzione della lista.
+  - Responsabilità: creare un `Mazzo` completo della famiglia corrente tramite `creaMazzo()`.
 
 - StandardMazzoFactory
   - Pattern: Concrete Factory, Singleton
   - Responsabilità: generare le carte standard `0-9` per ogni colore e costruire il mazzo standard.
-  - Implementazione: `StandardMazzoFactory` è un singleton (campo `instance` e metodo `getInstance()`), espone `getCarteNormali()` e `creaMazzo(...)` per la costruzione effettiva del `Mazzo`.
+  - Implementazione: `StandardMazzoFactory` è un singleton (campo `instance` e metodo `getInstance()`); `creaMazzo()` costruisce e mescola il `Mazzo`.
 
-- CarteCatalogo
-  - Stato attuale: non presente nel codice.
-  - La sua responsabilità è stata assorbita da `StandardMazzoFactory`.
 
 - Giocatore
   - Pattern: Information Expert
@@ -43,9 +39,8 @@ Classi e responsabilità
 - RegoleStandard
   - Pattern: Strategy / Policy di default
   - Responsabilità: configurare le strategie delle regole standard; `StrategiaVittoriaStandard` dichiara vincitore chi rimane senza carte.
-  - `RegoleDiGioco.noMercy()` usa `StrategiaVittoriaNoMercy`, che aggiunge la vittoria quando tutti gli avversari hanno più di 25 carte.
 
-- StrategiaVittoriaStandard / StrategiaVittoriaNoMercy
+- StrategiaVittoriaStandard
   - Pattern: Strategy (GOF)
   - Responsabilità: valutare la condizione di vittoria in base alle regole configurate, senza coinvolgere la UI.
 

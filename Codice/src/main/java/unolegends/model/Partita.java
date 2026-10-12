@@ -17,6 +17,9 @@ public class Partita {
     private boolean cartaPescataDaGiocare;
     private Ieffetto effettoInizialeInAttesa;
     private Giocatore vincitore;
+    private boolean giocoIniziato;
+    private boolean saltaProssimoTurno;
+    private Colore coloreAttuale;
     private boolean sensoOrario = true; // Variabile per tenere traccia del senso di gioco
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo) {
         this(giocatori, mazzo, pilaDegliScarti, indiceGiocatoreAttivo, RegoleDiGioco.standard());
@@ -35,8 +38,27 @@ public class Partita {
         }
         this.indiceGiocatoreAttivo = indiceGiocatoreAttivo;
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
+        this.coloreAttuale = cartaInCima == null ? null : cartaInCima.getColore();
         if (cartaInCima != null && cartaInCima.getEffetto().getRichiestaInput() != null) {
             this.effettoInizialeInAttesa = cartaInCima.getEffetto();
+        }
+    }
+
+    /**
+     * Completa l'inizializzazione della partita applicando l'effetto della prima carta.
+     * È idempotente per consentire al controller di invocarlo senza duplicare effetti.
+     */
+    public void iniziaGioco() {
+        if (giocoIniziato) {
+            return;
+        }
+        giocoIniziato = true;
+        if (effettoInizialeInAttesa == null) {
+            Carta cartaInCima = pilaDegliScarti.getCartaInCima();
+            if (cartaInCima != null) {
+                cartaInCima.getEffetto().attivaEffetto(this);
+                aggiornaGiocatoreAttivo();
+            }
         }
     }
 
@@ -74,12 +96,8 @@ public class Partita {
     public int getIndiceGiocatoreAttivo() {
         return indiceGiocatoreAttivo;
     }
-    public List<Carta> getMazzo() {
-        return mazzo.getCarte();
-    }
-
     public int getNumeroCarteNelMazzo() {
-        return mazzo.getCarte().size();
+        return mazzo.getNumeroCarteRestanti();
     }
 
     public Mazzo getMazzoDaPesca() {
@@ -110,7 +128,7 @@ public class Partita {
         }
 
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
-        if (cartaInCima != null && !regole.isGiocabile(cartaSelezionata, cartaInCima)) {
+        if (cartaInCima != null && !regole.isGiocabile(cartaSelezionata, cartaInCima, this)) {
             return EsitoGiocata.completata(false);
         }
 
@@ -131,9 +149,12 @@ public class Partita {
         }
 
         pilaDegliScarti.aggiungiCarta(cartaDaGiocare);
+        if (cartaDaGiocare.getColore() != Colore.NERO) {
+            coloreAttuale = cartaDaGiocare.getColore();
+        }
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
-        effetto.attivaeffetto(this, rispostaInput);
+        effetto.attivaEffetto(this, rispostaInput);
         if (penultimaCartaGiocata && !unoDichiarato) {
             regole.applicaPenalitaMancatoUno(giocatoreAttivo, this);
         }
@@ -153,17 +174,21 @@ public class Partita {
 
         Ieffetto effetto = effettoInizialeInAttesa;
         effettoInizialeInAttesa = null;
-        effetto.attivaeffetto(this, rispostaInput);
+        effetto.attivaEffetto(this, rispostaInput);
+        aggiornaGiocatoreAttivo();
         return true;
     }
 
     void applicaColoreScelto(Colore coloreScelto) {
-        Objects.requireNonNull(coloreScelto, "coloreScelto non puo essere null");
-        Carta cartaInCima = pilaDegliScarti.getCartaInCima();
-        if (!(cartaInCima instanceof CartaSpeciale cartaSpeciale)) { 
-            throw new IllegalStateException("La carta in cima agli scarti non supporta il cambio colore");
-        }
-        cartaSpeciale.setColore(coloreScelto);
+        coloreAttuale = Objects.requireNonNull(coloreScelto, "coloreScelto non puo essere null");
+    }
+
+    public Colore getColoreAttuale() {
+        return coloreAttuale;
+    }
+
+    void segnalaSaltoTurno() {
+        saltaProssimoTurno = true;
     }
 
     /**
@@ -175,6 +200,10 @@ public class Partita {
         }
 
         Carta cartaPescata = mazzo.prelevaCarta();
+        if (cartaPescata == null) {
+            mazzo.rimescolaDaScarti(pilaDegliScarti);
+            cartaPescata = mazzo.prelevaCarta();
+        }
         if (cartaPescata == null) {
             return false;
         }
@@ -224,6 +253,14 @@ public class Partita {
     }
 
     public void aggiornaGiocatoreAttivo() {
+        avanzaGiocatore();
+        if (saltaProssimoTurno) {
+            saltaProssimoTurno = false;
+            avanzaGiocatore();
+        }
+    }
+
+    private void avanzaGiocatore() {
         if (sensoOrario) {
             indiceGiocatoreAttivo = (indiceGiocatoreAttivo + 1) % giocatori.size();
         } else {

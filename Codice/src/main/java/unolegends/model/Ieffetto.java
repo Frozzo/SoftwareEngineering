@@ -2,7 +2,7 @@ package unolegends.model;
 
 public interface Ieffetto {
 
-    void attivaeffetto(Partita partita);
+    void attivaEffetto(Partita partita);
 
     default RichiestaInput getRichiestaInput() {
         return null;
@@ -12,10 +12,10 @@ public interface Ieffetto {
         return getRichiestaInput() == null ? risposta == null : risposta != null;
     }
 
-    default void attivaeffetto(Partita partita, String risposta) {
+    default void attivaEffetto(Partita partita, String risposta) {
         if (getRichiestaInput() != null) {
             throw new IllegalArgumentException("L'effetto richiede un input");
         }
-        attivaeffetto(partita);
+        attivaEffetto(partita);
     }
 }
