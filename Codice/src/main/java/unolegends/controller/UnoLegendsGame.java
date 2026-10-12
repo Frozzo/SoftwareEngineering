@@ -40,7 +40,7 @@ public class UnoLegendsGame {
         return new StatoPartita(
                 partita.getNomeGiocatoreAttivo(),
                 partita.getManoGiocatoreAttivo().stream()
-                        .map(carta -> carta.getDescrizioneBreve())
+                        .map(Carta::getDescrizioneBreve)
                         .collect(Collectors.toList()),
                 formattaCarta(partita.getPilaDegliScarti().getCartaInCima()),
                 partita.isCartaPescataDaGiocare(),
