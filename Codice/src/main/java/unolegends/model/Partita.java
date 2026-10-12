@@ -155,15 +155,16 @@ public class Partita {
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
         effetto.attivaEffetto(this, rispostaInput);
-        if (penultimaCartaGiocata && !unoDichiarato) {
+        boolean penalizzataPerMancatoUno = penultimaCartaGiocata && !unoDichiarato;
+        if (penalizzataPerMancatoUno) {
             regole.applicaPenalitaMancatoUno(giocatoreAttivo, this);
         }
         if (regole.isVincitore(giocatoreAttivo, this)) {
             vincitore = giocatoreAttivo;
-            return EsitoGiocata.completata(true);
+            return EsitoGiocata.completata(true, penalizzataPerMancatoUno);
         }
         aggiornaGiocatoreAttivo();
-        return EsitoGiocata.completata(true);
+        return EsitoGiocata.completata(true, penalizzataPerMancatoUno);
     }
 
     public boolean rispondiRichiestaInputIniziale(String rispostaInput) {

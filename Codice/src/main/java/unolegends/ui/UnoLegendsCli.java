@@ -77,8 +77,7 @@ public final class UnoLegendsCli {
                         continue;
                     }
 
-                    if (giocaCarta(indiceCarta, controller, scanner,
-                            stato.getManoGiocatoreAttivo().size() == 2)) {
+                    if (giocaCarta(indiceCarta, controller, scanner)) {
                         System.out.println("Carta giocata.");
                     } else {
                         System.out.println("Mossa non valida.");
@@ -101,8 +100,7 @@ public final class UnoLegendsCli {
                         System.out.println("Valore non valido.");
                         continue;
                     }
-                    if (giocaCarta(indiceCarta, controller, scanner,
-                            stato.getManoGiocatoreAttivo().size() == 2)) {
+                    if (giocaCarta(indiceCarta, controller, scanner)) {
                         System.out.println("Carta giocata.");
                     } else {
                         System.out.println("Mossa non valida.");
@@ -135,16 +133,15 @@ public final class UnoLegendsCli {
         System.out.println();
     }
 
-    private static boolean giocaCarta(int indiceCarta, UnoLegendsGame controller, Scanner scanner,
-                                      boolean richiedeDichiarazioneUno) {
-        boolean unoDichiarato = richiedeDichiarazioneUno && dichiaraUno(scanner);
+    private static boolean giocaCarta(int indiceCarta, UnoLegendsGame controller, Scanner scanner) {
+        boolean unoDichiarato = dichiaraUno(scanner);
         EsitoGiocata esito = controller.giocaCarta(indiceCarta, null, unoDichiarato);
         while (esito.getRichiestaInput() != null) {
             String risposta = richiediInput(scanner, esito.getRichiestaInput());
             esito = controller.giocaCarta(indiceCarta, risposta, unoDichiarato);
         }
         boolean giocataValida = esito.isGiocata();
-        if (giocataValida && richiedeDichiarazioneUno && !unoDichiarato) {
+        if (esito.isPenalizzataPerMancatoUno()) {
             System.out.println("UNO non dichiarato: hai pescato due carte di penalita.");
         }
         return giocataValida;
