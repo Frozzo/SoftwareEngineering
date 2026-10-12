@@ -1,79 +1,59 @@
 @startuml
-title UNO Legends - Flusso verifica carta giocabile
+title UNO Legends - Verifica giocata e interazione richiesta dall'effetto
 
 |Utente|
 start
 :Sceglie "gioca carta";
 
 |UnoLegendsCli|
-:Raccoglie l'indice della carta;
+:Raccoglie l'indice;
+:Invoca UnoLegendsGame.giocaCarta(indice, null, unoDichiarato);
 
 |UnoLegendsGame|
-:Invoca Partita.giocaCarta(indice);
+:Inoltra il tentativo a Partita;
 
 |Partita|
-if (Colore iniziale ancora da scegliere?) then (si)
-  :Restituisce false;
+if (Partita terminata o input iniziale in attesa?) then (si)
+  :Restituisce giocata non completata;
   stop
 endif
 
-:Chiede la carta al Giocatore;
-if (Carta presente?) then (no)
-  :Restituisce false;
+:Chiede la carta al giocatore attivo;
+if (Carta presente e giocabile?) then (no)
+  :Restituisce giocata non completata;
   stop
 endif
 
-if (Jolly o +4 senza colore scelto?) then (si)
-  |UnoLegendsCli|
-  :Richiede il nuovo colore;
+:Richiede all'effetto l'eventuale input;
+if (Input richiesto?) then (si)
+  :Restituisce EsitoGiocata con RichiestaInput;
   |UnoLegendsGame|
-  :Invoca scegliColore(colore);
+  :Inoltra RichiestaInput alla UI;
+  |UnoLegendsCli|
+  :Mostra messaggio/opzioni genericamente;
+  :Raccoglie la risposta;
+  :Ritenta la giocata con la risposta;
+  |UnoLegendsGame|
+  :Inoltra la risposta;
   |Partita|
-  if (Colore valido?) then (no)
-    :Restituisce false;
+  :Delega all'effetto la validazione della risposta;
+  if (Risposta valida?) then (no)
+    :Restituisce la stessa RichiestaInput;
+    |UnoLegendsCli|
+    :Ripete la richiesta;
     stop
   endif
 endif
 
 |Partita|
-if (Carta pescata diversa\nda quella appena pescata?) then (si)
-  :Restituisce false;
-  stop
-endif
-
-:Legge la carta in cima agli scarti;
-:Invoca RegoleDiGioco.isGiocabile(...);
-
-|RegoleDiGioco|
-:Invoca StrategiaCompatibilitaCarte.puoGiocare(...);
-
-|StrategiaCompatibilitaCarte|
-if (Carta nera/jolly?) then (si)
-  :Restituisce true;
-elseif (Penalità pendente > 0?) then (si)
-  :Restituisce false;
-elseif (Stesso colore attivo\no stesso valore/tipo?) then (si)
-  :Restituisce true;
-else (no)
-  :Restituisce false;
-endif
-
-|RegoleDiGioco|
-:Restituisce l'esito a Partita;
-
-|Partita|
-if (Carta giocabile?) then (no)
-  :Restituisce false;
-  stop
-endif
-
 :Estrae la carta dalla mano;
 :Aggiunge la carta agli scarti;
-:Attiva l'effetto;
-:Aggiorna il giocatore attivo;
+:Attiva l'effetto con la risposta ricevuta;
+:Verifica vittoria e penalità UNO;
+:Aggiorna il turno se la partita continua;
 
 |UnoLegendsGame|
-:Restituisce true;
+:Restituisce EsitoGiocata completato;
 
 |UnoLegendsCli|
 :Mostra l'esito all'utente;

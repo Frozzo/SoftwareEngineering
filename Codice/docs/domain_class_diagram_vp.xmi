@@ -55,7 +55,6 @@
 
     <packagedElement xmi:type="uml:Class" xmi:id="class_partita_vp" name="Partita">
       <ownedAttribute xmi:id="attr_partita_turno_vp" name="turnoCorrente" visibility="private"/>
-      <ownedOperation xmi:id="op_partita_getStato_vp" name="getStatoTurno" visibility="public"/>
       <ownedOperation xmi:id="op_partita_gioca_vp" name="giocaCarta" visibility="public"/>
       <ownedOperation xmi:id="op_partita_pesca_vp" name="pescaCarta" visibility="public"/>
       <ownedOperation xmi:id="op_partita_passa_vp" name="passaTurno" visibility="public"/>
@@ -84,11 +83,6 @@
       <ownedOperation xmi:id="op_game_gioca_vp" name="giocaCarta" visibility="public"/>
       <ownedOperation xmi:id="op_game_pesca_vp" name="pescaCarta" visibility="public"/>
       <ownedOperation xmi:id="op_game_passa_vp" name="passaTurno" visibility="public"/>
-    </packagedElement>
-
-    <packagedElement xmi:type="uml:Class" xmi:id="class_statoturno_vp" name="StatoTurno">
-      <ownedAttribute xmi:id="attr_stato_nome_vp" name="nomeGiocatoreAttivo" visibility="private"/>
-      <ownedAttribute xmi:id="attr_stato_deve_vp" name="deveGiocareCartaPescata" visibility="private"/>
     </packagedElement>
 
     <!-- Realizations -->
@@ -150,22 +144,6 @@
         <lowerValue xmi:type="uml:LiteralInteger" xmi:id="lower_game_partita" value="1"/>
         <upperValue xmi:type="uml:LiteralInteger" xmi:id="upper_game_partita" value="1"/>
       </ownedEnd>
-    </packagedElement>
-
-    <!-- StatoTurno associations to Carta -->
-    <packagedElement xmi:type="uml:Association" xmi:id="assoc_stato_mano_vp" name="Stato_mano">
-      <ownedEnd xmi:id="end_stato_mano_vp_1" type="class_statoturno_vp" name="stato"/>
-      <ownedEnd xmi:id="end_stato_mano_vp_2" type="class_carta_vp" name="manoGiocatoreAttivo"/>
-    </packagedElement>
-
-    <packagedElement xmi:type="uml:Association" xmi:id="assoc_stato_inCima_vp" name="Stato_cartaInCima">
-      <ownedEnd xmi:id="end_stato_inCima_vp_1" type="class_statoturno_vp" name="stato"/>
-      <ownedEnd xmi:id="end_stato_inCima_vp_2" type="class_carta_vp" name="cartaInCima"/>
-    </packagedElement>
-
-    <packagedElement xmi:type="uml:Association" xmi:id="assoc_stato_appena_vp" name="Stato_cartaAppenaPescata">
-      <ownedEnd xmi:id="end_stato_appena_vp_1" type="class_statoturno_vp" name="stato"/>
-      <ownedEnd xmi:id="end_stato_appena_vp_2" type="class_carta_vp" name="cartaAppenaPescata"/>
     </packagedElement>
 
     <!-- Comments -->

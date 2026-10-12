@@ -4,10 +4,9 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import unolegends.model.Carta;
-import unolegends.model.Colore;
+import unolegends.model.EsitoGiocata;
 import unolegends.model.Partita;
 import unolegends.model.PartitaFactory;
-import unolegends.model.StatoTurno;
 
 /**
  * GRASP Controller (Facade): punto di ingresso per la UI CLI.
@@ -31,18 +30,17 @@ public class UnoLegendsGame {
      * Restituisce alla UI uno snapshot già convertito in dati di presentazione.
      */
     public StatoPartita richiediStato() {
-        StatoTurno stato = partita.getStatoTurno();
         return new StatoPartita(
-                stato.getNomeGiocatoreAttivo(),
-                stato.getManoGiocatoreAttivo().stream()
+                partita.getNomeGiocatoreAttivo(),
+                partita.getManoGiocatoreAttivo().stream()
                         .map(carta -> carta.toCliString())
                         .collect(Collectors.toList()),
-                formattaCarta(stato.getCartaInCima()),
-                stato.isDeveGiocareCartaPescata(),
-                formattaCarta(stato.getCartaAppenaPescata()),
-                stato.isDeveScegliereColoreIniziale(),
-                stato.isPartitaTerminata(),
-                stato.getNomeVincitore());
+                formattaCarta(partita.getPilaDegliScarti().getCartaInCima()),
+                partita.isCartaPescataDaGiocare(),
+                formattaCarta(partita.getCartaAppenaPescata()),
+                partita.getRichiestaInputIniziale(),
+                partita.isPartitaTerminata(),
+                partita.getNomeVincitore());
     }
 
     public int carteNelMazzo() {
@@ -50,31 +48,17 @@ public class UnoLegendsGame {
     }
 
     /**
-     * Indica alla UI se la giocata selezionata richiede un colore.
+     * Inoltra al dominio il tentativo di giocata e l'eventuale risposta richiesta dall'effetto.
      */
-    public boolean cartaRichiedeSceltaColore(int indiceCarta) {
-        return partita.cartaRichiedeSceltaColore(indiceCarta);
+    public EsitoGiocata giocaCarta(int indiceCarta, String rispostaInput, boolean unoDichiarato) {
+        return partita.giocaCarta(indiceCarta, unoDichiarato, rispostaInput);
     }
 
     /**
-     * Coordina la scelta opzionale del colore e la successiva giocata.
+     * Inoltra la risposta alla richiesta emessa dall'effetto della carta iniziale.
      */
-    public boolean giocaCarta(int indiceCarta, Integer sceltaColore, boolean unoDichiarato) {
-        if (sceltaColore != null) {
-            Colore colore = convertiColore(sceltaColore);
-            if (colore == null || !partita.scegliColore(colore)) {
-                return false;
-            }
-        }
-        return partita.giocaCarta(indiceCarta, unoDichiarato);
-    }
-
-    /**
-     * Accetta un indice colore della UI: 0 rosso, 1 verde, 2 blu, 3 giallo.
-     */
-    public boolean scegliColore(int sceltaColore) {
-        Colore colore = convertiColore(sceltaColore);
-        return colore != null && partita.scegliColore(colore);
+    public boolean rispondiRichiestaInputIniziale(String rispostaInput) {
+        return partita.rispondiRichiestaInputIniziale(rispostaInput);
     }
 
     /**
@@ -93,20 +77,5 @@ public class UnoLegendsGame {
 
     private static String formattaCarta(Carta carta) {
         return carta == null ? null : carta.toCliString();
-    }
-
-    private static Colore convertiColore(int sceltaColore) {
-        switch (sceltaColore) {
-            case 0:
-                return Colore.ROSSO;
-            case 1:
-                return Colore.VERDE;
-            case 2:
-                return Colore.BLU;
-            case 3:
-                return Colore.GIALLO;
-            default:
-                return null;
-        }
     }
 }

@@ -48,9 +48,8 @@ public class RegoleDiGioco {
         this.strategiaPenalitaUno = Objects.requireNonNull(strategiaPenalitaUno);
     }
 
-    public boolean isGiocabile(Carta candidata, Carta inCima, Partita partita) {
-        StatoTurno statoTurno = partita == null ? null : partita.getStatoTurno();
-        return strategiaCompatibilitaCarte.puoGiocare(candidata, inCima, null, statoTurno);
+    public boolean isGiocabile(Carta candidata, Carta inCima) {
+        return strategiaCompatibilitaCarte.puoGiocare(candidata, inCima, null);
     }
 
     public boolean isVincitore(Giocatore giocatore, Partita partita) {

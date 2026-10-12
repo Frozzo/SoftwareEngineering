@@ -2,6 +2,7 @@
 title GiocaTurno - Diagramma di Sequenza (Iterazione 1)
 
 actor Giocatore
+participant "UnoLegendsCli (UI)" as CLIProg
 participant "UnoLegendsGame\n(Controller)" as Controller
 participant "Partita\n(Coordinator)" as Partita
 participant "Giocatore\n(Expert)" as GiocatoreExpert
@@ -11,7 +12,7 @@ participant "Mazzo\n(Expert)" as Mazzo
 == Evento 1: richiediStato() ==
 Giocatore -> Controller: richiediStato()
 activate Controller
-Controller -> Partita: getStatoTurno()
+Controller -> Partita: getGiocatoreAttivo() e getter di stato
 activate Partita
 Partita -> GiocatoreExpert: getMano()
 activate GiocatoreExpert
@@ -23,9 +24,9 @@ activate PilaScarti
 PilaScarti --> Partita: Carta cartaInCima
 deactivate PilaScarti
 
-Partita --> Controller: StatoTurno (stato turno corrente)
+Partita --> Controller: giocatore attivo e valori di stato
 deactivate Partita
-Controller --> Giocatore: StatoTurno con mano e carta in cima
+Controller --> Giocatore: StatoPartita con mano e carta in cima
 deactivate Controller
 
 == Evento 2: giocaCarta(indiceCarta) ==
@@ -33,6 +34,13 @@ Giocatore -> Controller: giocaCarta(indiceCarta)
 activate Controller
 Controller -> Partita: giocaCarta(indiceCarta)
 activate Partita
+Partita --> Controller: EsitoGiocata.inAttesa(RichiestaInput)
+Controller --> CLIProg: richiesta di input dell'effetto
+CLIProg -> CLIProg: Mostra messaggio/opzioni genericamente
+Giocatore -> CLIProg: Fornisce la risposta
+CLIProg -> Controller: giocaCarta(indiceCarta, risposta, unoDichiarato)
+Controller -> Partita: giocaCarta(indiceCarta, risposta)
+Partita -> Partita: Valida e inoltra la risposta all'effetto
 
 Partita -> PilaScarti: getCartaInCima()
 activate PilaScarti

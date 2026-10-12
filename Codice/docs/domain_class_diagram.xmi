@@ -48,7 +48,6 @@
 
     <packagedElement xmi:type="uml:Class" xmi:id="class_partita" name="Partita">
       <ownedAttribute xmi:id="attr_partita_turno" name="turnoCorrente" visibility="private"/>
-      <ownedOperation xmi:id="op_partita_getStato" name="getStatoTurno" visibility="public"/>
       <ownedOperation xmi:id="op_partita_gioca" name="giocaCarta" visibility="public"/>
       <ownedOperation xmi:id="op_partita_pesca" name="pescaCarta" visibility="public"/>
       <ownedOperation xmi:id="op_partita_passa" name="passaTurno" visibility="public"/>
@@ -77,11 +76,6 @@
       <ownedOperation xmi:id="op_game_gioca" name="giocaCarta" visibility="public"/>
       <ownedOperation xmi:id="op_game_pesca" name="pescaCarta" visibility="public"/>
       <ownedOperation xmi:id="op_game_passa" name="passaTurno" visibility="public"/>
-    </packagedElement>
-
-    <packagedElement xmi:type="uml:Class" xmi:id="class_statoturno" name="StatoTurno">
-      <ownedAttribute xmi:id="attr_stato_nome" name="nomeGiocatoreAttivo" visibility="private"/>
-      <ownedAttribute xmi:id="attr_stato_deve" name="deveGiocareCartaPescata" visibility="private"/>
     </packagedElement>
 
     <!-- Generalizations and Realizations -->
@@ -127,22 +121,6 @@
     <packagedElement xmi:type="uml:Association" xmi:id="assoc_game_partita" name="Game_partita">
       <ownedEnd xmi:id="end_game_partita_1" type="class_unolegendsgame" name="game"/>
       <ownedEnd xmi:id="end_game_partita_2" type="class_partita" name="partita"/>
-    </packagedElement>
-
-    <!-- StatoTurno associations to Carta (as separate associations) -->
-    <packagedElement xmi:type="uml:Association" xmi:id="assoc_stato_mano" name="Stato_mano">
-      <ownedEnd xmi:id="end_stato_mano_1" type="class_statoturno" name="stato"/>
-      <ownedEnd xmi:id="end_stato_mano_2" type="class_carta" name="manoGiocatoreAttivo"/>
-    </packagedElement>
-
-    <packagedElement xmi:type="uml:Association" xmi:id="assoc_stato_inCima" name="Stato_cartaInCima">
-      <ownedEnd xmi:id="end_stato_inCima_1" type="class_statoturno" name="stato"/>
-      <ownedEnd xmi:id="end_stato_inCima_2" type="class_carta" name="cartaInCima"/>
-    </packagedElement>
-
-    <packagedElement xmi:type="uml:Association" xmi:id="assoc_stato_appenaPescata" name="Stato_cartaAppenaPescata">
-      <ownedEnd xmi:id="end_stato_appena_1" type="class_statoturno" name="stato"/>
-      <ownedEnd xmi:id="end_stato_appena_2" type="class_carta" name="cartaAppenaPescata"/>
     </packagedElement>
 
     <!-- Notes as comment -->

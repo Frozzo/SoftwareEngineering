@@ -48,7 +48,6 @@
 
     <packagedElement xmi:type="uml:Class" xmi:id="class_partita_vp" name="Partita">
       <ownedAttribute xmi:id="attr_partita_turno_vp" name="turnoCorrente" visibility="private"/>
-      <ownedOperation xmi:id="op_partita_getStato_vp" name="getStatoTurno" visibility="public"/>
       <ownedOperation xmi:id="op_partita_gioca_vp" name="giocaCarta" visibility="public"/>
       <ownedOperation xmi:id="op_partita_pesca_vp" name="pescaCarta" visibility="public"/>
       <ownedOperation xmi:id="op_partita_passa_vp" name="passaTurno" visibility="public"/>
@@ -79,11 +78,6 @@
       <ownedOperation xmi:id="op_game_passa_vp" name="passaTurno" visibility="public"/>
     </packagedElement>
 
-    <packagedElement xmi:type="uml:Class" xmi:id="class_statoturno_vp" name="StatoTurno">
-      <ownedAttribute xmi:id="attr_stato_nome_vp" name="nomeGiocatoreAttivo" visibility="private"/>
-      <ownedAttribute xmi:id="attr_stato_deve_vp" name="deveGiocareCartaPescata" visibility="private"/>
-    </packagedElement>
-
     <!-- Diagram Package -->
     <packagedElement xmi:type="uml:Package" xmi:id="pkg_diagrams_vp" name="Diagrams">
       <packagedElement xmi:type="uml:Diagram" xmi:id="diagram_class_vp" name="Class Diagram">
@@ -105,7 +99,6 @@
 
           <diagramElement xmi:type="vp:Node" xmi:id="vp_node_unogame" subject="class_unolegendsgame_vp" x="320" y="380" width="220" height="80"/>
 
-          <diagramElement xmi:type="vp:Node" xmi:id="vp_node_statoturno" subject="class_statoturno_vp" x="40" y="380" width="220" height="80"/>
 
           <!-- Optionally add simple connectors for key associations -->
           <diagramElement xmi:type="vp:Connector" xmi:id="vp_conn_partita_giocatori" subject="assoc_partita_giocatori_vp" waypoints="(220,310),(260,300)"/>

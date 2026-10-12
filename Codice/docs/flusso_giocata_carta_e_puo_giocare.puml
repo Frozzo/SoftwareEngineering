@@ -1,75 +1,63 @@
 @startuml
-title UNO Legends - Giocata carta e controllo puoGiocare
+title UNO Legends - Giocata carta e richiesta di input dell'effetto
 
 |Utente|
 start
 :Sceglie l'opzione "gioca carta";
 
 |UnoLegendsCli|
-:Invoca parseIndice(scanner.nextLine().trim());
-:Invoca preparaColorePerCarta(...);
-
-if (Carta con effetto cambio colore?) then (si)
-  :Invoca scegliColore(scanner);
-  |UnoLegendsGame|
-  :Invoca scegliColore(colore);
-  |Partita|
-  :Valida colore != null e != NERO;
-endif
+:Raccoglie indice e dichiarazione UNO;
+:Invoca UnoLegendsGame.giocaCarta(indice, null, unoDichiarato);
 
 |UnoLegendsGame|
-:Invoca giocaCarta(indiceCarta);
+:Inoltra il tentativo a Partita;
 
 |Partita|
-:Invoca getGiocatoreAttivo();
-:Invoca Giocatore.getCartaInPosizione(indiceCarta);
+:Verifica partita, carta in mano e regola della carta appena pescata;
+:Verifica la compatibilità della carta;
 
-if (Carta non presente?) then (si)
-  :Restituisce false;
+if (Mossa non valida?) then (si)
+  :Restituisce EsitoGiocata senza richiesta;
   |UnoLegendsCli|
   :Mostra "Mossa non valida";
   stop
 endif
 
-if (Carta pescata da giocare\ne carta diversa?) then (si)
-  :Restituisce false;
-  stop
+:Invoca carta.getEffetto().getRichiestaInput();
+
+if (L'effetto richiede un input?) then (si)
+  :Restituisce EsitoGiocata.inAttesa(RichiestaInput);
+  |UnoLegendsGame|
+  :Inoltra la richiesta alla UI;
+  |UnoLegendsCli|
+  :Mostra messaggio e opzioni senza identificare l'effetto;
+  :Raccoglie la risposta;
+  :Invoca giocaCarta(indice, risposta, unoDichiarato);
+  |UnoLegendsGame|
+  :Inoltra il tentativo con la risposta;
+  |Partita|
+  :Invoca effetto.validaRispostaInput(risposta);
+  if (Risposta valida?) then (no)
+    :Restituisce la stessa richiesta;
+    |UnoLegendsCli|
+    :Mostra nuovamente la richiesta;
+    stop
+  endif
 endif
-
-:Invoca PilaDegliScarti.getCartaInCima();
-:Invoca RegoleDiGioco.isGiocabile(cartaSelezionata, cartaInCima, this);
-
-|RegoleDiGioco|
-:Invoca strategiaCorrispondenza.puoGiocare(...);
-
-|StrategiaCompatibilitaCarte|
-:Controlla carta nulla;
-:Controlla eventuale carta nera/jolly;
-:Confronta colore attivo o carta in cima;
-:Confronta valore/tipo;
-:Restituisce boolean;
-
-|RegoleDiGioco|
-:Restituisce esito;
 
 |Partita|
-if (Carta non giocabile?) then (si)
-  :Restituisce false;
-  stop
-endif
-
-:Invoca Giocatore.estraiCarta(indiceCarta);
-:Invoca PilaDegliScarti.aggiungiCarta(cartaDaGiocare);
-:Imposta cartaAppenaPescata = null;
-:Imposta cartaPescataDaGiocare = false;
-:Invoca cartaDaGiocare.getEffetto().attivaeffetto(this);
-:Invoca aggiornaGiocatoreAttivo();
-:Restituisce true;
+:Invoca Giocatore.estraiCarta(indice);
+:Invoca PilaDegliScarti.aggiungiCarta(carta);
+:Invoca carta.getEffetto().attivaeffetto(this, risposta);
+:Applica la penalità UNO se necessaria;
+:Verifica la condizione di vittoria;
+:Aggiorna il giocatore attivo se la partita continua;
+:Restituisce EsitoGiocata.completata(true);
 
 |UnoLegendsGame|
-:Restituisce esito;
+:Restituisce l'esito;
 
 |UnoLegendsCli|
-:Mostra "Carta giocata" o "Mossa non valida";
+:Mostra "Carta giocata";
 stop
 @enduml

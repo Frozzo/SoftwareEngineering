@@ -6,7 +6,6 @@ start
 :Seleziona carta +2;
 
 |UnoLegendsCli|
-:Invoca preparaColorePerCarta(...);
 :Invoca UnoLegendsGame.giocaCarta(indice);
 
 |UnoLegendsGame|

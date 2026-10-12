@@ -1,114 +1,183 @@
 @startuml
-title Design Class Diagram - UnoLegends (Iterazione 1 & Foresight)
+title UnoLegends - model
 skinparam classAttributeIconSize 0
+hide empty members
+scale max 7000 width
 
-' Interfaces and abstract
-abstract class Carta {
-  -id : String
-  +getId() : String
-  +toCliString() : String
+package "unolegends.model" {
+  abstract class Carta {
+    +getColore() : Colore
+    +getValoreCarta() : ValoreCarta
+    +getEffetto() : Ieffetto
+  }
+
+  class CartaNumero {
+    -colore : Colore
+    -valore : ValoreCarta
+    -effetto : Ieffetto
+    +toCliString() : String
+  }
+
+  class CartaSpeciale {
+    -colore : Colore
+    -valore : ValoreCarta
+    -effetto : Ieffetto
+    +setColore(colore : Colore) : void
+    +toCliString() : String
+  }
+
+  class Giocatore {
+    -nome : String
+    -mano : List<Carta>
+    +getMano() : List<Carta>
+    +getCartaInPosizione(indice : int) : Carta
+    +estraiCarta(indice : int) : Carta
+    +aggiungiCarta(carta : Carta) : void
+  }
+
+  class Partita {
+    -giocatori : List<Giocatore>
+    -mazzo : Mazzo
+    -pilaDegliScarti : PilaDegliScarti
+    -regole : RegoleDiGioco
+    -indiceGiocatoreAttivo : int
+    -vincitore : Giocatore
+    +giocaCarta(indice : int, uno : boolean, risposta : String) : EsitoGiocata
+    +pescaCarta() : boolean
+    +passaTurno() : boolean
+  }
+
+  class RegoleDiGioco {
+    +isGiocabile(carta : Carta, cima : Carta) : boolean
+    +isVincitore(giocatore : Giocatore, partita : Partita) : boolean
+    +pesca(giocatore : Giocatore, partita : Partita) : List<Carta>
+    +{static} standard() : RegoleDiGioco
+    +{static} noMercy() : RegoleDiGioco
+  }
+
+  class Mazzo {
+    -carte : Deque<Carta>
+    +prelevaCarta() : Carta
+    +rimescolaDaScarti(scarti : PilaDegliScarti) : void
+  }
+
+  class PilaDegliScarti {
+    -scarti : List<Carta>
+    +getCartaInCima() : Carta
+    +aggiungiCarta(carta : Carta) : void
+  }
+
+  interface Ieffetto {
+    +attivaeffetto(partita : Partita) : void
+    +getRichiestaInput() : RichiestaInput
+    +validaRispostaInput(risposta : String) : boolean
+    +attivaeffetto(partita : Partita, risposta : String) : void
+  }
+
+  class Effetto_Nullo
+  class Effetto_Cambia_colore
+  class Effetto_pescata_carte {
+    -numeroCarteDaPescare : int
+  }
+  class Effetto_Blocca_Turno
+  class Effetto_cambio_giro
+  class EffettoComposito {
+    -effetti : List<Ieffetto>
+  }
+
+  class RichiestaInput {
+    -messaggio : String
+    -opzioni : List<String>
+  }
+
+  class EsitoGiocata {
+    -giocata : boolean
+    -richiestaInput : RichiestaInput
+    +{static} completata(giocata : boolean) : EsitoGiocata
+    +{static} inAttesa(richiesta : RichiestaInput) : EsitoGiocata
+  }
+
+  abstract class MazzoFactory {
+    +getCarteNormali() : List<Carta>
+    +creaMazzo(source : List<Carta>, inizio : int, dimensione : int) : Mazzo
+  }
+
+  class StandardMazzoFactory {
+    +{static} getInstance() : StandardMazzoFactory
+    +getCarteNormali() : List<Carta>
+  }
+
+  class PartitaFactory {
+    +{static} creaPartitaStandard() : Partita
+    +{static} creaPartita(tipo : TipoMazzo, giocatori : int) : Partita
+  }
+
+  enum Colore {
+    ROSSO
+    VERDE
+    BLU
+    GIALLO
+    NERO
+  }
+
+  enum ValoreCarta {
+    ZERO
+    UNO
+    DUE
+    TRE
+    QUATTRO
+    CINQUE
+    SEI
+    SETTE
+    OTTO
+    NOVE
+    PIU_DUE
+    BLOCCA_TURNO
+    CAMBIA_GIRO
+    CAMBIA_COLORE
+    PIU_QUATTRO
+  }
+
+  enum TipoMazzo {
+    STANDARD
+    NO_MERCY
+  }
 }
 
-interface RegoleDiGioco {
-  +isGiocabile(candidata : Carta, inCima : Carta, partita : Partita) : boolean
-}
-
-class RegoleStandard {
-  +isGiocabile(candidata : Carta, inCima : Carta, partita : Partita) : boolean
-}
-
-class CartaNumero {
-  -colore : Colore
-  -numero : int
-}
-
-class CartaSpeciale {
-  -tipo : String
-  -attributi : Map<String,Object>
-}
-
-' Domain actors / aggregates
-class Giocatore {
-  -nome : String
-  +aggiungiCarta(carta : Carta) : void
-  +estraiCarta(indice : int) : Carta
-  +getCartaInPosizione(indice : int) : Carta
-}
-
-class Mazzo {
-  +prelevaCarta() : Carta
-}
-
-class PilaDegliScarti {
-  +aggiungiCarta(carta : Carta) : void
-  +getCartaInCima() : Carta
-}
-
-class Partita {
-  -turnoCorrente : int
-  +getStatoTurno() : StatoTurno
-  +giocaCarta(indice : int) : boolean
-  +pescaCarta() : boolean
-  +passaTurno() : boolean
-}
-
-class PartitaFactory <<Factory>> {
-  +{static} creaPartitaStandard() : Partita
-  +{static} creaPartita(numeroGiocatori : int) : Partita
-}
-
-abstract class MazzoFactory <<Abstract Factory>> {
-  +getCarteNormali() : List<Carta>
-  +creaMazzo(source : List<Carta>, startIndex : int, size : int) : Mazzo
-}
-
-class StandardMazzoFactory <<Factory, Singleton>> {
-  -{static} instance : StandardMazzoFactory
-  +{static} getInstance() : StandardMazzoFactory
-  +getCarteNormali() : List<Carta>
-  +creaMazzo(source : List<Carta>, startIndex : int, size : int) : Mazzo
-}
-
-class UnoLegendsGame <<Facade>> {
-  +richiediStato() : StatoTurno
-  +giocaCarta(indice : int) : boolean
-  +pescaCarta() : boolean
-  +passaTurno() : boolean
-}
-
-class StatoTurno {
-  -nomeGiocatoreAttivo : String
-  -deveGiocareCartaPescata : boolean
-}
-
-' relationships (Inheritance and Realization)
 Carta <|-- CartaNumero
 Carta <|-- CartaSpeciale
-RegoleDiGioco <|.. RegoleStandard
+
+Ieffetto <|.. Effetto_Nullo
+Ieffetto <|.. Effetto_Cambia_colore
+Ieffetto <|.. Effetto_pescata_carte
+Ieffetto <|.. Effetto_Blocca_Turno
+Ieffetto <|.. Effetto_cambio_giro
+Ieffetto <|.. EffettoComposito
+
 MazzoFactory <|-- StandardMazzoFactory
 
-' Navigability (Attribute visualization)
-Giocatore "1" --> "*" Carta : mano
-Mazzo "1" --> "*" Carta : contiene
-PilaDegliScarti "1" --> "*" Carta : scarti
+CartaNumero --> Ieffetto : effetto
+CartaSpeciale --> Ieffetto : effetto
+EffettoComposito --> "1..*" Ieffetto : effetti
+CartaNumero --> Colore
+CartaSpeciale --> Colore
+CartaNumero --> ValoreCarta
+CartaSpeciale --> ValoreCarta
 
-Partita "1" --> "2..4" Giocatore : giocatori
-Partita "1" --> "1" Mazzo : mazzo
-Partita "1" --> "1" PilaDegliScarti : scarti
-Partita "1" --> "1" RegoleDiGioco : regole
+Giocatore "1" --> "0..*" Carta : mano
+Mazzo "1" --> "0..*" Carta : carte
+PilaDegliScarti "1" --> "0..*" Carta : scarti
+Partita "1" --> "1..*" Giocatore : giocatori
+Partita "1" --> "1" Mazzo
+Partita "1" --> "1" PilaDegliScarti
+Partita "1" --> "1" RegoleDiGioco
+Partita --> "0..1" Giocatore : vincitore
+EsitoGiocata --> "0..1" RichiestaInput
 
-UnoLegendsGame --> "1" Partita : partita
-
-' StatoTurno Visual Attributes
-StatoTurno --> "*" Carta : manoGiocatoreAttivo
-StatoTurno --> "1" Carta : cartaInCima
-StatoTurno --> "0..1" Carta : cartaAppenaPescata
-
-' Creation and Dependency relationships
+Mazzo ..> PilaDegliScarti : rimescola
 PartitaFactory ..> Partita : crea
-PartitaFactory ..> MazzoFactory : usa
-StandardMazzoFactory ..> Mazzo : crea
-
-note "Design notes:\n- Sintassi UML standard applicata per attributi e metodi.\n- `RegoleDiGioco` is an interface Strategy/Policy; `RegoleStandard` is the default implementation injected into `Partita`.\n- `CartaSpeciale` represents extensibility for non-numeric cards (Iteration-2).\n- `MazzoFactory` is modeled as an Abstract Factory; `StandardMazzoFactory` implements the Singleton pattern and owns deck composition.\n- `PartitaFactory` is a Factory (GOF) / Creator (GRASP) for setup and selects the concrete deck factory during start-up.\n- `UnoLegendsGame` is Facade/Controller.\n" as N2
+PartitaFactory ..> MazzoFactory : seleziona
+StandardMazzoFactory ..> Carta : crea
+PartitaFactory ..> TipoMazzo
 
 @enduml

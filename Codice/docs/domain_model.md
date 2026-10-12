@@ -38,7 +38,7 @@ Sintesi delle scelte
 
 - `Partita`
   - Coordinator / Information Expert: orchestrazione del turno; mantiene riferimento a `RegoleDiGioco` per valutare se una carta è giocabile.
-  - Stato interno rilevante: l'indice del giocatore attivo. `StatoTurno` è uno snapshot interno del model; il controller lo converte in `StatoPartita`, che espone alla UI solo valori presentabili e non riferimenti alle entità del dominio.
+  - Stato interno rilevante: l'indice del giocatore attivo e l'eventuale effetto in attesa di input. Il controller costruisce `StatoPartita` e inoltra le richieste dichiarate dagli effetti; la UI non accede alle entità del dominio.
 
 - `UnoLegendsGame`
   - Facade / Controller per la UI.
@@ -57,7 +57,7 @@ Refactor applicato
 
 - La costruzione del mazzo standard è stata spostata in `StandardMazzoFactory`.
 - `PartitaFactory` usa `StandardMazzoFactory` per ottenere il catalogo standard e costruire il mazzo.
-- Tutte le strutture (`Giocatore`, `Mazzo`, `PilaDegliScarti`, `Partita`, `StatoTurno`) continuano a usare `Carta` come tipo comune.
+- Tutte le strutture (`Giocatore`, `Mazzo`, `PilaDegliScarti`, `Partita`) continuano a usare `Carta` come tipo comune.
 
 Prossimi passi consigliati
 

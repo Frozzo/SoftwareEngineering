@@ -3,8 +3,10 @@ package unolegends.controller;
 import java.util.List;
 import java.util.Objects;
 
+import unolegends.model.RichiestaInput;
+
 /**
- * Snapshot dello stato di gioco esposto alla UI senza riferimenti al dominio.
+ * Snapshot immutabile dello stato di gioco e dell'eventuale richiesta d'interazione.
  */
 public final class StatoPartita {
     private final String nomeGiocatoreAttivo;
@@ -12,13 +14,13 @@ public final class StatoPartita {
     private final String cartaInCima;
     private final boolean deveGiocareCartaPescata;
     private final String cartaAppenaPescata;
-    private final boolean deveScegliereColoreIniziale;
+    private final RichiestaInput richiestaInput;
     private final boolean partitaTerminata;
     private final String nomeVincitore;
 
     public StatoPartita(String nomeGiocatoreAttivo, List<String> manoGiocatoreAttivo,
                         String cartaInCima, boolean deveGiocareCartaPescata,
-                        String cartaAppenaPescata, boolean deveScegliereColoreIniziale,
+                        String cartaAppenaPescata, RichiestaInput richiestaInput,
                         boolean partitaTerminata, String nomeVincitore) {
         this.nomeGiocatoreAttivo = Objects.requireNonNull(nomeGiocatoreAttivo, "nomeGiocatoreAttivo non puo essere null");
         this.manoGiocatoreAttivo = List.copyOf(
@@ -26,7 +28,7 @@ public final class StatoPartita {
         this.cartaInCima = cartaInCima;
         this.deveGiocareCartaPescata = deveGiocareCartaPescata;
         this.cartaAppenaPescata = cartaAppenaPescata;
-        this.deveScegliereColoreIniziale = deveScegliereColoreIniziale;
+        this.richiestaInput = richiestaInput;
         this.partitaTerminata = partitaTerminata;
         this.nomeVincitore = nomeVincitore;
     }
@@ -51,8 +53,8 @@ public final class StatoPartita {
         return cartaAppenaPescata;
     }
 
-    public boolean isDeveScegliereColoreIniziale() {
-        return deveScegliereColoreIniziale;
+    public RichiestaInput getRichiestaInput() {
+        return richiestaInput;
     }
 
     public boolean isPartitaTerminata() {

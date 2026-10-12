@@ -21,13 +21,61 @@ public final class EffettoComposito implements Ieffetto {
         for (Ieffetto effetto : effetti) {
             copiaEffetti.add(Objects.requireNonNull(effetto, "un effetto non puo essere null"));
         }
+        if (contaEffettiConInput(copiaEffetti) > 1) {
+            throw new IllegalArgumentException("Un effetto composto puo richiedere un solo input");
+        }
         this.effetti = Collections.unmodifiableList(copiaEffetti);
     }
 
-    
+    private static int contaEffettiConInput(List<Ieffetto> effetti) {
+        int numeroRichieste = 0;
+        for (Ieffetto effetto : effetti) {
+            if (effetto instanceof EffettoComposito composto) {
+                numeroRichieste += contaEffettiConInput(composto.effetti);
+            } else if (effetto.getRichiestaInput() != null) {
+                numeroRichieste++;
+            }
+        }
+        return numeroRichieste;
+    }
+
     public void attivaeffetto(Partita partita) { //non so se qua co override va bene che vittoria ha detto che la prof si tilta
         for (Ieffetto effetto : effetti) {
             effetto.attivaeffetto(partita);
+        }
+    }
+
+    @Override
+    public RichiestaInput getRichiestaInput() {
+        for (Ieffetto effetto : effetti) {
+            RichiestaInput richiesta = effetto.getRichiestaInput();
+            if (richiesta != null) {
+                return richiesta;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public boolean validaRispostaInput(String risposta) {
+        for (Ieffetto effetto : effetti) {
+            if (effetto.getRichiestaInput() != null) {
+                return effetto.validaRispostaInput(risposta);
+            }
+        }
+        return risposta == null;
+    }
+
+    @Override
+    public void attivaeffetto(Partita partita, String risposta) {
+        boolean rispostaInoltrata = false;
+        for (Ieffetto effetto : effetti) {
+            if (!rispostaInoltrata && effetto.getRichiestaInput() != null) {
+                effetto.attivaeffetto(partita, risposta);
+                rispostaInoltrata = true;
+            } else {
+                effetto.attivaeffetto(partita);
+            }
         }
     }
 

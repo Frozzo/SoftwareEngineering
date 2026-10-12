@@ -15,8 +15,7 @@ public class Partita {
     private int indiceGiocatoreAttivo;
     private Carta cartaAppenaPescata;
     private boolean cartaPescataDaGiocare;
-    private boolean deveScegliereColoreIniziale;
-    private Colore coloreScelto;
+    private Ieffetto effettoInizialeInAttesa;
     private Giocatore vincitore;
     private boolean sensoOrario = true; // Variabile per tenere traccia del senso di gioco
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo) {
@@ -36,18 +35,41 @@ public class Partita {
         }
         this.indiceGiocatoreAttivo = indiceGiocatoreAttivo;
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
-        this.deveScegliereColoreIniziale = cartaInCima != null
-                && EffettoComposito.contieneEffetto(cartaInCima.getEffetto(), Effetto_Cambia_colore.class);
+        if (cartaInCima != null && cartaInCima.getEffetto().getRichiestaInput() != null) {
+            this.effettoInizialeInAttesa = cartaInCima.getEffetto();
+        }
     }
 
-    /**
-     * GRASP Coordinator: aggrega stato turno interrogando gli Information Expert.
-     */
-    public StatoTurno getStatoTurno() {
-        Giocatore attivo = getGiocatoreAttivo();
-        return new StatoTurno(attivo.getNome(), attivo.getMano(), pilaDegliScarti.getCartaInCima(),
-                cartaPescataDaGiocare, cartaAppenaPescata, deveScegliereColoreIniziale,
-                vincitore != null, vincitore == null ? null : vincitore.getNome());
+    private Giocatore getGiocatoreAttivo() {
+        return giocatori.get(indiceGiocatoreAttivo);
+    }
+
+    public String getNomeGiocatoreAttivo() {
+        return getGiocatoreAttivo().getNome();
+    }
+
+    public List<Carta> getManoGiocatoreAttivo() {
+        return getGiocatoreAttivo().getMano();
+    }
+
+    public boolean isCartaPescataDaGiocare() {
+        return cartaPescataDaGiocare;
+    }
+
+    public Carta getCartaAppenaPescata() {
+        return cartaAppenaPescata;
+    }
+
+    public RichiestaInput getRichiestaInputIniziale() {
+        return effettoInizialeInAttesa == null ? null : effettoInizialeInAttesa.getRichiestaInput();
+    }
+
+    public boolean isPartitaTerminata() {
+        return vincitore != null;
+    }
+
+    public String getNomeVincitore() {
+        return vincitore == null ? null : vincitore.getNome();
     }
     public int getIndiceGiocatoreAttivo() {
         return indiceGiocatoreAttivo;
@@ -58,15 +80,6 @@ public class Partita {
 
     public int getNumeroCarteNelMazzo() {
         return mazzo.getCarte().size();
-    }
-
-    public boolean cartaRichiedeSceltaColore(int indiceCarta) {
-        if (vincitore != null) {
-            return false;
-        }
-        Carta carta = getGiocatoreAttivo().getCartaInPosizione(indiceCarta);
-        return carta != null && EffettoComposito.contieneEffetto(
-                carta.getEffetto(), Effetto_Cambia_colore.class);
     }
 
     public Mazzo getMazzoDaPesca() {
@@ -80,84 +93,77 @@ public class Partita {
     /**
      * GRASP Coordinator: valida la mossa e orchestra estrazione carta + inserimento negli scarti.
      */
-    public boolean giocaCarta(int indiceCarta, boolean unoDichiarato) {
-        if (vincitore != null || deveScegliereColoreIniziale) {
-            return false;
+    public EsitoGiocata giocaCarta(int indiceCarta, boolean unoDichiarato, String rispostaInput) {
+        if (vincitore != null || effettoInizialeInAttesa != null) {
+            return EsitoGiocata.completata(false);
         }
 
         Giocatore giocatoreAttivo = getGiocatoreAttivo();
         boolean penultimaCartaGiocata = giocatoreAttivo.getMano().size() == 2;
         Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
         if (cartaSelezionata == null) {
-            coloreScelto = null;
-            return false;
-        }
-
-        boolean richiedeSceltaColore = EffettoComposito.contieneEffetto(
-                cartaSelezionata.getEffetto(), Effetto_Cambia_colore.class);
-        if (richiedeSceltaColore && coloreScelto == null) {
-            return false;
-        }
-        if (!richiedeSceltaColore) {
-            coloreScelto = null;
+            return EsitoGiocata.completata(false);
         }
 
         if (cartaPescataDaGiocare && cartaSelezionata != cartaAppenaPescata) {
-            coloreScelto = null;
-            return false;
+            return EsitoGiocata.completata(false);
         }
 
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
-        if (cartaInCima != null && !regole.isGiocabile(cartaSelezionata, cartaInCima, this)) {
-            return false;
+        if (cartaInCima != null && !regole.isGiocabile(cartaSelezionata, cartaInCima)) {
+            return EsitoGiocata.completata(false);
+        }
+
+        Ieffetto effetto = cartaSelezionata.getEffetto();
+        RichiestaInput richiesta = effetto.getRichiestaInput();
+        if (richiesta != null && rispostaInput == null) {
+            return EsitoGiocata.inAttesa(richiesta);
+        }
+        if (!effetto.validaRispostaInput(rispostaInput)) {
+            return richiesta == null
+                    ? EsitoGiocata.completata(false)
+                    : EsitoGiocata.inAttesa(richiesta);
         }
 
         Carta cartaDaGiocare = giocatoreAttivo.estraiCarta(indiceCarta);
         if (cartaDaGiocare == null) {
-            return false;
+            return EsitoGiocata.completata(false);
         }
 
         pilaDegliScarti.aggiungiCarta(cartaDaGiocare);
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
-        cartaDaGiocare.getEffetto().attivaeffetto(this);
+        effetto.attivaeffetto(this, rispostaInput);
         if (penultimaCartaGiocata && !unoDichiarato) {
             regole.applicaPenalitaMancatoUno(giocatoreAttivo, this);
         }
         if (regole.isVincitore(giocatoreAttivo, this)) {
             vincitore = giocatoreAttivo;
-            return true;
+            return EsitoGiocata.completata(true);
         }
         aggiornaGiocatoreAttivo();
-        return true;
+        return EsitoGiocata.completata(true);
     }
 
-    public boolean scegliColore(Colore colore) {
-        if (vincitore != null || colore == null || colore == Colore.NERO) {
+    public boolean rispondiRichiestaInputIniziale(String rispostaInput) {
+        if (vincitore != null || effettoInizialeInAttesa == null
+                || !effettoInizialeInAttesa.validaRispostaInput(rispostaInput)) {
             return false;
         }
 
-        if (deveScegliereColoreIniziale) {
-            coloreScelto = colore;
-            pilaDegliScarti.getCartaInCima().getEffetto().attivaeffetto(this);
-            deveScegliereColoreIniziale = false;
-            return true;
-        }
-
-        coloreScelto = colore;
+        Ieffetto effetto = effettoInizialeInAttesa;
+        effettoInizialeInAttesa = null;
+        effetto.attivaeffetto(this, rispostaInput);
         return true;
     }
 
-    void applicaColoreScelto() {
-        if (coloreScelto == null) {
-            throw new IllegalStateException("Il colore deve essere scelto prima di attivare l'effetto");
-        }
+    void applicaColoreScelto(Colore coloreScelto) {
+        Objects.requireNonNull(coloreScelto, "coloreScelto non puo essere null");
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
-        if (!(cartaInCima instanceof CartaSpeciale cartaSpeciale)) {
+        if (!(cartaInCima instanceof CartaSpeciale cartaSpeciale)) { 
             throw new IllegalStateException("La carta in cima agli scarti non supporta il cambio colore");
         }
         cartaSpeciale.setColore(coloreScelto);
-        coloreScelto = null;
     }
 
     /**
@@ -200,10 +206,6 @@ public class Partita {
     /**
      * GRASP Coordinator: indica se il giocatore attivo deve ancora gestire la carta appena pescata.
      */
-    public boolean deveGiocareCartaPescata() {
-        return cartaPescataDaGiocare;
-    }
-
     public boolean tuttiGliAltriGiocatoriHannoPiuDi(Giocatore giocatore, int sogliaCarte) {
         if (giocatore == null || sogliaCarte < 0) {
             return false;
@@ -219,10 +221,6 @@ public class Partita {
             }
         }
         return trovatoAvversario;
-    }
-
-    private Giocatore getGiocatoreAttivo() {
-        return giocatori.get(indiceGiocatoreAttivo);
     }
 
     public void aggiornaGiocatoreAttivo() {

@@ -3,6 +3,8 @@ package unolegends.ui;
 import java.util.List;
 import java.util.Scanner;
 
+import unolegends.model.EsitoGiocata;
+import unolegends.model.RichiestaInput;
 import unolegends.controller.StatoPartita;
 import unolegends.controller.UnoLegendsGame;
 
@@ -46,10 +48,10 @@ public final class UnoLegendsCli {
                     System.out.println("Partita terminata. Vince " + stato.getNomeVincitore() + "!");
                     return;
                 }
-                if (stato.isDeveScegliereColoreIniziale()) {
-                    System.out.println("La prima carta richiede un colore: sceglie il giocatore iniziale.");
-                    if (!controller.scegliColore(scegliColore(scanner))) {
-                        throw new IllegalStateException("Impossibile impostare il colore iniziale");
+                if (stato.getRichiestaInput() != null) {
+                    String risposta = richiediInput(scanner, stato.getRichiestaInput());
+                    if (!controller.rispondiRichiestaInputIniziale(risposta)) {
+                        System.out.println("Risposta non valida. Riprova.");
                     }
                     continue;
                 }
@@ -135,44 +137,37 @@ public final class UnoLegendsCli {
 
     private static boolean giocaCarta(int indiceCarta, UnoLegendsGame controller, Scanner scanner,
                                       boolean richiedeDichiarazioneUno) {
-        Integer sceltaColore = controller.cartaRichiedeSceltaColore(indiceCarta)
-                ? scegliColore(scanner)
-                : null;
         boolean unoDichiarato = richiedeDichiarazioneUno && dichiaraUno(scanner);
-        boolean giocataValida = controller.giocaCarta(indiceCarta, sceltaColore, unoDichiarato);
+        EsitoGiocata esito = controller.giocaCarta(indiceCarta, null, unoDichiarato);
+        while (esito.getRichiestaInput() != null) {
+            String risposta = richiediInput(scanner, esito.getRichiestaInput());
+            esito = controller.giocaCarta(indiceCarta, risposta, unoDichiarato);
+        }
+        boolean giocataValida = esito.isGiocata();
         if (giocataValida && richiedeDichiarazioneUno && !unoDichiarato) {
             System.out.println("UNO non dichiarato: hai pescato due carte di penalita.");
         }
         return giocataValida;
     }
 
+    private static String richiediInput(Scanner scanner, RichiestaInput richiesta) {
+        System.out.println(richiesta.getMessaggio());
+        if (!richiesta.getOpzioni().isEmpty()) {
+            List<String> opzioni = richiesta.getOpzioni();
+            for (int i = 0; i < opzioni.size(); i++) {
+                System.out.println(i + ") " + opzioni.get(i));
+            }
+            System.out.print("> ");
+            Integer indice = parseIndice(scanner.nextLine().trim());
+            return indice != null && indice < opzioni.size() ? opzioni.get(indice) : "";
+        }
+        System.out.print("> ");
+        return scanner.nextLine().trim();
+    }
+
     private static boolean dichiaraUno(Scanner scanner) {
         System.out.print("Dichiara UNO insieme alla giocata digitando 'uno'; altrimenti premi Invio: ");
         return "uno".equalsIgnoreCase(scanner.nextLine().trim());
-    }
-
-    private static int scegliColore(Scanner scanner) {
-        while (true) {
-            System.out.println("Scegli colore:");
-            System.out.println("0) Rosso");
-            System.out.println("1) Verde");
-            System.out.println("2) Blu");
-            System.out.println("3) Giallo");
-            System.out.print("> ");
-
-            switch (scanner.nextLine().trim()) {
-                case "0":
-                    return 0;
-                case "1":
-                    return 1;
-                case "2":
-                    return 2;
-                case "3":
-                    return 3;
-                default:
-                    System.out.println("Scelta non valida. Scegli un colore da 0 a 3.");
-            }
-        }
     }
 
     private static Integer parseIndice(String valore) {

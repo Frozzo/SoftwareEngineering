@@ -96,14 +96,13 @@ public class PartitaFactory {
                     carteMescolate.size() - indicePartenzaMazzoDiPesca);
             PilaDegliScarti pilaDegliScarti = new PilaDegliScarti(List.of(primaCarta));
             // Default rules: RegoleStandard. In futuro PartitaFactory può accettare configurazioni.
-            boolean richiedeSceltaColore = EffettoComposito.contieneEffetto(
-                    primaCarta.getEffetto(), Effetto_Cambia_colore.class);
-            int indiceGiocatoreIniziale = richiedeSceltaColore
+            boolean richiedeInput = primaCarta.getEffetto().getRichiestaInput() != null;
+            int indiceGiocatoreIniziale = richiedeInput
                     ? 0
                     : (giocatori.size() - 1) % giocatori.size();
             Partita nuovaPartita = new Partita(giocatori, mazzo, pilaDegliScarti,
                     indiceGiocatoreIniziale, regole);
-            if (!richiedeSceltaColore) {
+            if (!richiedeInput) {
                 primaCarta.getEffetto().attivaeffetto(nuovaPartita);
                 nuovaPartita.aggiornaGiocatoreAttivo();
             }

@@ -1,56 +1,54 @@
 @startuml
-title UNO Legends - Cambio colore per Jolly e +4
+title UNO Legends - Richiesta di input da un effetto
 
-|Giocatore attivo|
-start
-:Seleziona Jolly o +4;
+actor "Giocatore attivo" as Giocatore
+participant UnoLegendsCli as View
+participant UnoLegendsGame as Controller
+participant Partita
+participant Ieffetto
+participant Effetto_Cambia_colore as Effetto
 
-|UnoLegendsCli|
-:Invoca preparaColorePerCarta(stato, indice, gioco, scanner);
-:Invoca EffettoComposito.contieneEffetto(...);
+== Giocata di una carta ==
+Giocatore -> View : Seleziona Jolly o +4
+View -> Controller : giocaCarta(indice, null, unoDichiarato)
+Controller -> Partita : giocaCarta(indice, unoDichiarato, null)
+Partita -> Partita : Verifica carta, turno e compatibilità
+Partita -> Ieffetto : getRichiestaInput()
+Ieffetto --> Partita : RichiestaInput(messaggio, opzioni)
+Partita --> Controller : EsitoGiocata.inAttesa(richiesta)
+Controller --> View : richiesta di input
+View -> View : Mostra messaggio e opzioni\ngenericamente
+Giocatore -> View : Seleziona un'opzione
+View -> Controller : giocaCarta(indice, risposta, unoDichiarato)
+Controller -> Partita : giocaCarta(indice, unoDichiarato, risposta)
+Partita -> Ieffetto : validaRispostaInput(risposta)
+Ieffetto --> Partita : valida
+Partita -> Partita : Estrae la carta e la aggiunge agli scarti
+Partita -> Effetto : attivaeffetto(partita, risposta)
+Effetto -> Partita : applicaColoreScelto(colore)
+Partita --> Controller : EsitoGiocata.completata(true)
+Controller --> View : giocata riuscita
+View --> Giocatore : Mostra "Carta giocata"
 
-if (Effetto cambio colore presente?) then (si)
-  :Invoca scegliColore(scanner);
+== Carta iniziale che richiede input ==
+View -> Controller : richiediStato()
+Controller -> Partita : getRichiestaInputIniziale()
+Partita -> Ieffetto : getRichiestaInput()
+Ieffetto --> Partita : richiesta
+Partita --> Controller : richiesta
+Controller --> View : richiesta di input
+View -> View : Mostra la richiesta genericamente
+Giocatore -> View : Fornisce la risposta
+View -> Controller : rispondiRichiestaInputIniziale(risposta)
+Controller -> Partita : inoltra risposta
+Partita -> Effetto : valida e attiva con la risposta
+Effetto -> Partita : applicaColoreScelto(colore)
+Partita --> Controller : true
 
-  |UnoLegendsGame|
-  :Invoca scegliColore(colore);
-
-  |Partita|
-  if (colore == null o colore == NERO?) then (si)
-    :Restituisce false;
-    |UnoLegendsCli|
-    :Mostra "Scelta colore non valida";
-    stop
-  endif
-  :Memorizza coloreScelto;
-else (no)
-  :Prosegue senza scelta colore;
-endif
-
-|UnoLegendsGame|
-:Invoca giocaCarta(indice);
-
-|Partita|
-:Verifica carta selezionata;
-:Verifica coloreScelto per carte jolly;
-:Invoca RegoleDiGioco.isGiocabile(...);
-:Invoca StrategiaCompatibilitaCarte.puoGiocare(...);
-:Invoca Giocatore.estraiCarta(indice);
-:Invoca PilaDegliScarti.aggiungiCarta(carta);
-:Invoca carta.getEffetto().attivaeffetto(this);
-
-|Effetto_Cambia_colore|
-:Invoca Partita.applicaColoreScelto();
-
-|Partita|
-:Invoca CartaSpeciale.setColore(coloreScelto);
-:Azzera coloreScelto;
-:Invoca aggiornaGiocatoreAttivo();
-
-|UnoLegendsGame|
-:Restituisce true;
-
-|UnoLegendsCli|
-:Mostra "Carta giocata";
-stop
+note over Ieffetto, View
+  Ogni effetto che necessita di input fornisce
+  una RichiestaInput e valida/applica la risposta.
+  La View mostra messaggio e opzioni senza
+  controllare il tipo concreto di effetto.
+end note
 @enduml

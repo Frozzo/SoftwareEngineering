@@ -1,168 +1,126 @@
 @startuml
-title GiocaTurno - Sequence / Interaction Diagram (continuazione Partita creata)
-skinparam handwritten true
+title GiocaTurno - flusso standard
 
-actor "Utente\n(CLI)" as Utente
-participant "UnoLegendsGame\n(Controller / Facade)" as Game
-participant "Partita\n(Coordinator)" as Partita
-participant "RegoleDiGioco\n(Strategy Context)" as Regole
-participant "UnoLegendsCli\n(UI Program)" as CLIProg
-participant "Giocatore\n(Information Expert)" as Giocatore
-participant "Mazzo\n(Information Expert)" as Mazzo
-participant "PilaDegliScarti\n(Information Expert)" as Scarti
-participant "StatoTurno\n(DTO dominio)" as StatoDominio
-participant "StatoPartita\n(DTO UI)" as StatoUI
+actor "Utente" as Utente
+participant "UnoLegendsCli" as CLI
+participant "UnoLegendsGame\n(Controller)" as Game
+participant "Partita" as Partita
+participant "Giocatore" as Giocatore
+participant "RegoleDiGioco" as Regole
+participant "StrategiaCompatibilitaCarte" as Compatibilita
+participant "Carta" as Carta
+participant "Ieffetto" as Effetto
+participant "RichiestaInput" as Richiesta
+participant "PilaDegliScarti" as Scarti
+participant "Mazzo" as Mazzo
+participant "StrategiaVittoriaStandard" as Vittoria
+participant "StatoPartita" as Stato
+participant "EsitoGiocata" as Esito
 
-== Richiedi stato turno ==
-Utente -> CLIProg : selezionaComando('richiediStato')
-activate CLIProg
-CLIProg -> Game : richiediStato()
-activate Game
-Game -> Partita : getStatoTurno()
-activate Partita
-Partita -> Giocatore : getNome()
-activate Giocatore
-Giocatore --> Partita : nome
-deactivate Giocatore
-Partita -> Giocatore : getMano()
-activate Giocatore
-Giocatore --> Partita : mano
-deactivate Giocatore
+== Mostra lo stato ==
+Utente -> CLI : richiede lo stato del turno
+CLI -> Game : richiediStato()
+Game -> Partita : legge giocatore attivo,\nmano e stato della partita
+Partita -> Giocatore : getNome() / getMano()
+Giocatore --> Partita : nome e mano
 Partita -> Scarti : getCartaInCima()
-activate Scarti
-Scarti --> Partita : cartaInCima
-deactivate Scarti
-Partita -> Partita : crea StatoTurno(nome, mano, cartaInCima, flag, cartaAppenaPescata)
-Partita -> StatoDominio : snapshot dello stato di dominio
-Partita --> Game : StatoTurno
-deactivate Partita
-Game -> StatoUI : crea snapshot con stringhe e flag
-Game --> CLIProg : StatoPartita (snapshot senza tipi del model)
-deactivate Game
-CLIProg --> Utente : StatoPartita (snapshot)
-deactivate CLIProg
+Scarti --> Partita : carta in cima
+Partita --> Game : dati del turno
+Game -> Stato : crea snapshot per la UI
+Game --> CLI : StatoPartita
+CLI --> Utente : mostra mano e carta in cima
 
-== Gioca carta ==
-Utente -> CLIProg : selezionaComando('giocaCarta', indiceCarta)
-activate CLIProg
-CLIProg -> Game : cartaRichiedeSceltaColore(indiceCarta)
-Game -> Partita : cartaRichiedeSceltaColore(indiceCarta)
-Partita --> Game : richiedeColore
-Game --> CLIProg : richiedeColore
-CLIProg -> Game : giocaCarta(indiceCarta, sceltaColore, unoDichiarato)
-activate Game
-opt sceltaColore presente
-    Game -> Partita : scegliColore(colore convertito)
-end
-Game -> Partita : giocaCarta(indiceCarta, unoDichiarato)
-activate Partita
-Partita -> Giocatore : getCartaInPosizione(indiceCarta)
-activate Giocatore
-Giocatore --> Partita : cartaSelezionata (o null)
-deactivate Giocatore
-alt carta pescata da giocare e indice non corrisponde
-    Partita --> Game : false (mossa non valida)
-else carta compatibile?
+== Gioca una carta ==
+Utente -> CLI : sceglie una carta il cui effetto richiede input
+CLI -> Game : giocaCarta(indice, null, UNO dichiarato)
+Game -> Partita : giocaCarta(indice, unoDichiarato, null)
+Partita -> Giocatore : getCartaInPosizione(indice)
+Giocatore --> Partita : carta selezionata
+Partita -> Scarti : getCartaInCima()
+Scarti --> Partita : carta in cima
+Partita -> Regole : isGiocabile(carta, cartaInCima)
+Regole -> Compatibilita : puoGiocare(carta, cartaInCima, null)
+Compatibilita --> Regole : esito compatibilità
+Regole --> Partita : carta giocabile
+
+Partita -> Carta : getEffetto()
+Carta --> Partita : Ieffetto
+Partita -> Effetto : getRichiestaInput()
+Effetto --> Partita : RichiestaInput
+Partita -> Esito : inAttesa(RichiestaInput)
+Esito --> Partita : esito con richiesta
+Partita --> Game : EsitoGiocata
+Game --> CLI : EsitoGiocata
+loop finché EsitoGiocata contiene una RichiestaInput
+    CLI -> Esito : getRichiestaInput()
+    Esito --> CLI : RichiestaInput
+    CLI -> Richiesta : getMessaggio() / getOpzioni()
+    Richiesta --> CLI : messaggio e opzioni
+    CLI --> Utente : mostra la richiesta
+    Utente -> CLI : inserisce la risposta
+    CLI -> Game : giocaCarta(indice, risposta, UNO dichiarato)
+    Game -> Partita : giocaCarta(indice, unoDichiarato, risposta)
+    Partita -> Giocatore : getCartaInPosizione(indice)
+    Giocatore --> Partita : carta selezionata
     Partita -> Scarti : getCartaInCima()
-    activate Scarti
-    Scarti --> Partita : cartaInCima
-    deactivate Scarti
-    alt compatibile
-        Partita -> Giocatore : estraiCarta(indiceCarta)
-        activate Giocatore
-        Giocatore --> Partita : cartaDaGiocare
-        deactivate Giocatore
-        Partita -> Scarti : aggiungiCarta(cartaDaGiocare)
-        activate Scarti
-        Scarti --> Partita : ok
-        deactivate Scarti
-        Partita -> Partita : cartaAppenaPescata = null; cartaPescataDaGiocare=false
-        opt mano prima della giocata di due carte e UNO non dichiarato
-            Partita -> Regole : applicaPenalitaMancatoUno(giocatoreAttivo)
-            loop due carte di penalita
-                Regole -> Partita : pescaCartaForzata(giocatoreAttivo)
-            end
-        end
-        Partita -> Regole : isVincitore(giocatoreAttivo, partita)
-        alt vittoria secondo il profilo configurato
-            Partita -> Partita : registra vincitore e termina partita
-        else nessuna vittoria
-            Partita -> Partita : aggiornaGiocatoreAttivo()
-        end
-        Partita --> Game : true
-    else non compatibile
-        Partita --> Game : false
+    Scarti --> Partita : carta in cima
+    Partita -> Regole : isGiocabile(carta, cartaInCima)
+    Regole -> Compatibilita : puoGiocare(carta, cartaInCima, null)
+    Compatibilita --> Regole : carta giocabile
+    Regole --> Partita : carta giocabile
+    Partita -> Carta : getEffetto()
+    Carta --> Partita : Ieffetto
+    Partita -> Effetto : getRichiestaInput()
+    Effetto --> Partita : richiesta
+    Partita -> Effetto : validaRispostaInput(risposta)
+    Effetto --> Partita : risposta valida
+    Partita -> Giocatore : estraiCarta(indice)
+    Giocatore --> Partita : carta giocata
+    Partita -> Scarti : aggiungiCarta(carta)
+    Partita -> Partita : azzera stato della carta pescata
+    Partita -> Effetto : attivaeffetto(partita, risposta)
+    Partita -> Regole : isVincitore(giocatore, partita)
+    Regole -> Vittoria : isVincitore(giocatore, partita)
+    Vittoria -> Giocatore : verifica se la mano è vuota
+    Giocatore --> Vittoria : esito verifica
+    Vittoria --> Regole : esito vittoria
+    Regole --> Partita : esito vittoria
+    alt partita vinta
+        Partita -> Partita : registra il vincitore
+    else partita continua
+        Partita -> Partita : aggiornaGiocatoreAttivo()
     end
+    Partita -> Esito : completata(true)
+    Esito --> Partita : giocata completata,\nsenza RichiestaInput
+    Partita --> Game : EsitoGiocata
+    Game --> CLI : EsitoGiocata
 end
-deactivate Partita
-Game --> Utente : risultato
-Game --> CLIProg : risultato
-deactivate Game
-CLIProg --> Utente : risultato
-deactivate CLIProg
+CLI --> Utente : comunica il risultato
 
-== Pesca carta ==
-Utente -> CLIProg : selezionaComando('pescaCarta')
-activate CLIProg
-CLIProg -> Game : pescaCarta()
-activate Game
-Game -> Partita : pescaCarta()
-activate Partita
-alt già pescata e non giocata
-    Partita --> Game : false
-else
-    Partita -> Mazzo : prelevaCarta()
-    activate Mazzo
-    Mazzo --> Partita : cartaPescata (o null)
-    deactivate Mazzo
-    alt carta nulla
-        Partita --> Game : false
-    else
-        Partita -> Giocatore : aggiungiCarta(cartaPescata)
-        activate Giocatore
-        Giocatore --> Partita : ok
-        deactivate Giocatore
-        Partita -> Partita : cartaAppenaPescata = cartaPescata; cartaPescataDaGiocare = true
-        Partita --> Game : true
-    end
-end
-deactivate Partita
-Game --> Utente : risultato
-Game --> CLIProg : risultato
-deactivate Game
-CLIProg --> Utente : risultato
-deactivate CLIProg
-
-== Passa turno ==
-Utente -> CLIProg : selezionaComando('passaTurno')
-activate CLIProg
-CLIProg -> Game : passaTurno()
-activate Game
-Game -> Partita : passaTurno()
-activate Partita
-alt carta non pescata
-    Partita --> Game : false
-else
-    Partita -> Partita : cartaAppenaPescata=null; cartaPescataDaGiocare=false
-    Partita -> Partita : aggiornaGiocatoreAttivo()
-    Partita --> Game : true
-end
-deactivate Partita
-Game --> Utente : risultato
-Game --> CLIProg : risultato
-deactivate Game
-CLIProg --> Utente : risultato
-deactivate CLIProg
-
-note over Partita, Game
-    Ruoli e pattern principali (ricap):
-    - `Partita`: Coordinator / Information Expert for turn orchestration
-    - `UnoLegendsGame`: Controller / Facade (riceve comandi dalla UI)
-    - `Giocatore`, `Mazzo`, `PilaDegliScarti`: Information Experts
-    - `StatoTurno`: snapshot interno al dominio
-    - `StatoPartita`: DTO di presentazione esposto alla UI
-    - `RegoleStandard`: policy di default usata dalla partita configurata
-    - Nota: l'attore `Utente` rappresenta l'utente esterno (CLI). La classe `Giocatore` è l'entità del dominio, distinta dall'attore esterno.
+note over Partita, Effetto
+    Il primo tentativo restituisce EsitoGiocata.inAttesa(RichiestaInput):
+    la carta resta in mano e l'effetto non viene ancora attivato.
+    La CLI ripete giocaCarta con la risposta; Partita rivalida la mossa
+    e la risposta prima di estrarre la carta e applicarne l'effetto.
 end note
+
+== Pesca e passa il turno ==
+Utente -> CLI : sceglie di pescare
+CLI -> Game : pescaCarta()
+Game -> Partita : pescaCarta()
+Partita -> Mazzo : prelevaCarta()
+Mazzo --> Partita : carta pescata
+Partita -> Giocatore : aggiungiCarta(carta)
+Partita -> Partita : registra la carta pescata
+Partita --> Game : esito pesca
+Game --> CLI : esito pesca
+
+Utente -> CLI : passa il turno
+CLI -> Game : passaTurno()
+Game -> Partita : passaTurno()
+Partita -> Partita : azzera lo stato della pesca\ne aggiorna il giocatore attivo
+Partita --> Game : esito passaggio
+Game --> CLI : esito passaggio
+CLI --> Utente : mostra il nuovo turno
 
 @enduml
