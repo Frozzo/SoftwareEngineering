@@ -42,6 +42,7 @@ public class UnoLegendsGame {
                 partita.getManoGiocatoreAttivo().stream()
                         .map(Carta::getDescrizioneBreve)
                         .collect(Collectors.toList()),
+                partita.richiedeDichiarazioneUno(),
                 formattaCarta(partita.getPilaDegliScarti().getCartaInCima()),
                 partita.isCartaPescataDaGiocare(),
                 formattaCarta(partita.getCartaAppenaPescata()),

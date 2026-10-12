@@ -77,7 +77,8 @@ public final class UnoLegendsCli {
                         continue;
                     }
 
-                    if (giocaCarta(indiceCarta, controller, scanner)) {
+                    if (giocaCarta(indiceCarta, controller, scanner,
+                            stato.isRichiedeDichiarazioneUno())) {
                         System.out.println("Carta giocata.");
                     } else {
                         System.out.println("Mossa non valida.");
@@ -100,7 +101,8 @@ public final class UnoLegendsCli {
                         System.out.println("Valore non valido.");
                         continue;
                     }
-                    if (giocaCarta(indiceCarta, controller, scanner)) {
+                    if (giocaCarta(indiceCarta, controller, scanner,
+                            stato.isRichiedeDichiarazioneUno())) {
                         System.out.println("Carta giocata.");
                     } else {
                         System.out.println("Mossa non valida.");
@@ -133,8 +135,9 @@ public final class UnoLegendsCli {
         System.out.println();
     }
 
-    private static boolean giocaCarta(int indiceCarta, UnoLegendsGame controller, Scanner scanner) {
-        boolean unoDichiarato = dichiaraUno(scanner);
+    private static boolean giocaCarta(int indiceCarta, UnoLegendsGame controller, Scanner scanner,
+                                      boolean richiedeDichiarazioneUno) {
+        boolean unoDichiarato = richiedeDichiarazioneUno && dichiaraUno(scanner);
         EsitoGiocata esito = controller.giocaCarta(indiceCarta, null, unoDichiarato);
         while (esito.getRichiestaInput() != null) {
             String risposta = richiediInput(scanner, esito.getRichiestaInput());

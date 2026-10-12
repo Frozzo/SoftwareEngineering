@@ -11,6 +11,7 @@ import unolegends.model.RichiestaInput;
 public final class StatoPartita {
     private final String nomeGiocatoreAttivo;
     private final List<String> manoGiocatoreAttivo;
+    private final boolean richiedeDichiarazioneUno;
     private final String cartaInCima;
     private final boolean deveGiocareCartaPescata;
     private final String cartaAppenaPescata;
@@ -19,12 +20,14 @@ public final class StatoPartita {
     private final String nomeVincitore;
 
     public StatoPartita(String nomeGiocatoreAttivo, List<String> manoGiocatoreAttivo,
+                        boolean richiedeDichiarazioneUno,
                         String cartaInCima, boolean deveGiocareCartaPescata,
                         String cartaAppenaPescata, RichiestaInput richiestaInput,
                         boolean partitaTerminata, String nomeVincitore) {
         this.nomeGiocatoreAttivo = Objects.requireNonNull(nomeGiocatoreAttivo, "nomeGiocatoreAttivo non puo essere null");
         this.manoGiocatoreAttivo = List.copyOf(
                 Objects.requireNonNull(manoGiocatoreAttivo, "manoGiocatoreAttivo non puo essere null"));
+        this.richiedeDichiarazioneUno = richiedeDichiarazioneUno;
         this.cartaInCima = cartaInCima;
         this.deveGiocareCartaPescata = deveGiocareCartaPescata;
         this.cartaAppenaPescata = cartaAppenaPescata;
@@ -39,6 +42,10 @@ public final class StatoPartita {
 
     public List<String> getManoGiocatoreAttivo() {
         return manoGiocatoreAttivo;
+    }
+
+    public boolean isRichiedeDichiarazioneUno() {
+        return richiedeDichiarazioneUno;
     }
 
     public String getCartaInCima() {

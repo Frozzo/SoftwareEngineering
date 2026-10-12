@@ -74,6 +74,10 @@ public class Partita {
         return getGiocatoreAttivo().getMano();
     }
 
+    public boolean richiedeDichiarazioneUno() {
+        return getGiocatoreAttivo().getMano().size() == 2;
+    }
+
     public boolean isCartaPescataDaGiocare() {
         return cartaPescataDaGiocare;
     }
