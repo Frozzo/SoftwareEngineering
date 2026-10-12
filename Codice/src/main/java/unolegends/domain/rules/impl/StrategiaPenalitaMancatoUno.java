@@ -30,7 +30,7 @@ public final class StrategiaPenalitaMancatoUno implements IStrategiaPenalitaUno 
         Objects.requireNonNull(giocatore, "giocatore non puo essere null");
         Objects.requireNonNull(partita, "partita non puo essere null");
         for (int i = 0; i < numeroCarte; i++) {
-            if (!partita.pescaCartaForzata(giocatore)) {
+            if (partita.pescaSingola(giocatore) == null) {
                 break;
             }
         }

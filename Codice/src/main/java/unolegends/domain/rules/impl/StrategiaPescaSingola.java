@@ -16,15 +16,10 @@ public final class StrategiaPescaSingola implements IStrategiaPesca {
         Objects.requireNonNull(giocatore, "giocatore non puo essere null");
         Objects.requireNonNull(partita, "partita non puo essere null");
 
-        Carta carta = partita.getMazzoDaPesca().prelevaCarta();
-        if (carta == null) {
-            partita.getMazzoDaPesca().rimescolaDaScarti(partita.getPilaDegliScarti());
-            carta = partita.getMazzoDaPesca().prelevaCarta();
-        }
+        Carta carta = partita.pescaSingola(giocatore);
         if (carta == null) {
             return List.of();
         }
-        giocatore.aggiungiCarta(carta);
         return List.of(carta);
     }
 }

@@ -200,20 +200,34 @@ public class Partita {
             return false;
         }
 
-        Carta cartaPescata = mazzo.prelevaCarta();
-        if (cartaPescata == null) {
-            mazzo.rimescolaDaScarti(pilaDegliScarti);
-            cartaPescata = mazzo.prelevaCarta();
-        }
+        Carta cartaPescata = pescaSingola(getGiocatoreAttivo());
         if (cartaPescata == null) {
             return false;
         }
 
-        getGiocatoreAttivo().aggiungiCarta(cartaPescata);
         cartaAppenaPescata = cartaPescata;
         cartaPescataDaGiocare = true;
         return true;
     }
+
+    /**
+     * Pesca una carta per il giocatore e gestisce il rimescolamento degli scarti.
+     * Non modifica lo stato del turno o della carta appena pescata.
+     */
+    public Carta pescaSingola(Giocatore giocatore) {
+        Objects.requireNonNull(giocatore, "giocatore non puo essere null");
+
+        Carta carta = mazzo.prelevaCarta();
+        if (carta == null) {
+            mazzo.rimescolaDaScarti(pilaDegliScarti);
+            carta = mazzo.prelevaCarta();
+        }
+        if (carta != null) {
+            giocatore.aggiungiCarta(carta);
+        }
+        return carta;
+    }
+
     public boolean pescaCartaForzata(Giocatore giocatore) {
         Objects.requireNonNull(giocatore, "giocatore non puo essere null");
         return !regole.pesca(giocatore, this).isEmpty();
