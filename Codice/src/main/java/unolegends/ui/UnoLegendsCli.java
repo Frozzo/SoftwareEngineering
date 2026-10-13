@@ -3,6 +3,7 @@ package unolegends.ui;
 import java.util.List;
 import java.util.Scanner;
 
+import unolegends.model.Colore;
 import unolegends.model.EsitoGiocata;
 import unolegends.model.RichiestaInput;
 import unolegends.controller.StatoPartita;
@@ -159,6 +160,17 @@ public final class UnoLegendsCli {
             }
             System.out.print("> ");
             Integer indice = parseIndice(scanner.nextLine().trim());
+            String scelta = indice != null && indice < opzioni.size()
+                    ? opzioni.get(indice)
+                    : "nessuna opzione valida";
+            String sceltaColorata = scelta;
+            for (Colore colore : Colore.values()) {
+                if (colore.getNome().equalsIgnoreCase(scelta)) {
+                    sceltaColorata = colore.formatta(scelta);
+                    break;
+                }
+            }
+            System.out.println("Hai scelto: " + sceltaColorata);
             return indice != null && indice < opzioni.size() ? opzioni.get(indice) : "";
         }
         System.out.print("> ");
