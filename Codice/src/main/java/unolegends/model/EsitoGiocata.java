@@ -6,21 +6,20 @@ package unolegends.model;
 public final class EsitoGiocata {
     private final boolean giocata;
     private final RichiestaInput richiestaInput;
-    private final boolean penalizzataPerMancatoUno;
+    private final boolean MancatoUno;
 
-    private EsitoGiocata(boolean giocata, RichiestaInput richiestaInput,
-                         boolean penalizzataPerMancatoUno) {
+    private EsitoGiocata(boolean giocata, RichiestaInput richiestaInput,boolean MancatoUno) {
         this.giocata = giocata;
         this.richiestaInput = richiestaInput;
-        this.penalizzataPerMancatoUno = penalizzataPerMancatoUno;
+        this.MancatoUno = MancatoUno;
     }
 
     public static EsitoGiocata completata(boolean giocata) {
         return completata(giocata, false);
     }
 
-    public static EsitoGiocata completata(boolean giocata, boolean penalizzataPerMancatoUno) {
-        return new EsitoGiocata(giocata, null, penalizzataPerMancatoUno);
+    public static EsitoGiocata completata(boolean giocata, boolean MancatoUno) {
+        return new EsitoGiocata(giocata, null, MancatoUno);
     }
 
     public static EsitoGiocata inAttesa(RichiestaInput richiestaInput) {
@@ -38,7 +37,7 @@ public final class EsitoGiocata {
         return richiestaInput;
     }
 
-    public boolean isPenalizzataPerMancatoUno() {
-        return penalizzataPerMancatoUno;
+    public boolean isMancatoUno() {
+        return MancatoUno;
     }
 }

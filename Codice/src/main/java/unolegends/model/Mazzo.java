@@ -15,13 +15,9 @@ public class Mazzo {
     private final Deque<Carta> carte;
 
     public Mazzo(Collection<Carta> carteIniziali) {
-        Objects.requireNonNull(carteIniziali, "carteIniziali non puo essere null");
         this.carte = new ArrayDeque<>(carteIniziali);
     }
 
-    /**
-     * GRASP Information Expert: preleva la prossima carta disponibile dal mazzo.
-     */
     public Carta prelevaCarta() {
         return carte.pollFirst();
     }
@@ -30,20 +26,16 @@ public class Mazzo {
         return carte.isEmpty();
     }
 
-    public int getNumeroCarteRestanti() {
+    public int getNumeroCarte() {
         return carte.size();
     }
 
-    /**
-     * GRASP Information Expert: il mazzo sa come mescolare se stesso.
-     */
     public void mischia() {
         List<Carta> listaTemporanea = new ArrayList<>(carte);
         Collections.shuffle(listaTemporanea);
         carte.clear();
         carte.addAll(listaTemporanea);
     }
-
     /**
      * Ricostituisce e mescola il mazzo usando gli scarti, preservando la carta in cima.
      */

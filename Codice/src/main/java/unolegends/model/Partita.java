@@ -26,16 +26,10 @@ public class Partita {
     }
 
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo, RegoleDiGioco regole) {
-        this.giocatori = new ArrayList<>(Objects.requireNonNull(giocatori, "giocatori non puo essere null"));
-        this.mazzo = Objects.requireNonNull(mazzo, "mazzo non puo essere null");
-        this.pilaDegliScarti = Objects.requireNonNull(pilaDegliScarti, "pilaDegliScarti non puo essere null");
-        this.regole = Objects.requireNonNull(regole, "regole non puo essere null");
-        if (giocatori.isEmpty()) {
-            throw new IllegalArgumentException("La lista giocatori non puo essere vuota");
-        }
-        if (indiceGiocatoreAttivo < 0 || indiceGiocatoreAttivo >= giocatori.size()) {
-            throw new IllegalArgumentException("indiceGiocatoreAttivo non valido");
-        }
+        this.giocatori = new ArrayList<>(giocatori);
+        this.mazzo = mazzo;
+        this.pilaDegliScarti = pilaDegliScarti;
+        this.regole = regole;
         this.indiceGiocatoreAttivo = indiceGiocatoreAttivo;
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
         this.coloreAttuale = cartaInCima == null ? null : cartaInCima.getColore();
@@ -43,7 +37,6 @@ public class Partita {
             this.effettoInizialeInAttesa = cartaInCima.getEffetto();
         }
     }
-
     /**
      * Completa l'inizializzazione della partita applicando l'effetto della prima carta.
      * È idempotente per consentire al controller di invocarlo senza duplicare effetti.
@@ -101,7 +94,7 @@ public class Partita {
         return indiceGiocatoreAttivo;
     }
     public int getNumeroCarteNelMazzo() {
-        return mazzo.getNumeroCarteRestanti();
+        return mazzo.getNumeroCarte();
     }
 
     public Mazzo getMazzoDaPesca() {
@@ -119,7 +112,6 @@ public class Partita {
         if (vincitore != null || effettoInizialeInAttesa != null) {
             return EsitoGiocata.completata(false);
         }
-
         Giocatore giocatoreAttivo = getGiocatoreAttivo();
         boolean penultimaCartaGiocata = giocatoreAttivo.getMano().size() == 2;
         Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
@@ -159,16 +151,16 @@ public class Partita {
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
         effetto.attivaEffetto(this, rispostaInput);
-        boolean penalizzataPerMancatoUno = penultimaCartaGiocata && !unoDichiarato;
-        if (penalizzataPerMancatoUno) {
+        boolean MancatoUno = penultimaCartaGiocata && !unoDichiarato;
+        if (MancatoUno) {
             regole.applicaPenalitaMancatoUno(giocatoreAttivo, this);
         }
         if (regole.isVincitore(giocatoreAttivo, this)) {
             vincitore = giocatoreAttivo;
-            return EsitoGiocata.completata(true, penalizzataPerMancatoUno);
+            return EsitoGiocata.completata(true, MancatoUno);
         }
         aggiornaGiocatoreAttivo();
-        return EsitoGiocata.completata(true, penalizzataPerMancatoUno);
+        return EsitoGiocata.completata(true, MancatoUno);
     }
 
     public boolean rispondiRichiestaInputIniziale(String rispostaInput) {

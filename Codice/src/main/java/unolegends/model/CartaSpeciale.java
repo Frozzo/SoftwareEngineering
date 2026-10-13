@@ -14,16 +14,15 @@ public class CartaSpeciale extends Carta {
         this.valoreCarta = Objects.requireNonNull(valoreCarta, "valoreCarta non puo essere null");
         this.effetto = Objects.requireNonNull(effetto, "effetto non puo essere null");
     }
-    
-    @Override
+
     public Colore getColore() {
         return colore;
     }
-    @Override
+
     public ValoreCarta getValoreCarta() {
         return valoreCarta;
     }
-    @Override
+
     public Ieffetto getEffetto() {
         return effetto;
     }
@@ -31,8 +30,9 @@ public class CartaSpeciale extends Carta {
     public void attivaEffetto(Partita partita) {
         effetto.attivaEffetto(partita);
     }
-        public String toTestoBase() {
-        return valoreCarta.getValore() + " " + colore.getNome().toLowerCase(Locale.ROOT);
+    
+    public String toTestoBase() {
+    return valoreCarta.getValore() + " " + colore.getNome().toLowerCase(Locale.ROOT);
     }
 
     public String getDescrizioneBreve() {

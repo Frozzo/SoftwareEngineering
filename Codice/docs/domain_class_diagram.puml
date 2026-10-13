@@ -1,0 +1,309 @@
+@startuml
+title UnoLegends - class diagram del model
+skinparam classAttributeIconSize 0
+hide empty members
+scale max 7600 width
+
+package "unolegends.model" {
+  abstract class Carta {
+    +getColore() : Colore
+    +getValoreCarta() : ValoreCarta
+    +getEffetto() : Ieffetto
+    +getDescrizioneBreve() : String
+  }
+
+  class CartaNumero {
+    -colore : Colore
+    -valore : ValoreCarta
+    -id : int
+    -effetto : Ieffetto
+    +CartaNumero(id : int, colore : Colore, valore : ValoreCarta)
+    +getColore() : Colore
+    +getValoreCarta() : ValoreCarta
+    +getEffetto() : Ieffetto
+    +toTestoBase() : String
+    +getDescrizioneBreve() : String
+  }
+
+  class CartaSpeciale {
+    -colore : Colore
+    -valoreCarta : ValoreCarta
+    -effetto : Ieffetto
+    +CartaSpeciale(colore : Colore, valoreCarta : ValoreCarta, effetto : Ieffetto)
+    +getColore() : Colore
+    +getValoreCarta() : ValoreCarta
+    +getEffetto() : Ieffetto
+    +attivaEffetto(partita : Partita) : void
+    +toTestoBase() : String
+    +getDescrizioneBreve() : String
+  }
+
+  class Giocatore {
+    -nome : String
+    -mano : List<Carta>
+    +Giocatore(nome : String, manoIniziale : List<Carta>)
+    +getNome() : String
+    +getMano() : List<Carta>
+    +getCartaInPosizione(indiceCarta : int) : Carta
+    +estraiCarta(indiceCarta : int) : Carta
+    +aggiungiCarta(carta : Carta) : void
+  }
+
+  class Mazzo {
+    -carte : Deque<Carta>
+    +Mazzo(carteIniziali : Collection<Carta>)
+    +prelevaCarta() : Carta
+    +isVuoto() : boolean
+    +getNumeroCarteRestanti() : int
+    +mischia() : void
+    +rimescolaDaScarti(pilaDegliScarti : PilaDegliScarti) : void
+  }
+
+  class PilaDegliScarti {
+    -scarti : List<Carta>
+    +PilaDegliScarti(scartiIniziali : List<Carta>)
+    +getCartaInCima() : Carta
+    +aggiungiCarta(carta : Carta) : void
+    +estraiCartePerRimescolamento() : List<Carta>
+  }
+
+  class Partita {
+    -giocatori : List<Giocatore>
+    -mazzo : Mazzo
+    -pilaDegliScarti : PilaDegliScarti
+    -regole : RegoleDiGioco
+    -indiceGiocatoreAttivo : int
+    -cartaAppenaPescata : Carta
+    -cartaPescataDaGiocare : boolean
+    -effettoInizialeInAttesa : Ieffetto
+    -vincitore : Giocatore
+    -giocoIniziato : boolean
+    -saltaProssimoTurno : boolean
+    -coloreAttuale : Colore
+    -sensoOrario : boolean
+    +Partita(giocatori : List<Giocatore>, mazzo : Mazzo, pilaDegliScarti : PilaDegliScarti, indiceGiocatoreAttivo : int)
+    +Partita(giocatori : List<Giocatore>, mazzo : Mazzo, pilaDegliScarti : PilaDegliScarti, indiceGiocatoreAttivo : int, regole : RegoleDiGioco)
+    +iniziaGioco() : void
+    -getGiocatoreAttivo() : Giocatore
+    +getNomeGiocatoreAttivo() : String
+    +getManoGiocatoreAttivo() : List<Carta>
+    +isCartaPescataDaGiocare() : boolean
+    +getCartaAppenaPescata() : Carta
+    +getRichiestaInputIniziale() : RichiestaInput
+    +isPartitaTerminata() : boolean
+    +getNomeVincitore() : String
+    +getIndiceGiocatoreAttivo() : int
+    +getNumeroCarteNelMazzo() : int
+    +getMazzoDaPesca() : Mazzo
+    +getPilaDegliScarti() : PilaDegliScarti
+    +giocaCarta(indiceCarta : int, unoDichiarato : boolean, rispostaInput : String) : EsitoGiocata
+    +rispondiRichiestaInputIniziale(rispostaInput : String) : boolean
+    ~applicaColoreScelto(coloreScelto : Colore) : void
+    +getColoreAttuale() : Colore
+    ~segnalaSaltoTurno() : void
+    +pescaCarta() : boolean
+    +pescaSingola(giocatore : Giocatore) : Carta
+    +pescaCartaForzata(giocatore : Giocatore) : boolean
+    +passaTurno() : boolean
+    +tuttiGliAltriGiocatoriHannoPiuDi(giocatore : Giocatore, sogliaCarte : int) : boolean
+    +aggiornaGiocatoreAttivo() : void
+    -avanzaGiocatore() : void
+    +cambioGiro() : void
+    +getProssimoGiocatore() : Giocatore
+  }
+
+  class RegoleDiGioco {
+    -strategiaVittoria : IStrategiaCondizioneVittoria
+    -strategiaSconfitta : IStrategiaCondizioneSconfitta
+    -strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte
+    -strategiaPesca : IStrategiaPesca
+    -strategiaPenalitaUno : IStrategiaPenalitaUno
+    +RegoleDiGioco(strategiaVittoria : IStrategiaCondizioneVittoria, strategiaSconfitta : IStrategiaCondizioneSconfitta, strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte, strategiaPesca : IStrategiaPesca)
+    +RegoleDiGioco(strategiaVittoria : IStrategiaCondizioneVittoria, strategiaSconfitta : IStrategiaCondizioneSconfitta, strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte, strategiaPesca : IStrategiaPesca, strategiaPenalitaUno : IStrategiaPenalitaUno)
+    +isGiocabile(candidata : Carta, inCima : Carta, partita : Partita) : boolean
+    +isVincitore(giocatore : Giocatore, partita : Partita) : boolean
+    +isEliminato(giocatore : Giocatore, partita : Partita) : boolean
+    +pesca(giocatore : Giocatore, partita : Partita) : List<Carta>
+    +applicaPenalitaMancatoUno(giocatore : Giocatore, partita : Partita) : void
+    +{static} standard() : RegoleDiGioco
+  }
+
+  interface Ieffetto {
+    +attivaEffetto(partita : Partita) : void
+    +{default} getRichiestaInput() : RichiestaInput
+    +{default} validaRispostaInput(risposta : String) : boolean
+    +{default} attivaEffetto(partita : Partita, risposta : String) : void
+  }
+
+  class Effetto_Nullo {
+    +attivaEffetto(partita : Partita) : void
+  }
+
+  class Effetto_Cambia_colore {
+    +attivaEffetto(partita : Partita) : void
+    +getRichiestaInput() : RichiestaInput
+    +validaRispostaInput(risposta : String) : boolean
+    +attivaEffetto(partita : Partita, risposta : String) : void
+    -{static} coloreDaRisposta(risposta : String) : Colore
+  }
+
+  class Effetto_pescata_carte {
+    -numeroCarteDaPescare : int
+    +Effetto_pescata_carte(numeroCarteDaPescare : int)
+    +attivaEffetto(partita : Partita) : void
+  }
+
+  class Effetto_Blocca_Turno {
+    +attivaEffetto(partita : Partita) : void
+  }
+
+  class Effetto_cambio_giro {
+    +attivaEffetto(partita : Partita) : void
+  }
+
+  class EffettoComposito {
+    -effetti : List<Ieffetto>
+    +EffettoComposito(effetti : List<Ieffetto>)
+    -{static} contaEffettiConInput(effetti : List<Ieffetto>) : int
+    +attivaEffetto(partita : Partita) : void
+    +getRichiestaInput() : RichiestaInput
+    +validaRispostaInput(risposta : String) : boolean
+    +attivaEffetto(partita : Partita, risposta : String) : void
+    +{static} contieneEffetto(effetto : Ieffetto, tipoEffetto : Class<? extends Ieffetto>) : boolean
+  }
+
+  class RichiestaInput {
+    -messaggio : String
+    -opzioni : List<String>
+    +RichiestaInput(messaggio : String, opzioni : List<String>)
+    +getMessaggio() : String
+    +getOpzioni() : List<String>
+  }
+
+  class EsitoGiocata {
+    -giocata : boolean
+    -richiestaInput : RichiestaInput
+    -penalizzataPerMancatoUno : boolean
+    -EsitoGiocata(giocata : boolean, richiestaInput : RichiestaInput, penalizzataPerMancatoUno : boolean)
+    +{static} completata(giocata : boolean) : EsitoGiocata
+    +{static} completata(giocata : boolean, penalizzataPerMancatoUno : boolean) : EsitoGiocata
+    +{static} inAttesa(richiestaInput : RichiestaInput) : EsitoGiocata
+    +isGiocata() : boolean
+    +getRichiestaInput() : RichiestaInput
+    +isPenalizzataPerMancatoUno() : boolean
+  }
+
+  interface MazzoFactory {
+    +creaMazzo() : Mazzo
+  }
+
+  class StandardMazzoFactory {
+    -{static} INSTANCE : StandardMazzoFactory
+    -StandardMazzoFactory()
+    +{static} getInstance() : StandardMazzoFactory
+    +creaMazzo() : Mazzo
+  }
+
+  class PartitaFactory {
+    -{static} CARTE_PER_GIOCATORE : int
+    +{static} creaRegoleStandard() : RegoleDiGioco
+    +{static} creaPartita(mazzoFactory : MazzoFactory, numeroDiGiocatori : int, regole : RegoleDiGioco) : Partita
+    -{static} distribuisciCarteAiGiocatori(mazzo : Mazzo, numeroDiGiocatori : int) : List<Giocatore>
+  }
+
+  enum Colore {
+    ROSSO
+    VERDE
+    BLU
+    GIALLO
+    NERO
+    --
+    -{static} ANSI_RESET : String
+    -nome : String
+    -ansiCode : String
+    -Colore(nome : String, ansiCode : String)
+    +getNome() : String
+    +formatta(testo : String) : String
+  }
+
+  enum ValoreCarta {
+    ZERO
+    UNO
+    DUE
+    TRE
+    QUATTRO
+    CINQUE
+    SEI
+    SETTE
+    OTTO
+    NOVE
+    PIU_DUE
+    BLOCCA_TURNO
+    CAMBIA_GIRO
+    CAMBIA_COLORE
+    PIU_QUATTRO
+    --
+    -valore : String
+    -ValoreCarta(valore : String)
+    +getValore() : String
+    +{static} fromInt(numero : int) : ValoreCarta
+    +{static} fromString(testo : String) : ValoreCarta
+  }
+
+  enum TipoMazzo {
+    STANDARD
+  }
+}
+
+Carta <|-- CartaNumero
+Carta <|-- CartaSpeciale
+Ieffetto <|.. Effetto_Nullo
+Ieffetto <|.. Effetto_Cambia_colore
+Ieffetto <|.. Effetto_pescata_carte
+Ieffetto <|.. Effetto_Blocca_Turno
+Ieffetto <|.. Effetto_cambio_giro
+Ieffetto <|.. EffettoComposito
+MazzoFactory <|.. StandardMazzoFactory
+
+CartaNumero --> "1" Colore
+CartaNumero --> "1" ValoreCarta
+CartaNumero --> "1" Ieffetto : effetto
+CartaSpeciale --> "1" Colore
+CartaSpeciale --> "1" ValoreCarta
+CartaSpeciale --> "1" Ieffetto : effetto
+EffettoComposito --> "1..*" Ieffetto : effetti
+Effetto_Cambia_colore ..> RichiestaInput : crea
+
+Giocatore "1" --> "0..*" Carta : mano
+Mazzo "1" --> "0..*" Carta : carte
+PilaDegliScarti "1" --> "0..*" Carta : scarti
+Partita "1" --> "1..*" Giocatore : giocatori
+Partita "1" --> "1" Mazzo : mazzo
+Partita "1" --> "1" PilaDegliScarti : pilaDegliScarti
+Partita "1" --> "1" RegoleDiGioco : regole
+Partita "1" --> "0..1" Carta : cartaAppenaPescata
+Partita "1" --> "0..1" Ieffetto : effettoInizialeInAttesa
+Partita "1" --> "0..1" Giocatore : vincitore
+Partita "1" --> "0..1" Colore : coloreAttuale
+EsitoGiocata "1" --> "0..1" RichiestaInput : richiestaInput
+
+PartitaFactory ..> MazzoFactory : usa
+PartitaFactory ..> RegoleDiGioco : configura
+PartitaFactory ..> Partita : crea
+PartitaFactory ..> Giocatore : crea
+StandardMazzoFactory ..> Mazzo : crea
+StandardMazzoFactory ..> CartaNumero : crea
+StandardMazzoFactory ..> CartaSpeciale : crea
+Mazzo ..> PilaDegliScarti : rimescola da scarti
+Effetto_pescata_carte ..> Partita : pesca e salta turno
+Effetto_Blocca_Turno ..> Partita : segnala salto turno
+Effetto_cambio_giro ..> Partita : cambia giro
+Effetto_Cambia_colore ..> Partita : applica colore
+
+note right of RegoleDiGioco
+  Le interfacce IStrategia* sono dichiarate nel package
+  unolegends.domain.rules, esterno al model, e qui sono
+  riportate come tipi degli attributi senza espanderne
+  le classi.
+end note
+@enduml

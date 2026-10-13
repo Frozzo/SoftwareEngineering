@@ -144,7 +144,7 @@ public final class UnoLegendsCli {
             esito = controller.giocaCarta(indiceCarta, risposta, unoDichiarato);
         }
         boolean giocataValida = esito.isGiocata();
-        if (esito.isPenalizzataPerMancatoUno()) {
+        if (esito.isMancatoUno()) {
             System.out.println("UNO non dichiarato: hai pescato due carte di penalita.");
         }
         return giocataValida;

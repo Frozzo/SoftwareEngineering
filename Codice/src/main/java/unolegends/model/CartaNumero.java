@@ -27,7 +27,6 @@ public class CartaNumero extends Carta {
         return this.valore;
     }
 
-    @Override
     public Ieffetto getEffetto() {
         return effetto;
     }
@@ -36,7 +35,7 @@ public class CartaNumero extends Carta {
         return valore.getValore() + " " + colore.getNome().toLowerCase(Locale.ROOT);
     }
 
-    public String getDescrizioneBreve() {
+    public String getDescrizioneBreve() { 
         String base = toTestoBase();
         return colore.formatta(base);
     }
