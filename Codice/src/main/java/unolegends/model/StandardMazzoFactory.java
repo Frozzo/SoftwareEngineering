@@ -19,14 +19,13 @@ public class StandardMazzoFactory implements MazzoFactory {
     
     public Mazzo creaMazzo() {
         List<Carta> carte = new ArrayList<>();
-        int idCounter = 0;
 
         for (Colore colore : List.of(Colore.ROSSO, Colore.GIALLO, Colore.VERDE, Colore.BLU)) {
             for (int numero = 0; numero <= 9; numero++) {
                 ValoreCarta numeroEnum = ValoreCarta.fromInt(numero);
-                carte.add(new CartaNumero(idCounter++, colore, numeroEnum));
+                carte.add(new CartaNumero(colore, numeroEnum));
                 if (numero != 0) {
-                    carte.add(new CartaNumero(idCounter++, colore, numeroEnum));
+                    carte.add(new CartaNumero(colore, numeroEnum));
                 }
             }
 

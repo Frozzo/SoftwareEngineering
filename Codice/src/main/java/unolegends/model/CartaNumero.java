@@ -8,11 +8,9 @@ import java.util.Locale;
 public class CartaNumero extends Carta {
     private final Colore colore;
     private final ValoreCarta valore;
-    private final int id;
     private final Ieffetto effetto;
 
-    public CartaNumero(int id, Colore colore, ValoreCarta valore) {
-        this.id = id;
+    public CartaNumero(Colore colore, ValoreCarta valore) {
         this.colore = java.util.Objects.requireNonNull(colore, "colore non puo essere null");
         this.valore = java.util.Objects.requireNonNull(valore, "valore non puo essere null");
         this.effetto = new Effetto_Nullo();
