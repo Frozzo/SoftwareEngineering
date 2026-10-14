@@ -8,16 +8,10 @@ import unolegends.model.Colore;
  * Strategia standard per verificare la compatibilità delle carte.
  */
 public final class StrategiaCompatibilitaCarte implements IStrategiaCompatibilitaCarte {
-    private final boolean penalitaUnoAttiva;
+
 
     public StrategiaCompatibilitaCarte() {
-        this(true);
     }
-
-    public StrategiaCompatibilitaCarte(boolean penalitaUnoAttiva) {
-        this.penalitaUnoAttiva = penalitaUnoAttiva;
-    }
-
     @Override
     public boolean puoGiocare(Carta cartaGiocata, Carta cartaInCima, Colore coloreAttivo) {
         if (cartaGiocata == null) {

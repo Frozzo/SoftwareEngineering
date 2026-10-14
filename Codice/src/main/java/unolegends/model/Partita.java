@@ -21,9 +21,6 @@ public class Partita {
     private boolean saltaProssimoTurno;
     private Colore coloreAttuale;
     private boolean sensoOrario = true; // Variabile per tenere traccia del senso di gioco
-    public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo) {
-        this(giocatori, mazzo, pilaDegliScarti, indiceGiocatoreAttivo, RegoleDiGioco.standard());
-    }
 
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo, RegoleDiGioco regole) {
         this.giocatori = new ArrayList<>(giocatori);
@@ -45,7 +42,7 @@ public class Partita {
         if (giocoIniziato) {
             return;
         }
-        giocoIniziato = true;
+        this.giocoIniziato = true;
         if (effettoInizialeInAttesa == null) {
             Carta cartaInCima = pilaDegliScarti.getCartaInCima();
             if (cartaInCima != null) {
@@ -90,9 +87,11 @@ public class Partita {
     public String getNomeVincitore() {
         return vincitore == null ? null : vincitore.getNome();
     }
+
     public int getIndiceGiocatoreAttivo() {
         return indiceGiocatoreAttivo;
     }
+
     public int getNumeroCarteNelMazzo() {
         return mazzo.getNumeroCarte();
     }
@@ -104,7 +103,6 @@ public class Partita {
     public PilaDegliScarti getPilaDegliScarti() {
         return pilaDegliScarti;
     }
-
     /**
      * GRASP Coordinator: valida la mossa e orchestra estrazione carta + inserimento negli scarti.
      */
@@ -113,18 +111,13 @@ public class Partita {
             return EsitoGiocata.completata(false);
         }
         Giocatore giocatoreAttivo = getGiocatoreAttivo();
-        boolean penultimaCartaGiocata = giocatoreAttivo.getMano().size() == 2;
         Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
         if (cartaSelezionata == null) {
             return EsitoGiocata.completata(false);
         }
 
-        if (cartaPescataDaGiocare && cartaSelezionata != cartaAppenaPescata) {
-            return EsitoGiocata.completata(false);
-        }
-
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
-        if (cartaInCima != null && !regole.isGiocabile(cartaSelezionata, cartaInCima, this)) {
+        if (!regole.isGiocabile(cartaSelezionata, cartaInCima, this)) {
             return EsitoGiocata.completata(false);
         }
 
@@ -140,21 +133,15 @@ public class Partita {
         }
 
         Carta cartaDaGiocare = giocatoreAttivo.estraiCarta(indiceCarta);
-        if (cartaDaGiocare == null) {
-            return EsitoGiocata.completata(false);
-        }
-
         pilaDegliScarti.aggiungiCarta(cartaDaGiocare);
+        
         if (cartaDaGiocare.getColore() != Colore.NERO) {
             coloreAttuale = cartaDaGiocare.getColore();
         }
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
         effetto.attivaEffetto(this, rispostaInput);
-        boolean MancatoUno = penultimaCartaGiocata && !unoDichiarato;
-        if (MancatoUno) {
-            regole.applicaPenalitaMancatoUno(giocatoreAttivo, this);
-        }
+        boolean MancatoUno = regole.mancatoUno(giocatoreAttivo, unoDichiarato, this, regole); //controlla sei il giocatore ha dichiarato uno e se è necessario applicare la penalità
         if (regole.isVincitore(giocatoreAttivo, this)) {
             vincitore = giocatoreAttivo;
             return EsitoGiocata.completata(true, MancatoUno);
@@ -164,8 +151,7 @@ public class Partita {
     }
 
     public boolean rispondiRichiestaInputIniziale(String rispostaInput) {
-        if (vincitore != null || effettoInizialeInAttesa == null
-                || !effettoInizialeInAttesa.validaRispostaInput(rispostaInput)) {
+        if (effettoInizialeInAttesa == null || !effettoInizialeInAttesa.validaRispostaInput(rispostaInput)) {
             return false;
         }
 
@@ -188,19 +174,12 @@ public class Partita {
         saltaProssimoTurno = true;
     }
 
-    /**
-     * GRASP Coordinator: richiede al Mazzo una carta e delega al Giocatore l'aggiornamento della mano.
-     */
     public boolean pescaCarta() {
         if (vincitore != null || cartaPescataDaGiocare) {
             return false;
         }
 
         Carta cartaPescata = pescaSingola(getGiocatoreAttivo());
-        if (cartaPescata == null) {
-            return false;
-        }
-
         cartaAppenaPescata = cartaPescata;
         cartaPescataDaGiocare = true;
         return true;
@@ -241,26 +220,6 @@ public class Partita {
         cartaPescataDaGiocare = false;
         aggiornaGiocatoreAttivo();
         return true;
-    }
-
-    /**
-     * GRASP Coordinator: indica se il giocatore attivo deve ancora gestire la carta appena pescata.
-     */
-    public boolean tuttiGliAltriGiocatoriHannoPiuDi(Giocatore giocatore, int sogliaCarte) {
-        if (giocatore == null || sogliaCarte < 0) {
-            return false;
-        }
-
-        boolean trovatoAvversario = false;
-        for (Giocatore altroGiocatore : giocatori) {
-            if (altroGiocatore != giocatore) {
-                trovatoAvversario = true;
-                if (altroGiocatore.getMano().size() <= sogliaCarte) {
-                    return false;
-                }
-            }
-        }
-        return trovatoAvversario;
     }
 
     public void aggiornaGiocatoreAttivo() {

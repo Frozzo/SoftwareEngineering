@@ -67,14 +67,19 @@ public class RegoleDiGioco {
     public void applicaPenalitaMancatoUno(Giocatore giocatore, Partita partita) {
         strategiaPenalitaUno.applica(giocatore, partita);
     }
+    public boolean mancatoUno(Giocatore giocatoreAttivo, boolean unoDichiarato, Partita partita, RegoleDiGioco regole) {
+        if(giocatoreAttivo.getMano().size() == 1 && !unoDichiarato) {
+            regole.applicaPenalitaMancatoUno(giocatoreAttivo, partita);
+            return true;  
+        }
+        return false;
+    }
 
     public static RegoleDiGioco standard() {
         return new RegoleDiGioco(
                 new StrategiaVittoriaStandard(),
                 new StrategiaSconfittaStandard(),
-                new StrategiaCompatibilitaCarte(true),
+                new StrategiaCompatibilitaCarte(),
                 new StrategiaPescaSingola());
     }
-
-
 }

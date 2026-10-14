@@ -49,7 +49,7 @@ public final class UnoLegendsCli {
                     System.out.println("Partita terminata. Vince " + stato.getNomeVincitore() + "!");
                     return;
                 }
-                if (stato.getRichiestaInput() != null) {
+                if (stato.getRichiestaInput() != null) { //controlla se c'è una richiesta di input in sospeso in particolare all'inizio della partita
                     String risposta = richiediInput(scanner, stato.getRichiestaInput());
                     if (!controller.rispondiRichiestaInputIniziale(risposta)) {
                         System.out.println("Risposta non valida. Riprova.");
@@ -78,7 +78,7 @@ public final class UnoLegendsCli {
                         continue;
                     }
 
-                    if (giocaCarta(indiceCarta, controller, scanner,
+                    if (gestisciGiocata(indiceCarta, controller, scanner,
                             stato.isRichiedeDichiarazioneUno())) {
                         System.out.println("Carta giocata.");
                     } else {
@@ -102,7 +102,7 @@ public final class UnoLegendsCli {
                         System.out.println("Valore non valido.");
                         continue;
                     }
-                    if (giocaCarta(indiceCarta, controller, scanner,
+                    if (gestisciGiocata(indiceCarta, controller, scanner,
                             stato.isRichiedeDichiarazioneUno())) {
                         System.out.println("Carta giocata.");
                     } else {
@@ -136,8 +136,8 @@ public final class UnoLegendsCli {
         System.out.println();
     }
 
-    private static boolean giocaCarta(int indiceCarta, UnoLegendsGame controller, Scanner scanner,
-                                      boolean richiedeDichiarazioneUno) {
+    private static boolean gestisciGiocata(int indiceCarta, UnoLegendsGame controller, Scanner scanner,boolean richiedeDichiarazioneUno) {
+
         boolean unoDichiarato = richiedeDichiarazioneUno && dichiaraUno(scanner);
         EsitoGiocata esito = controller.giocaCarta(indiceCarta, null, unoDichiarato);
         while (esito.getRichiestaInput() != null) {
