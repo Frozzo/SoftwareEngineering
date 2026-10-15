@@ -31,21 +31,14 @@ public class RegoleDiGioco {
                          IStrategiaCondizioneSconfitta strategiaSconfitta,
                          IStrategiaCompatibilitaCarte strategiaCompatibilitaCarte,
                          IStrategiaPesca strategiaPesca) {
-        this(strategiaVittoria, strategiaSconfitta, strategiaCompatibilitaCarte,
-                strategiaPesca, new StrategiaPenalitaMancatoUno());
-    }
-
-    public RegoleDiGioco(IStrategiaCondizioneVittoria strategiaVittoria,
-                         IStrategiaCondizioneSconfitta strategiaSconfitta,
-                         IStrategiaCompatibilitaCarte strategiaCompatibilitaCarte,
-                         IStrategiaPesca strategiaPesca,
-                         IStrategiaPenalitaUno strategiaPenalitaUno) {
-        this.strategiaVittoria = Objects.requireNonNull(strategiaVittoria);
-        this.strategiaSconfitta = Objects.requireNonNull(strategiaSconfitta);
         this.strategiaCompatibilitaCarte = Objects.requireNonNull(strategiaCompatibilitaCarte);
+        this.strategiaSconfitta = Objects.requireNonNull(strategiaSconfitta);
+        this.strategiaVittoria = Objects.requireNonNull(strategiaVittoria);
         this.strategiaPesca = Objects.requireNonNull(strategiaPesca);
-        this.strategiaPenalitaUno = Objects.requireNonNull(strategiaPenalitaUno);
+
+        this.strategiaPenalitaUno = new StrategiaPenalitaMancatoUno();
     }
+    
 
     public boolean isGiocabile(Carta candidata, Carta inCima, Partita partita) {
         return strategiaCompatibilitaCarte.puoGiocare(candidata, inCima,

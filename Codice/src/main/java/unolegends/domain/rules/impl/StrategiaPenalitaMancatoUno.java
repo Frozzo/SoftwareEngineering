@@ -1,7 +1,4 @@
 package unolegends.domain.rules.impl;
-
-import java.util.Objects;
-
 import unolegends.domain.rules.IStrategiaPenalitaUno;
 import unolegends.model.Giocatore;
 import unolegends.model.Partita;
