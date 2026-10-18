@@ -27,10 +27,6 @@ public class CartaSpeciale extends Carta {
         return effetto;
     }
 
-    public void attivaEffetto(Partita partita) {
-        effetto.attivaEffetto(partita);
-    }
-    
     public String toTestoBase() {
     return valoreCarta.getValore() + " " + colore.getNome().toLowerCase(Locale.ROOT);
     }

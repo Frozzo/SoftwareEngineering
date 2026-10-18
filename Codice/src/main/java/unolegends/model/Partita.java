@@ -17,6 +17,7 @@ public class Partita {
     private boolean cartaPescataDaGiocare;
     private Ieffetto effettoInizialeInAttesa;
     private Giocatore vincitore;
+    private Giocatore giocatoreInAttesaDichiarazioneUno;
     private boolean giocoIniziato;
     private boolean saltaProssimoTurno;
     private Colore coloreAttuale;
@@ -64,10 +65,6 @@ public class Partita {
         return getGiocatoreAttivo().getMano();
     }
 
-    public boolean richiedeDichiarazioneUno() {
-        return getGiocatoreAttivo().getMano().size() == 2;
-    }
-
     public boolean isCartaPescataDaGiocare() {
         return cartaPescataDaGiocare;
     }
@@ -92,25 +89,19 @@ public class Partita {
         return indiceGiocatoreAttivo;
     }
 
-    public int getNumeroCarteNelMazzo() {
-        return mazzo.getNumeroCarte();
-    }
-
-    public Mazzo getMazzoDaPesca() {
-        return mazzo;
-    }
-
     public PilaDegliScarti getPilaDegliScarti() {
         return pilaDegliScarti;
     }
     /**
      * GRASP Coordinator: valida la mossa e orchestra estrazione carta + inserimento negli scarti.
      */
-    public EsitoGiocata giocaCarta(int indiceCarta, boolean unoDichiarato, String rispostaInput) {
-        if (vincitore != null || effettoInizialeInAttesa != null) {
+    public EsitoGiocata giocaCarta(int indiceCarta, String rispostaInput) {
+        if (vincitore != null || effettoInizialeInAttesa != null
+                || giocatoreInAttesaDichiarazioneUno != null) {
             return EsitoGiocata.completata(false);
         }
         Giocatore giocatoreAttivo = getGiocatoreAttivo();
+        boolean avevaDueCarte = giocatoreAttivo.getMano().size() == 2;
         Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
         if (cartaSelezionata == null) {
             return EsitoGiocata.completata(false);
@@ -141,13 +132,34 @@ public class Partita {
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
         effetto.attivaEffetto(this, rispostaInput);
-        boolean MancatoUno = regole.mancatoUno(giocatoreAttivo, unoDichiarato, this, regole); //controlla sei il giocatore ha dichiarato uno e se è necessario applicare la penalità
         if (regole.isVincitore(giocatoreAttivo, this)) {
             vincitore = giocatoreAttivo;
-            return EsitoGiocata.completata(true, MancatoUno);
+            return EsitoGiocata.completata(true);
+        }
+        boolean richiedeDichiarazioneUno = avevaDueCarte
+                && giocatoreAttivo.getMano().size() == 1;
+        if (richiedeDichiarazioneUno) {
+            giocatoreInAttesaDichiarazioneUno = giocatoreAttivo;
+            return EsitoGiocata.richiedeDichiarazioneUno();
         }
         aggiornaGiocatoreAttivo();
-        return EsitoGiocata.completata(true, MancatoUno);
+        return EsitoGiocata.completata(true);
+    }
+
+    /**
+     * Completa la finestra di dichiarazione UNO dopo una giocata valida.
+     *
+     * @return true se e stata applicata la penalita per mancata dichiarazione
+     */
+    public boolean completaDichiarazioneUno(boolean unoDichiarato) {
+        if (giocatoreInAttesaDichiarazioneUno == null) {
+            return false;
+        }
+        Giocatore giocatore = giocatoreInAttesaDichiarazioneUno;
+        giocatoreInAttesaDichiarazioneUno = null;
+        boolean mancatoUno = regole.mancatoUno(giocatore, unoDichiarato, this, regole);
+        aggiornaGiocatoreAttivo();
+        return mancatoUno;
     }
 
     public boolean rispondiRichiestaInputIniziale(String rispostaInput) {
@@ -175,7 +187,8 @@ public class Partita {
     }
 
     public boolean pescaCarta() {
-        if (vincitore != null || cartaPescataDaGiocare) {
+        if (vincitore != null || cartaPescataDaGiocare
+                || giocatoreInAttesaDichiarazioneUno != null) {
             return false;
         }
 
@@ -212,7 +225,8 @@ public class Partita {
      * GRASP Coordinator: gestisce il cambio turno tramite self-message dedicato.
      */
     public boolean passaTurno() {
-        if (vincitore != null || !cartaPescataDaGiocare) {
+        if (vincitore != null || !cartaPescataDaGiocare
+                || giocatoreInAttesaDichiarazioneUno != null) {
             return false;
         }
 
