@@ -17,6 +17,7 @@ public class Partita {
     private boolean cartaPescataDaGiocare;
     private Ieffetto effettoInizialeInAttesa;
     private Giocatore vincitore;
+    private Giocatore giocatoreInAttesaDichiarazioneUno;
     private boolean giocoIniziato;
     private boolean saltaProssimoTurno;
     private Colore coloreAttuale;
@@ -72,10 +73,6 @@ public class Partita {
         return getGiocatoreAttivo().getMano();
     }
 
-    public boolean richiedeDichiarazioneUno() {
-        return getGiocatoreAttivo().getMano().size() == 2;
-    }
-
     public boolean isCartaPescataDaGiocare() {
         return cartaPescataDaGiocare;
     }
@@ -100,14 +97,6 @@ public class Partita {
         return indiceGiocatoreAttivo;
     }
 
-    public int getNumeroCarteNelMazzo() {
-        return mazzo.getNumeroCarte();
-    }
-
-    public Mazzo getMazzoDaPesca() {
-        return mazzo;
-    }
-
     public PilaDegliScarti getPilaDegliScarti() {
         return pilaDegliScarti;
     }
@@ -119,13 +108,13 @@ public class Partita {
      * partita continua. Restituisce un esito distinto anche quando serve un input,
      * così la UI può chiedere una risposta senza considerare conclusa la giocata.
      */
-    public EsitoGiocata giocaCarta(int indiceCarta, boolean unoDichiarato, String rispostaInput) { 
-        // Caso 1: la partita è già conclusa oppure l'effetto della carta iniziale
-        // aspetta una risposta; in entrambi i casi non si può iniziare una giocata.
-        if (vincitore != null || effettoInizialeInAttesa != null) {
+    public EsitoGiocata giocaCarta(int indiceCarta, String rispostaInput) {
+        if (vincitore != null || effettoInizialeInAttesa != null
+                || giocatoreInAttesaDichiarazioneUno != null) {
             return EsitoGiocata.completata(false);
         }
         Giocatore giocatoreAttivo = getGiocatoreAttivo();
+        boolean avevaDueCarte = giocatoreAttivo.getMano().size() == 2;
         Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
         // Caso 2: l'indice è fuori dalla mano; non esiste una carta da giocare.
         if (cartaSelezionata == null) {
@@ -164,21 +153,36 @@ public class Partita {
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
         effetto.attivaEffetto(this, rispostaInput);
-        boolean MancatoUno = regole.mancatoUno(giocatoreAttivo, unoDichiarato, this, regole); //controlla sei il giocatore ha dichiarato uno e se è necessario applicare la penalità
-        // Caso 7: registra il vincitore e non sposta il turno a un altro giocatore.
         if (regole.isVincitore(giocatoreAttivo, this)) {
             vincitore = giocatoreAttivo;
-            return EsitoGiocata.completata(true, MancatoUno);
+            return EsitoGiocata.completata(true);
+        }
+        boolean richiedeDichiarazioneUno = avevaDueCarte
+                && giocatoreAttivo.getMano().size() == 1;
+        if (richiedeDichiarazioneUno) {
+            giocatoreInAttesaDichiarazioneUno = giocatoreAttivo;
+            return EsitoGiocata.richiedeDichiarazioneUno();
         }
         aggiornaGiocatoreAttivo();
-        return EsitoGiocata.completata(true, MancatoUno);
+        return EsitoGiocata.completata(true);
     }
 
     /**
-     * Completa l'effetto della carta iniziale, che non passa da una giocata
-     * ordinaria. Rifiuta la risposta se non c'è un effetto in attesa o se non è
-     * valida; in caso positivo consuma l'attesa, applica l'effetto e aggiorna il turno.
+     * Completa la finestra di dichiarazione UNO dopo una giocata valida.
+     *
+     * @return true se e stata applicata la penalita per mancata dichiarazione
      */
+    public boolean completaDichiarazioneUno(boolean unoDichiarato) {
+        if (giocatoreInAttesaDichiarazioneUno == null) {
+            return false;
+        }
+        Giocatore giocatore = giocatoreInAttesaDichiarazioneUno;
+        giocatoreInAttesaDichiarazioneUno = null;
+        boolean mancatoUno = regole.mancatoUno(giocatore, unoDichiarato, this, regole);
+        aggiornaGiocatoreAttivo();
+        return mancatoUno;
+    }
+
     public boolean rispondiRichiestaInputIniziale(String rispostaInput) {
         if (effettoInizialeInAttesa == null || !effettoInizialeInAttesa.validaRispostaInput(rispostaInput)) {
             return false;
@@ -219,7 +223,8 @@ public class Partita {
      * e gli scarti non forniscono una carta.
      */
     public boolean pescaCarta() {
-        if (vincitore != null || cartaPescataDaGiocare) {
+        if (vincitore != null || cartaPescataDaGiocare
+                || giocatoreInAttesaDichiarazioneUno != null) {
             return false;
         }
 
@@ -269,7 +274,8 @@ public class Partita {
      * giocatore attivo; altrimenti non modifica la partita.
      */
     public boolean passaTurno() {
-        if (vincitore != null || !cartaPescataDaGiocare) {
+        if (vincitore != null || !cartaPescataDaGiocare
+                || giocatoreInAttesaDichiarazioneUno != null) {
             return false;
         }
 

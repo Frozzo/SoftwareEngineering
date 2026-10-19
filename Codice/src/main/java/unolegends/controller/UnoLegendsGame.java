@@ -40,7 +40,6 @@ public class UnoLegendsGame {
         return new StatoPartita(
                 partita.getNomeGiocatoreAttivo(),
                 partita.getManoGiocatoreAttivo().stream().map(Carta::getDescrizioneBreve).collect(Collectors.toList()),
-                partita.richiedeDichiarazioneUno(),
                 formattaCarta(partita.getPilaDegliScarti().getCartaInCima()),
                 partita.isCartaPescataDaGiocare(),
                 formattaCarta(partita.getCartaAppenaPescata()),
@@ -49,17 +48,17 @@ public class UnoLegendsGame {
                 partita.getNomeVincitore());
     }
 
-    public int carteNelMazzo() {
-        return partita.getNumeroCarteNelMazzo();
-    }
-
     /**
      * Inoltra al dominio il tentativo di giocata e l'eventuale risposta richiesta
      * dall'effetto. Il controller non valida la carta: restituisce alla UI l'esito
      * prodotto da Partita, che può indicare una mossa rifiutata o un input in attesa.
      */
-    public EsitoGiocata giocaCarta(int indiceCarta, String rispostaInput, boolean unoDichiarato) {
-        return partita.giocaCarta(indiceCarta, unoDichiarato, rispostaInput);
+    public EsitoGiocata giocaCarta(int indiceCarta, String rispostaInput) {
+        return partita.giocaCarta(indiceCarta, rispostaInput);
+    }
+
+    public boolean completaDichiarazioneUno(boolean unoDichiarato) {
+        return partita.completaDichiarazioneUno(unoDichiarato);
     }
 
     /**

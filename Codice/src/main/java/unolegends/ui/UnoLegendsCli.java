@@ -1,7 +1,9 @@
 package unolegends.ui;
 
 import java.util.List;
-import java.util.Scanner;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 
 import unolegends.model.Colore;
 import unolegends.model.EsitoGiocata;
@@ -16,22 +18,17 @@ public final class UnoLegendsCli {
     private UnoLegendsCli() {
     }
 
-    /**
-     * Gestisce il menu iniziale e il ciclo interattivo della partita. Il menu
-     * accetta solo l'avvio della demo o l'uscita; ogni altra scelta termina senza
-     * creare una partita. Nel ciclo rilegge lo stato a ogni iterazione per
-     * proporre solo le azioni consentite dalla situazione corrente.
-     */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         System.out.println("UnoLegends - CLI");
         System.out.println();
 
-        try (Scanner scanner = new Scanner(System.in)) {
+        // Menù iniziale indicizzato: scala per future opzioni (0 avvia partita)
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
             System.out.println("Menu iniziale:");
             System.out.println("0) Avvia partita demo standard (2 giocatori)");
             System.out.println("1) Esci");
             System.out.print("> ");
-            String sceltaIniziale = scanner.nextLine().trim();
+            String sceltaIniziale = reader.readLine().trim();
             if ("1".equals(sceltaIniziale)) {
                 System.out.println("Uscita.");
                 return;
@@ -55,7 +52,7 @@ public final class UnoLegendsCli {
                     return;
                 }
                 if (stato.getRichiestaInput() != null) { //controlla se c'è una richiesta di input in sospeso in particolare all'inizio della partita
-                    String risposta = richiediInput(scanner, stato.getRichiestaInput());
+                    String risposta = richiediInput(reader, stato.getRichiestaInput());
                     if (!controller.rispondiRichiestaInputIniziale(risposta)) {
                         System.out.println("Risposta non valida. Riprova.");
                     }
@@ -67,7 +64,7 @@ public final class UnoLegendsCli {
                     System.out.println("Carta pescata: " + stato.getCartaAppenaPescata());
                     System.out.println("Scegli: indica l'indice della carta pescata oppure 'p' per passare il turno.");
                     System.out.print("> ");
-                    String scelta = scanner.nextLine().trim();
+                    String scelta = reader.readLine().trim();
                     if ("p".equalsIgnoreCase(scelta)) {
                         if (controller.passaTurno()) {
                             System.out.println("Turno passato.");
@@ -83,8 +80,7 @@ public final class UnoLegendsCli {
                         continue;
                     }
 
-                    if (gestisciGiocata(indiceCarta, controller, scanner,
-                            stato.isRichiedeDichiarazioneUno())) {
+                    if (gestisciGiocata(indiceCarta, controller, reader)) {
                         System.out.println("Carta giocata.");
                     } else {
                         System.out.println("Mossa non valida.");
@@ -94,7 +90,7 @@ public final class UnoLegendsCli {
 
                 System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci");
                 System.out.print("> ");
-                String scelta = scanner.nextLine().trim();
+                String scelta = reader.readLine().trim();
 
                 if ("2".equals(scelta)) {
                     return;
@@ -102,13 +98,12 @@ public final class UnoLegendsCli {
                 if ("0".equals(scelta)) {
                     System.out.println("Digita l'indice della carta da giocare.");
                     System.out.print("> ");
-                    Integer indiceCarta = parseIndice(scanner.nextLine().trim());
+                    Integer indiceCarta = parseIndice(reader.readLine().trim());
                     if (indiceCarta == null) {
                         System.out.println("Valore non valido.");
                         continue;
                     }
-                    if (gestisciGiocata(indiceCarta, controller, scanner,
-                            stato.isRichiedeDichiarazioneUno())) {
+                    if (gestisciGiocata(indiceCarta, controller, reader)) {
                         System.out.println("Carta giocata.");
                     } else {
                         System.out.println("Mossa non valida.");
@@ -146,34 +141,24 @@ public final class UnoLegendsCli {
         System.out.println();
     }
 
-    /**
-     * Raccoglie gli input necessari e inoltra il tentativo di giocata al controller.
-     * La dichiarazione UNO viene chiesta solo quando la mano ha due carte; gli eventuali
-     * input richiesti dall'effetto vengono raccolti e inviati ripetendo il comando fino
-     * a ottenere un esito definitivo. La validità della mossa è decisa dal dominio.
-     */
-    private static boolean gestisciGiocata(int indiceCarta, UnoLegendsGame controller, Scanner scanner,boolean richiedeDichiarazioneUno) {
-
-        boolean unoDichiarato = richiedeDichiarazioneUno && dichiaraUno(scanner);
-        EsitoGiocata esito = controller.giocaCarta(indiceCarta, null, unoDichiarato);
+    private static boolean gestisciGiocata(int indiceCarta, UnoLegendsGame controller,
+                                           BufferedReader reader) throws IOException {
+        EsitoGiocata esito = controller.giocaCarta(indiceCarta, null);
         while (esito.getRichiestaInput() != null) {
-            String risposta = richiediInput(scanner, esito.getRichiestaInput());
-            esito = controller.giocaCarta(indiceCarta, risposta, unoDichiarato);
+            String risposta = richiediInput(reader, esito.getRichiestaInput());
+            esito = controller.giocaCarta(indiceCarta, risposta);
         }
         boolean giocataValida = esito.isGiocata();
-        if (esito.isMancatoUno()) {
-            System.out.println("UNO non dichiarato: hai pescato due carte di penalita.");
+        if (giocataValida && esito.isRichiedeDichiarazioneUno()) {
+            boolean unoDichiarato = attendiDichiarazioneUno(reader);
+            if (controller.completaDichiarazioneUno(unoDichiarato)) {
+                System.out.println("\nUNO non dichiarato: hai pescato due carte di penalita.");
+            }
         }
         return giocataValida;
     }
 
-    /**
-     * Mostra una richiesta prodotta dal dominio e restituisce la risposta dell'utente.
-     * Se sono disponibili opzioni, accetta un indice e restituisce la relativa opzione;
-     * un indice non valido diventa una risposta vuota, che il dominio può rifiutare.
-     * Senza opzioni, legge invece una risposta testuale libera.
-     */
-    private static String richiediInput(Scanner scanner, RichiestaInput richiesta) {
+    private static String richiediInput(BufferedReader reader, RichiestaInput richiesta) throws IOException {
         System.out.println(richiesta.getMessaggio());
         if (!richiesta.getOpzioni().isEmpty()) {
             List<String> opzioni = richiesta.getOpzioni();
@@ -181,7 +166,7 @@ public final class UnoLegendsCli {
                 System.out.println(i + ") " + opzioni.get(i));
             }
             System.out.print("> ");
-            Integer indice = parseIndice(scanner.nextLine().trim());
+            Integer indice = parseIndice(reader.readLine().trim());
             String scelta = indice != null && indice < opzioni.size()
                     ? opzioni.get(indice)
                     : "nessuna opzione valida";
@@ -196,16 +181,27 @@ public final class UnoLegendsCli {
             return indice != null && indice < opzioni.size() ? opzioni.get(indice) : "";
         }
         System.out.print("> ");
-        return scanner.nextLine().trim();
+        return reader.readLine().trim();
     }
 
-    /**
-     * Interpreta la dichiarazione UNO solo quando l'utente scrive "uno",
-     * ignorando maiuscole/minuscole; qualsiasi altra risposta vale come non dichiarato.
-     */
-    private static boolean dichiaraUno(Scanner scanner) {
-        System.out.print("Dichiara UNO insieme alla giocata digitando 'uno'; altrimenti premi Invio: ");
-        return "uno".equalsIgnoreCase(scanner.nextLine().trim());
+    private static boolean attendiDichiarazioneUno(BufferedReader reader) throws IOException {
+        System.out.print("Dichiara UNO entro 5 secondi: ");
+        for (int secondo = 1; secondo <= 5; secondo++) {
+            long fineAttesa = System.currentTimeMillis() + 1000;
+            while (System.currentTimeMillis() < fineAttesa) {
+                if (reader.ready()) {
+                    return "uno".equalsIgnoreCase(reader.readLine().trim());
+                }
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+            System.out.print(".");
+        }
+        return false;
     }
 
     /**
