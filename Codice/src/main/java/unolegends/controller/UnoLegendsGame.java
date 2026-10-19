@@ -54,7 +54,9 @@ public class UnoLegendsGame {
     }
 
     /**
-     * Inoltra al dominio il tentativo di giocata e l'eventuale risposta richiesta dall'effetto.
+     * Inoltra al dominio il tentativo di giocata e l'eventuale risposta richiesta
+     * dall'effetto. Il controller non valida la carta: restituisce alla UI l'esito
+     * prodotto da Partita, che può indicare una mossa rifiutata o un input in attesa.
      */
     public EsitoGiocata giocaCarta(int indiceCarta, String rispostaInput, boolean unoDichiarato) {
         return partita.giocaCarta(indiceCarta, unoDichiarato, rispostaInput);
@@ -62,25 +64,33 @@ public class UnoLegendsGame {
 
     /**
      * Inoltra la risposta alla richiesta emessa dall'effetto della carta iniziale.
+     * La validità della risposta e l'applicazione dell'effetto sono responsabilità
+     * di Partita; il booleano viene restituito alla UI per segnalare l'esito.
      */
     public boolean rispondiRichiestaInputIniziale(String rispostaInput) {
         return partita.rispondiRichiestaInputIniziale(rispostaInput);
     }
 
     /**
-     * GRASP Controller: inoltra il comando di pesca carta alla radice del dominio.
+     * Inoltra il comando di pesca alla partita e restituisce se è stato accettato
+     * secondo lo stato corrente (per esempio, non si può pescare due volte di seguito).
      */
     public boolean pescaCarta() {
         return partita.pescaCarta();
     }
 
     /**
-     * GRASP Controller: inoltra il comando di passaggio turno alla radice del dominio.
+     * Inoltra la richiesta di passaggio turno; Partita controlla se il passaggio
+     * è consentito e aggiorna lo stato del turno.
      */
     public boolean passaTurno() {
         return partita.passaTurno();
     }
 
+    /**
+     * Converte una carta in testo per lo snapshot della UI, preservando null
+     * quando non esiste una carta da visualizzare.
+     */
     private static String formattaCarta(Carta carta) {
         return carta == null ? null : carta.getDescrizioneBreve();
     }

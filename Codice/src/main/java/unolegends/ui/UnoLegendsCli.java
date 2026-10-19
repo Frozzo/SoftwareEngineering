@@ -16,11 +16,16 @@ public final class UnoLegendsCli {
     private UnoLegendsCli() {
     }
 
+    /**
+     * Gestisce il menu iniziale e il ciclo interattivo della partita. Il menu
+     * accetta solo l'avvio della demo o l'uscita; ogni altra scelta termina senza
+     * creare una partita. Nel ciclo rilegge lo stato a ogni iterazione per
+     * proporre solo le azioni consentite dalla situazione corrente.
+     */
     public static void main(String[] args) {
         System.out.println("UnoLegends - CLI");
         System.out.println();
 
-        // Menù iniziale indicizzato: scala per future opzioni (0 avvia partita)
         try (Scanner scanner = new Scanner(System.in)) {
             System.out.println("Menu iniziale:");
             System.out.println("0) Avvia partita demo standard (2 giocatori)");
@@ -124,6 +129,11 @@ public final class UnoLegendsCli {
         }
     }
 
+    /**
+     * Presenta lo snapshot restituito dal controller. Stampa "nessuna" quando
+     * non c'è una carta in cima agli scarti e numera la mano da zero per
+     * permettere all'utente di selezionare una carta con il relativo indice.
+     */
     private static void mostraStato(StatoPartita stato) {
         System.out.println();
         System.out.println("Giocatore attivo: " + stato.getNomeGiocatoreAttivo());
@@ -136,6 +146,12 @@ public final class UnoLegendsCli {
         System.out.println();
     }
 
+    /**
+     * Raccoglie gli input necessari e inoltra il tentativo di giocata al controller.
+     * La dichiarazione UNO viene chiesta solo quando la mano ha due carte; gli eventuali
+     * input richiesti dall'effetto vengono raccolti e inviati ripetendo il comando fino
+     * a ottenere un esito definitivo. La validità della mossa è decisa dal dominio.
+     */
     private static boolean gestisciGiocata(int indiceCarta, UnoLegendsGame controller, Scanner scanner,boolean richiedeDichiarazioneUno) {
 
         boolean unoDichiarato = richiedeDichiarazioneUno && dichiaraUno(scanner);
@@ -151,6 +167,12 @@ public final class UnoLegendsCli {
         return giocataValida;
     }
 
+    /**
+     * Mostra una richiesta prodotta dal dominio e restituisce la risposta dell'utente.
+     * Se sono disponibili opzioni, accetta un indice e restituisce la relativa opzione;
+     * un indice non valido diventa una risposta vuota, che il dominio può rifiutare.
+     * Senza opzioni, legge invece una risposta testuale libera.
+     */
     private static String richiediInput(Scanner scanner, RichiestaInput richiesta) {
         System.out.println(richiesta.getMessaggio());
         if (!richiesta.getOpzioni().isEmpty()) {
@@ -177,11 +199,20 @@ public final class UnoLegendsCli {
         return scanner.nextLine().trim();
     }
 
+    /**
+     * Interpreta la dichiarazione UNO solo quando l'utente scrive "uno",
+     * ignorando maiuscole/minuscole; qualsiasi altra risposta vale come non dichiarato.
+     */
     private static boolean dichiaraUno(Scanner scanner) {
         System.out.print("Dichiara UNO insieme alla giocata digitando 'uno'; altrimenti premi Invio: ");
         return "uno".equalsIgnoreCase(scanner.nextLine().trim());
     }
 
+    /**
+     * Converte l'input in un indice non negativo. Restituisce null se il testo
+     * non è un intero o se il valore è negativo, così il chiamante può gestire
+     * l'errore senza interrompere il ciclo della partita.
+     */
     private static Integer parseIndice(String valore) {
         try {
             int indice = Integer.parseInt(valore);
