@@ -46,12 +46,16 @@ public final class UnoLegendsCli {
             System.out.println("Il sistema mostra automaticamente lo stato dopo ogni scelta.");
             System.out.println();
             while (true) {
+                // Rilegge lo stato a ogni iterazione: le scelte precedenti possono averlo modificato.
                 StatoPartita stato = controller.richiediStato();
+                // La partita non richiede altre mosse; mostra il vincitore e termina la CLI.
                 if (stato.isPartitaTerminata()) {
                     System.out.println("Partita terminata. Vince " + stato.getNomeVincitore() + "!");
                     return;
                 }
-                if (stato.getRichiestaInput() != null) { //controlla se c'è una richiesta di input in sospeso in particolare all'inizio della partita
+                // Risolve prima eventuali richieste rimaste in sospeso (per esempio il colore iniziale).
+                // Poi riparte dal controllo dello stato, senza mostrare o chiedere una mossa normale.
+                if (stato.getRichiestaInput() != null) {
                     String risposta = richiediInput(reader, stato.getRichiestaInput());
                     if (!controller.rispondiRichiestaInputIniziale(risposta)) {
                         System.out.println("Risposta non valida. Riprova.");
@@ -60,9 +64,11 @@ public final class UnoLegendsCli {
                 }
                 mostraStato(stato);
 
+                // Dopo una pesca. il turno è vincolato: si può giocare solo una carta
+                // oppure passare. Il continue fa ripartire il ciclo per aggiornare lo stato.
                 if (stato.isDeveGiocareCartaPescata()) {
                     System.out.println("Carta pescata: " + stato.getCartaAppenaPescata());
-                    System.out.println("Scegli: indica l'indice della carta pescata oppure 'p' per passare il turno.");
+                    System.out.println("Scegli: indica l'indice della carta che vuoi giocare oppure 'p' per passare il turno.");
                     System.out.print("> ");
                     String scelta = reader.readLine().trim();
                     if ("p".equalsIgnoreCase(scelta)) {
@@ -88,6 +94,8 @@ public final class UnoLegendsCli {
                     continue;
                 }
 
+                // Se non ci sono richieste pendenti né una carta pescata da risolvere,
+                // il giocatore può giocare una carta, pescare oppure uscire.
                 System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci");
                 System.out.print("> ");
                 String scelta = reader.readLine().trim();
@@ -114,7 +122,7 @@ public final class UnoLegendsCli {
                     if (!controller.pescaCarta()) {
                         System.out.println("Mazzo esaurito.");
                     } else {
-                        System.out.println("Hai pescato una carta: ora puoi solo giocare quella carta oppure passare.");
+                        System.out.println("Hai pescato una carta: ora puoi solo giocare una carta oppure passare.");
                     }
                     continue;
                 }
@@ -158,6 +166,14 @@ public final class UnoLegendsCli {
         return giocataValida;
     }
 
+    /**
+     * Mostra il messaggio della richiesta e raccoglie la risposta da tastiera.
+     * Se la richiesta contiene opzioni, le stampa numerate e interpreta
+     * l'inserimento come indice: restituisce l'opzione corrispondente, oppure
+     * una stringa vuota se l'indice non è valido. Se tra le opzioni è stato
+     * scelto un colore, ne mostra anche il nome formattato. Senza opzioni,
+     * legge e restituisce direttamente la riga inserita dall'utente.
+     */
     private static String richiediInput(BufferedReader reader, RichiestaInput richiesta) throws IOException {
         System.out.println(richiesta.getMessaggio());
         if (!richiesta.getOpzioni().isEmpty()) {

@@ -109,10 +109,11 @@ public class Partita {
      * così la UI può chiedere una risposta senza considerare conclusa la giocata.
      */
     public EsitoGiocata giocaCarta(int indiceCarta, String rispostaInput) {
-        if (vincitore != null || effettoInizialeInAttesa != null
-                || giocatoreInAttesaDichiarazioneUno != null) {
-            return EsitoGiocata.completata(false);
-        }
+         // Caso 1: rifiuta la giocata se la partita è terminata o c'è già un'azione in attesa.
+         if (vincitore != null || effettoInizialeInAttesa != null
+                 || giocatoreInAttesaDichiarazioneUno != null) {
+             return EsitoGiocata.completata(false);
+         }
         Giocatore giocatoreAttivo = getGiocatoreAttivo();
         boolean avevaDueCarte = giocatoreAttivo.getMano().size() == 2;
         Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
@@ -153,12 +154,14 @@ public class Partita {
         cartaAppenaPescata = null;
         cartaPescataDaGiocare = false;
         effetto.attivaEffetto(this, rispostaInput);
+        // Caso 7: se la giocata lascia il giocatore senza carte, termina la partita.
         if (regole.isVincitore(giocatoreAttivo, this)) {
             vincitore = giocatoreAttivo;
             return EsitoGiocata.completata(true);
         }
         boolean richiedeDichiarazioneUno = avevaDueCarte
                 && giocatoreAttivo.getMano().size() == 1;
+        // Caso 8: con una sola carta in mano, attende la dichiarazione UNO prima di passare il turno.
         if (richiedeDichiarazioneUno) {
             giocatoreInAttesaDichiarazioneUno = giocatoreAttivo;
             return EsitoGiocata.richiedeDichiarazioneUno();
