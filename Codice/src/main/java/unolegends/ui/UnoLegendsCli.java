@@ -5,10 +5,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import unolegends.model.Colore;
-import unolegends.model.EsitoGiocata;
-import unolegends.model.RichiestaInput;
-import unolegends.controller.StatoPartita;
+import unolegends.controller.EsitoGiocataDto;
+import unolegends.controller.RichiestaInputDto;
+import unolegends.controller.StatoPartitaDto;
 import unolegends.controller.UnoLegendsGame;
 
 /**
@@ -47,7 +46,7 @@ public final class UnoLegendsCli {
             System.out.println();
             while (true) {
                 // Rilegge lo stato a ogni iterazione: le scelte precedenti possono averlo modificato.
-                StatoPartita stato = controller.richiediStato();
+                StatoPartitaDto stato = controller.richiediStato();
                 // La partita non richiede altre mosse; mostra il vincitore e termina la CLI.
                 if (stato.isPartitaTerminata()) {
                     System.out.println("Partita terminata. Vince " + stato.getNomeVincitore() + "!");
@@ -137,7 +136,7 @@ public final class UnoLegendsCli {
      * non c'è una carta in cima agli scarti e numera la mano da zero per
      * permettere all'utente di selezionare una carta con il relativo indice.
      */
-    private static void mostraStato(StatoPartita stato) {
+    private static void mostraStato(StatoPartitaDto stato) {
         System.out.println();
         System.out.println("Giocatore attivo: " + stato.getNomeGiocatoreAttivo());
         System.out.println("Carta in cima: " + (stato.getCartaInCima() == null ? "nessuna" : stato.getCartaInCima()));
@@ -151,7 +150,7 @@ public final class UnoLegendsCli {
 
     private static boolean gestisciGiocata(int indiceCarta, UnoLegendsGame controller,
                                            BufferedReader reader) throws IOException {
-        EsitoGiocata esito = controller.giocaCarta(indiceCarta, null);
+        EsitoGiocataDto esito = controller.giocaCarta(indiceCarta, null);
         while (esito.getRichiestaInput() != null) {
             String risposta = richiediInput(reader, esito.getRichiestaInput());
             esito = controller.giocaCarta(indiceCarta, risposta);
@@ -174,7 +173,7 @@ public final class UnoLegendsCli {
      * scelto un colore, ne mostra anche il nome formattato. Senza opzioni,
      * legge e restituisce direttamente la riga inserita dall'utente.
      */
-    private static String richiediInput(BufferedReader reader, RichiestaInput richiesta) throws IOException {
+    private static String richiediInput(BufferedReader reader, RichiestaInputDto richiesta) throws IOException {
         System.out.println(richiesta.getMessaggio());
         if (!richiesta.getOpzioni().isEmpty()) {
             List<String> opzioni = richiesta.getOpzioni();
@@ -186,18 +185,29 @@ public final class UnoLegendsCli {
             String scelta = indice != null && indice < opzioni.size()
                     ? opzioni.get(indice)
                     : "nessuna opzione valida";
-            String sceltaColorata = scelta;
-            for (Colore colore : Colore.values()) {
-                if (colore.getNome().equalsIgnoreCase(scelta)) {
-                    sceltaColorata = colore.formatta(scelta);
-                    break;
-                }
-            }
-            System.out.println("Hai scelto: " + sceltaColorata);
+            System.out.println("Hai scelto: " + formattaOpzione(scelta));
             return indice != null && indice < opzioni.size() ? opzioni.get(indice) : "";
         }
         System.out.print("> ");
         return reader.readLine().trim();
+    }
+
+    private static String formattaOpzione(String opzione) {
+        String codiceAnsi;
+        if ("Rosso".equalsIgnoreCase(opzione)) {
+            codiceAnsi = "\u001B[31m";
+        } else if ("Verde".equalsIgnoreCase(opzione)) {
+            codiceAnsi = "\u001B[32m";
+        } else if ("Blu".equalsIgnoreCase(opzione)) {
+            codiceAnsi = "\u001B[34m";
+        } else if ("Giallo".equalsIgnoreCase(opzione)) {
+            codiceAnsi = "\u001B[33m";
+        } else if ("Nero".equalsIgnoreCase(opzione)) {
+            codiceAnsi = "\u001B[30m";
+        } else {
+            return opzione;
+        }
+        return codiceAnsi + opzione + "\u001B[0m";
     }
 
     private static boolean attendiDichiarazioneUno(BufferedReader reader) throws IOException {

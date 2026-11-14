@@ -9,9 +9,10 @@ import unolegends.model.Partita;
 import unolegends.model.PartitaFactory;
 import unolegends.model.RegoleDiGioco;
 import unolegends.model.StandardMazzoFactory;
+import unolegends.model.RichiestaInput;
 
 /**
- * GRASP Controller (Facade): punto di ingresso per la UI CLI.
+ * GRASP Controller (Facade): punto di ingresso per la UI.
  */
 public class UnoLegendsGame {
     private final Partita partita;
@@ -29,21 +30,21 @@ public class UnoLegendsGame {
         return new UnoLegendsGame(partita);
     }
 
-    public UnoLegendsGame(Partita partita) {
+    UnoLegendsGame(Partita partita) {
         this.partita = Objects.requireNonNull(partita, "partita non puo essere null");
     }
 
     /**
      * Restituisce alla UI uno snapshot già convertito in dati di presentazione.
      */
-    public StatoPartita richiediStato() {
-        return new StatoPartita(
+    public StatoPartitaDto richiediStato() {
+        return new StatoPartitaDto(
                 partita.getNomeGiocatoreAttivo(),
                 partita.getManoGiocatoreAttivo().stream().map(Carta::getDescrizioneBreve).collect(Collectors.toList()),
                 formattaCarta(partita.getPilaDegliScarti().getCartaInCima()),
                 partita.isCartaPescataDaGiocare(),
                 formattaCarta(partita.getCartaAppenaPescata()),
-                partita.getRichiestaInputIniziale(),
+                convertiRichiesta(partita.getRichiestaInputIniziale()),
                 partita.isPartitaTerminata(),
                 partita.getNomeVincitore());
     }
@@ -53,8 +54,12 @@ public class UnoLegendsGame {
      * dall'effetto. Il controller non valida la carta: restituisce alla UI l'esito
      * prodotto da Partita, che può indicare una mossa rifiutata o un input in attesa.
      */
-    public EsitoGiocata giocaCarta(int indiceCarta, String rispostaInput) {
-        return partita.giocaCarta(indiceCarta, rispostaInput);
+    public EsitoGiocataDto giocaCarta(int indiceCarta, String rispostaInput) {
+        EsitoGiocata esito = partita.giocaCarta(indiceCarta, rispostaInput);
+        return new EsitoGiocataDto(
+                esito.isGiocata(),
+                convertiRichiesta(esito.getRichiestaInput()),
+                esito.isRichiedeDichiarazioneUno());
     }
 
     public boolean completaDichiarazioneUno(boolean unoDichiarato) {
@@ -92,5 +97,11 @@ public class UnoLegendsGame {
      */
     private static String formattaCarta(Carta carta) {
         return carta == null ? null : carta.getDescrizioneBreve();
+    }
+
+    private static RichiestaInputDto convertiRichiesta(RichiestaInput richiesta) {
+        return richiesta == null
+                ? null
+                : new RichiestaInputDto(richiesta.getMessaggio(), richiesta.getOpzioni());
     }
 }

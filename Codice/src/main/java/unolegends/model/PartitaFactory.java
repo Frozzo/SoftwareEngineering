@@ -22,7 +22,7 @@ import java.util.Objects;
  * - SRP: unica responsabilità = configurare il setup iniziale
  */
 public class PartitaFactory {
-    private static final int CARTE_PER_GIOCATORE = 4;
+    private static final int CARTE_PER_GIOCATORE = 7;
 
     public static RegoleDiGioco creaRegoleStandard() {
         return RegoleDiGioco.standard();
