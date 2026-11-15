@@ -9,7 +9,10 @@ public interface Ieffetto {
     }
 
     default boolean validaRispostaInput(String risposta) {
-        return getRichiestaInput() == null ? risposta == null : risposta != null;
+        if (getRichiestaInput() == null) {
+            return risposta == null;
+        }
+        return risposta != null;
     }
 
     default void attivaEffetto(Partita partita, String risposta) {

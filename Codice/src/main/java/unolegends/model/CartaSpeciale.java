@@ -35,4 +35,11 @@ public class CartaSpeciale extends Carta {
         String base = toTestoBase();
         return colore.formatta(base);
     }
+
+    public String getDescrizioneBreve(Colore coloreVisualizzato) {
+        Objects.requireNonNull(coloreVisualizzato, "coloreVisualizzato non puo essere null");
+        String base = valoreCarta.getValore() + " "
+                + coloreVisualizzato.getNome().toLowerCase(Locale.ROOT);
+        return coloreVisualizzato.formatta(base);
+    }
 }

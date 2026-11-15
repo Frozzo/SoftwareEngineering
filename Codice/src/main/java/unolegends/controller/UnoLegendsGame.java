@@ -4,6 +4,8 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import unolegends.model.Carta;
+import unolegends.model.CartaSpeciale;
+import unolegends.model.Colore;
 import unolegends.model.EsitoGiocata;
 import unolegends.model.Partita;
 import unolegends.model.PartitaFactory;
@@ -41,7 +43,7 @@ public class UnoLegendsGame {
         return new StatoPartitaDto(
                 partita.getNomeGiocatoreAttivo(),
                 partita.getManoGiocatoreAttivo().stream().map(Carta::getDescrizioneBreve).collect(Collectors.toList()),
-                formattaCarta(partita.getPilaDegliScarti().getCartaInCima()),
+                formattaCarta(partita.getPilaDegliScarti().getCartaInCima(), partita.getColoreAttuale()),
                 partita.isCartaPescataDaGiocare(),
                 formattaCarta(partita.getCartaAppenaPescata()),
                 convertiRichiesta(partita.getRichiestaInputIniziale()),
@@ -97,6 +99,17 @@ public class UnoLegendsGame {
      */
     private static String formattaCarta(Carta carta) {
         return carta == null ? null : carta.getDescrizioneBreve();
+    }
+
+    private static String formattaCarta(Carta carta, Colore coloreAttuale) {
+        if (carta == null) {
+            return null;
+        }
+        if (carta instanceof CartaSpeciale && carta.getColore() == Colore.NERO
+                && coloreAttuale != null && coloreAttuale != Colore.NERO) {
+            return ((CartaSpeciale) carta).getDescrizioneBreve(coloreAttuale);
+        }
+        return carta.getDescrizioneBreve();
     }
 
     private static RichiestaInputDto convertiRichiesta(RichiestaInput richiesta) {
