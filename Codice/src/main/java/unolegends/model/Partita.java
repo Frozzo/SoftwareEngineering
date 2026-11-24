@@ -27,18 +27,23 @@ public class Partita {
      * Costruisce lo stato iniziale della partita e ricava il colore attivo dalla
      * carta iniziale. Se il suo effetto richiede input, lo conserva in attesa:
      * non può essere applicato correttamente finché il giocatore non risponde.
+     *
+     * <p>Il giocatore iniziale dipende dalla carta iniziale, quindi lo decide
+     * Partita (Information Expert) e non la factory: se la carta richiede input
+     * risponde il primo giocatore; altrimenti l'indice parte dall'ultimo, così
+     * l'avanzamento eseguito da {@link #iniziaGioco()} porta il turno al primo.</p>
      */
-    public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, int indiceGiocatoreAttivo, RegoleDiGioco regole) {
+    public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, RegoleDiGioco regole) {
         this.giocatori = new ArrayList<>(giocatori);
         this.mazzo = mazzo;
         this.pilaDegliScarti = pilaDegliScarti;
         this.regole = regole;
-        this.indiceGiocatoreAttivo = indiceGiocatoreAttivo;
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
         this.coloreAttuale = cartaInCima == null ? null : cartaInCima.getColore();
-        if (cartaInCima != null && cartaInCima.getEffetto().getRichiestaInput() != null) {
+        if (cartaInCima != null && cartaInCima.getEffetto().getRichiestaInput(this) != null) {
             this.effettoInizialeInAttesa = cartaInCima.getEffetto();
         }
+        this.indiceGiocatoreAttivo = effettoInizialeInAttesa != null ? 0 : this.giocatori.size() - 1;
     }
     /**
      * Completa l'inizializzazione della partita applicando l'effetto della prima carta.
@@ -82,7 +87,7 @@ public class Partita {
     }
 
     public RichiestaInput getRichiestaInputIniziale() {
-        return effettoInizialeInAttesa == null ? null : effettoInizialeInAttesa.getRichiestaInput();
+        return effettoInizialeInAttesa == null ? null : effettoInizialeInAttesa.getRichiestaInput(this);
     }
 
     public boolean isPartitaTerminata() {
@@ -124,12 +129,12 @@ public class Partita {
 
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
         // Caso 3: la carta non rispetta le regole di compatibilità; la mano resta invariata.
-        if (!regole.isGiocabile(cartaSelezionata, cartaInCima, this)) {
+        if (!regole.isGiocabile(giocatoreAttivo, cartaSelezionata, cartaInCima, this)) {
             return EsitoGiocata.completata(false);
         }
 
         Ieffetto effetto = cartaSelezionata.getEffetto();
-        RichiestaInput richiesta = effetto.getRichiestaInput();
+        RichiestaInput richiesta = effetto.getRichiestaInput(this);
         // Caso 4: l'effetto ha bisogno di una risposta (per esempio un colore),
         // ma questa è la prima chiamata; restituisce la richiesta senza giocare la carta.
         if (richiesta != null && rispostaInput == null) {
@@ -137,7 +142,7 @@ public class Partita {
         }
         // Caso 5: la risposta non rispetta l'effetto. Se è previsto un input,
         // lascia la giocata in attesa; altrimenti rifiuta la mossa.
-        if (!effetto.validaRispostaInput(rispostaInput)) {
+        if (!effetto.validaRispostaInput(rispostaInput, this)) {
             return richiesta == null
                     ? EsitoGiocata.completata(false)
                     : EsitoGiocata.inAttesa(richiesta);
@@ -181,13 +186,13 @@ public class Partita {
         }
         Giocatore giocatore = giocatoreInAttesaDichiarazioneUno;
         giocatoreInAttesaDichiarazioneUno = null;
-        boolean mancatoUno = regole.mancatoUno(giocatore, unoDichiarato, this, regole);
+        boolean mancatoUno = regole.mancatoUno(giocatore, unoDichiarato, this);
         aggiornaGiocatoreAttivo();
         return mancatoUno;
     }
 
     public boolean rispondiRichiestaInputIniziale(String rispostaInput) {
-        if (effettoInizialeInAttesa == null || !effettoInizialeInAttesa.validaRispostaInput(rispostaInput)) {
+        if (effettoInizialeInAttesa == null || !effettoInizialeInAttesa.validaRispostaInput(rispostaInput, this)) {
             return false;
         }
 
@@ -224,6 +229,9 @@ public class Partita {
      * e registra la carta come unica giocabile prima del passaggio del turno.
      * Il valore true indica che la richiesta è stata accettata, anche se il mazzo
      * e gli scarti non forniscono una carta.
+     *
+     * <p>Quante carte pescare lo decide la strategia di pesca volontaria delle
+     * regole; la carta giocabile subito è l'ultima pescata.</p>
      */
     public boolean pescaCarta() {
         if (vincitore != null || cartaPescataDaGiocare
@@ -231,8 +239,8 @@ public class Partita {
             return false;
         }
 
-        Carta cartaPescata = pescaSingola(getGiocatoreAttivo());
-        cartaAppenaPescata = cartaPescata;
+        List<Carta> cartePescate = regole.pescaVolontaria(getGiocatoreAttivo(), this);
+        cartaAppenaPescata = cartePescate.isEmpty() ? null : cartePescate.get(cartePescate.size() - 1);
         cartaPescataDaGiocare = true;
         return true;
     }
@@ -259,13 +267,26 @@ public class Partita {
     }
 
     /**
-     * Esegue una pesca richiesta da un effetto, delegando alle regole la strategia
-     * e il numero di carte da pescare; restituisce true se è stata pescata almeno
-     * una carta.
+     * Unico punto d'ingresso per tutte le pesche forzate (effetti delle carte,
+     * penalità UNO e, in futuro, abilità e accumulo dello stacking). Chiede alle
+     * regole quante carte vanno pescate davvero in base al contesto, poi le pesca
+     * una alla volta fermandosi se mazzo e scarti sono esauriti.
+     *
+     * @return le carte effettivamente pescate
      */
-    public boolean pescaCartaForzata(Giocatore giocatore) {
-        Objects.requireNonNull(giocatore, "giocatore non puo essere null");
-        return !regole.pesca(giocatore, this).isEmpty();
+    public List<Carta> applicaPescaForzata(Giocatore bersaglio, int numeroCarte, OriginePesca origine) {
+        ContestoPesca contesto = new ContestoPesca(bersaglio, numeroCarte, origine);
+        int carteDaPescare = regole.calcolaCartePescaForzata(contesto);
+
+        List<Carta> cartePescate = new ArrayList<>();
+        for (int i = 0; i < carteDaPescare; i++) {
+            Carta carta = pescaSingola(bersaglio);
+            if (carta == null) {
+                break;
+            }
+            cartePescate.add(carta);
+        }
+        return cartePescate;
     }
 
     /**

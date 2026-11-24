@@ -103,7 +103,7 @@ package "unolegends.model" {
     ~segnalaSaltoTurno() : void
     +pescaCarta() : boolean
     +pescaSingola(giocatore : Giocatore) : Carta
-    +pescaCartaForzata(giocatore : Giocatore) : boolean
+    +applicaPescaForzata(bersaglio : Giocatore, numeroCarte : int, origine : OriginePesca) : List<Carta>
     +passaTurno() : boolean
     +tuttiGliAltriGiocatoriHannoPiuDi(giocatore : Giocatore, sogliaCarte : int) : boolean
     +aggiornaGiocatoreAttivo() : void
@@ -116,22 +116,22 @@ package "unolegends.model" {
     -strategiaVittoria : IStrategiaCondizioneVittoria
     -strategiaSconfitta : IStrategiaCondizioneSconfitta
     -strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte
-    -strategiaPesca : IStrategiaPesca
+    -strategiaPescaVolontaria : IStrategiaPesca
     -strategiaPenalitaUno : IStrategiaPenalitaUno
-    +RegoleDiGioco(strategiaVittoria : IStrategiaCondizioneVittoria, strategiaSconfitta : IStrategiaCondizioneSconfitta, strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte, strategiaPesca : IStrategiaPesca)
-    +RegoleDiGioco(strategiaVittoria : IStrategiaCondizioneVittoria, strategiaSconfitta : IStrategiaCondizioneSconfitta, strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte, strategiaPesca : IStrategiaPesca, strategiaPenalitaUno : IStrategiaPenalitaUno)
-    +isGiocabile(candidata : Carta, inCima : Carta, partita : Partita) : boolean
+    +RegoleDiGioco(strategiaVittoria : IStrategiaCondizioneVittoria, strategiaSconfitta : IStrategiaCondizioneSconfitta, strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte, strategiaPescaVolontaria : IStrategiaPesca, strategiaPenalitaUno : IStrategiaPenalitaUno)
+    +isGiocabile(giocatore : Giocatore, candidata : Carta, inCima : Carta, partita : Partita) : boolean
     +isVincitore(giocatore : Giocatore, partita : Partita) : boolean
     +isEliminato(giocatore : Giocatore, partita : Partita) : boolean
-    +pesca(giocatore : Giocatore, partita : Partita) : List<Carta>
-    +applicaPenalitaMancatoUno(giocatore : Giocatore, partita : Partita) : void
+    +pescaVolontaria(giocatore : Giocatore, partita : Partita) : List<Carta>
+    +calcolaCartePescaForzata(contesto : ContestoPesca) : int
+    +mancatoUno(giocatore : Giocatore, unoDichiarato : boolean, partita : Partita) : boolean
     +{static} standard() : RegoleDiGioco
   }
 
   interface Ieffetto {
     +attivaEffetto(partita : Partita) : void
-    +{default} getRichiestaInput() : RichiestaInput
-    +{default} validaRispostaInput(risposta : String) : boolean
+    +{default} getRichiestaInput(partita : Partita) : RichiestaInput
+    +{default} validaRispostaInput(risposta : String, partita : Partita) : boolean
     +{default} attivaEffetto(partita : Partita, risposta : String) : void
   }
 
@@ -141,15 +141,16 @@ package "unolegends.model" {
 
   class Effetto_Cambia_colore {
     +attivaEffetto(partita : Partita) : void
-    +getRichiestaInput() : RichiestaInput
-    +validaRispostaInput(risposta : String) : boolean
+    +getRichiestaInput(partita : Partita) : RichiestaInput
+    +validaRispostaInput(risposta : String, partita : Partita) : boolean
     +attivaEffetto(partita : Partita, risposta : String) : void
     -{static} coloreDaRisposta(risposta : String) : Colore
   }
 
   class Effetto_pescata_carte {
     -numeroCarteDaPescare : int
-    +Effetto_pescata_carte(numeroCarteDaPescare : int)
+    -origine : OriginePesca
+    +Effetto_pescata_carte(numeroCarteDaPescare : int, origine : OriginePesca)
     +attivaEffetto(partita : Partita) : void
   }
 
@@ -166,10 +167,23 @@ package "unolegends.model" {
     +EffettoComposito(effetti : List<Ieffetto>)
     -{static} contaEffettiConInput(effetti : List<Ieffetto>) : int
     +attivaEffetto(partita : Partita) : void
-    +getRichiestaInput() : RichiestaInput
-    +validaRispostaInput(risposta : String) : boolean
+    +getRichiestaInput(partita : Partita) : RichiestaInput
+    +validaRispostaInput(risposta : String, partita : Partita) : boolean
     +attivaEffetto(partita : Partita, risposta : String) : void
     +{static} contieneEffetto(effetto : Ieffetto, tipoEffetto : Class<? extends Ieffetto>) : boolean
+  }
+
+  enum OriginePesca {
+    VOLONTARIA
+    PIU_DUE
+    PIU_QUATTRO
+    PENALITA_UNO
+  }
+
+  class ContestoPesca <<record>> {
+    +bersaglio : Giocatore
+    +numeroCarte : int
+    +origine : OriginePesca
   }
 
   class RichiestaInput {
@@ -189,7 +203,7 @@ package "unolegends.model" {
     +{static} completata(giocata : boolean, penalizzataPerMancatoUno : boolean) : EsitoGiocata
     +{static} inAttesa(richiestaInput : RichiestaInput) : EsitoGiocata
     +isGiocata() : boolean
-    +getRichiestaInput() : RichiestaInput
+    +getRichiestaInput(partita : Partita) : RichiestaInput
     +isPenalizzataPerMancatoUno() : boolean
   }
 
@@ -296,6 +310,11 @@ StandardMazzoFactory ..> CartaNumero : crea
 StandardMazzoFactory ..> CartaSpeciale : crea
 Mazzo ..> PilaDegliScarti : rimescola da scarti
 Effetto_pescata_carte ..> Partita : pesca e salta turno
+Effetto_pescata_carte --> "1" OriginePesca : origine
+ContestoPesca --> "1" Giocatore : bersaglio
+ContestoPesca --> "1" OriginePesca : origine
+Partita ..> ContestoPesca : crea
+RegoleDiGioco ..> ContestoPesca : usa
 Effetto_Blocca_Turno ..> Partita : segnala salto turno
 Effetto_cambio_giro ..> Partita : cambia giro
 Effetto_Cambia_colore ..> Partita : applica colore

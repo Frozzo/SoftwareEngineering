@@ -22,9 +22,9 @@ public final class EffettoComposito implements Ieffetto {
     }
 
     @Override
-    public RichiestaInput getRichiestaInput() {
+    public RichiestaInput getRichiestaInput(Partita partita) {
         for (Ieffetto effetto : effetti) {
-            RichiestaInput richiesta = effetto.getRichiestaInput();
+            RichiestaInput richiesta = effetto.getRichiestaInput(partita);
             if (richiesta != null) {
                 return richiesta;
             }
@@ -33,10 +33,10 @@ public final class EffettoComposito implements Ieffetto {
     }
 
     @Override
-    public boolean validaRispostaInput(String risposta) {
+    public boolean validaRispostaInput(String risposta, Partita partita) {
         for (Ieffetto effetto : effetti) {
-            if (effetto.getRichiestaInput() != null) {
-                return effetto.validaRispostaInput(risposta);
+            if (effetto.getRichiestaInput(partita) != null) {
+                return effetto.validaRispostaInput(risposta, partita);
             }
         }
         return risposta == null;
@@ -46,7 +46,7 @@ public final class EffettoComposito implements Ieffetto {
     public void attivaEffetto(Partita partita, String risposta) {
         boolean rispostaInoltrata = false;
         for (Ieffetto effetto : effetti) {
-            if (!rispostaInoltrata && effetto.getRichiestaInput() != null) {
+            if (!rispostaInoltrata && effetto.getRichiestaInput(partita) != null) {
                 effetto.attivaEffetto(partita, risposta);
                 rispostaInoltrata = true;
             } else {

@@ -7,7 +7,7 @@ import unolegends.model.Giocatore;
 import unolegends.model.Partita;
 
 /**
- * Regola standard: il giocatore pesca una sola carta.
+ * Regola standard della pesca volontaria: il giocatore pesca una sola carta.
  */
 public final class StrategiaPescaSingola implements IStrategiaPesca {
     @Override

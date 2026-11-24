@@ -35,14 +35,7 @@ public class PartitaFactory {
         List<Giocatore> giocatori = distribuisciCarteAiGiocatori(mazzo, numeroDiGiocatori);
         Carta primaCarta = mazzo.prelevaCarta();
         PilaDegliScarti pilaDegliScarti = new PilaDegliScarti(List.of(primaCarta));
-        boolean richiedeInput = primaCarta.getEffetto().getRichiestaInput() != null;
-        int indiceGiocatoreIniziale;
-        if (richiedeInput == true) {
-            indiceGiocatoreIniziale = 0;
-        } else {
-            indiceGiocatoreIniziale = (giocatori.size() - 1) % giocatori.size();
-        }
-            return new Partita(giocatori, mazzo, pilaDegliScarti,indiceGiocatoreIniziale, regole);
+        return new Partita(giocatori, mazzo, pilaDegliScarti, regole);
     }
 
     private static List<Giocatore> distribuisciCarteAiGiocatori(Mazzo mazzo, int numeroDiGiocatori) {

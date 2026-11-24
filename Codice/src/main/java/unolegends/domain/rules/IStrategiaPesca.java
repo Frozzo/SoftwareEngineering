@@ -6,7 +6,9 @@ import unolegends.model.Giocatore;
 import unolegends.model.Partita;
 
 /**
- * Strategia atomica che decide quante carte assegnare a un giocatore.
+ * Strategia atomica della pesca volontaria: decide quante carte pesca il
+ * giocatore quando sceglie di pescare. Restituisce le carte pescate in ordine;
+ * l'ultima è quella che il giocatore può eventualmente giocare subito.
  */
 @FunctionalInterface
 public interface IStrategiaPesca {

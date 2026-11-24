@@ -33,7 +33,7 @@ public class StandardMazzoFactory implements MazzoFactory {
                 carte.add(new CartaSpeciale(
                         colore,
                         ValoreCarta.PIU_DUE,
-                        new Effetto_pescata_carte(2)));
+                        new Effetto_pescata_carte(2, OriginePesca.PIU_DUE)));
                 carte.add(new CartaSpeciale(
                         colore,
                         ValoreCarta.BLOCCA_TURNO,
@@ -55,7 +55,7 @@ public class StandardMazzoFactory implements MazzoFactory {
                     ValoreCarta.PIU_QUATTRO,
                     new EffettoComposito(List.of(
                         new Effetto_Cambia_colore(),
-                        new Effetto_pescata_carte(4)))));
+                        new Effetto_pescata_carte(4, OriginePesca.PIU_QUATTRO)))));
         }
 
         Mazzo mazzo = new Mazzo(carte);
