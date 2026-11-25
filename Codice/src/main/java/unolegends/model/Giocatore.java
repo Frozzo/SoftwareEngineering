@@ -39,6 +39,24 @@ public class Giocatore {
         return mano.remove(indiceCarta);
     }
 
+    /**
+     * Toglie dalla mano proprio la carta indicata (confronto per identità, non per
+     * valore: due "5 Rosso" sono carte diverse). Serve quando una giocata viene
+     * completata in un secondo momento, dopo una risposta del giocatore: si
+     * conserva il riferimento alla carta invece dell'indice.
+     *
+     * @return true se la carta era nella mano ed è stata tolta
+     */
+    public boolean rimuoviCarta(Carta carta) {
+        for (int i = 0; i < mano.size(); i++) {
+            if (mano.get(i) == carta) {
+                mano.remove(i);
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void aggiungiCarta(Carta carta) {
         mano.add(Objects.requireNonNull(carta, "carta non puo essere null"));
     }

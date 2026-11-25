@@ -1,0 +1,75 @@
+@startuml GiocaTurno_Step2
+title GiocaTurno - Diagramma di Sequenza (Step 2: fase del turno, input unificato, eventi)
+
+actor Giocatore
+participant "UnoLegendsCli\n(View)" as CLI
+participant "UnoLegendsGame\n(Controller)" as Controller
+participant "Partita\n(Coordinator)" as Partita
+participant "Ieffetto +4\n(EffettoComposito)" as Effetto
+participant "Giocatore\n(Expert)" as GiocatoreExpert
+participant "PilaDegliScarti\n(Expert)" as Pila
+
+== Inizio giro del ciclo CLI ==
+CLI -> Controller: prelevaMessaggi()
+Controller -> Partita: prelevaEventi()
+Partita --> Controller: List<EventoPartita> (registro svuotato)
+Controller --> CLI: List<String> (frasi)
+CLI -> Controller: richiediStato()
+Controller -> Partita: getFase(), getter di stato
+Controller --> CLI: StatoPartitaDto(fase = NORMALE, ...)
+CLI -> CLI: switch(fase) -> turnoNormale
+
+== Giocata di un +4 ==
+Giocatore -> CLI: "0" (gioca), indice i
+CLI -> Controller: giocaCarta(i)
+Controller -> Partita: giocaCarta(i)
+activate Partita
+Partita -> Partita: fase in {NORMALE, POST_PESCA}?
+Partita -> GiocatoreExpert: getCartaInPosizione(i)
+Partita -> Partita: regole.isGiocabile(...)
+Partita -> Effetto: getRichiestaInput(partita)
+Effetto --> Partita: RichiestaInput(SCELTA_COLORE, opzioni)
+Partita -> Partita: mettiInAttesa(effetto, risposta -> completaGiocata(carta, risposta))\nfase = ATTESA_INPUT
+note right: la carta resta in mano
+Partita --> Controller: true
+deactivate Partita
+Controller --> CLI: true ("Carta giocata.")
+
+== Giro successivo: la fase dice cosa chiedere ==
+CLI -> Controller: richiediStato()
+Controller -> Partita: getRichiestaInputInAttesa()
+Controller -> Controller: messaggioPer(SCELTA_COLORE)
+Controller --> CLI: StatoPartitaDto(fase = ATTESA_INPUT, richiesta)
+CLI -> Giocatore: messaggio + opzioni numerate
+Giocatore -> CLI: indice colore
+CLI -> Controller: rispondiInput("Rosso")
+Controller -> Partita: rispondiInput("Rosso")
+activate Partita
+Partita -> Effetto: validaRispostaInput("Rosso", partita)
+Effetto --> Partita: true
+Partita -> Partita: azioneInAttesa = null; fase = NORMALE\ncompletamento.accept("Rosso")
+Partita -> GiocatoreExpert: rimuoviCarta(carta)
+Partita -> Pila: aggiungiCarta(carta)
+Partita -> Effetto: attivaEffetto(partita, "Rosso")
+activate Effetto
+Effetto -> Partita: applicaColoreScelto(ROSSO)
+Partita -> Partita: registraEvento(COLORE_SCELTO)
+Effetto -> Partita: applicaPescaForzata(prossimo, 4, PIU_QUATTRO)
+Partita -> Partita: registraEvento(PESCA_FORZATA)
+Effetto -> Partita: segnalaSaltoTurno()
+deactivate Effetto
+alt mano vuota
+  Partita -> Partita: fase = TERMINATA
+else rimasta una carta
+  Partita -> Partita: fase = ATTESA_UNO
+else altrimenti
+  Partita -> Partita: chiudiTurno() -> aggiornaGiocatoreAttivo()\nregistraEvento(TURNO_SALTATO)
+end
+Partita --> Controller: true
+deactivate Partita
+Controller --> CLI: true
+
+== Giro successivo ==
+CLI -> Controller: prelevaMessaggi()
+Controller --> CLI: ["G1 sceglie il colore Rosso.", "G2 pesca 4 carte per un +4.", "G2 salta il turno."]
+@enduml

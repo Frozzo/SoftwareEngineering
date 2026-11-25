@@ -46,6 +46,7 @@ package "unolegends.model" {
     +getMano() : List<Carta>
     +getCartaInPosizione(indiceCarta : int) : Carta
     +estraiCarta(indiceCarta : int) : Carta
+    +rimuoviCarta(carta : Carta) : boolean
     +aggiungiCarta(carta : Carta) : void
   }
 
@@ -72,32 +73,32 @@ package "unolegends.model" {
     -mazzo : Mazzo
     -pilaDegliScarti : PilaDegliScarti
     -regole : RegoleDiGioco
+    -eventi : List<EventoPartita>
     -indiceGiocatoreAttivo : int
+    -fase : FaseTurno
+    -azioneInAttesa : AzioneInAttesa
     -cartaAppenaPescata : Carta
-    -cartaPescataDaGiocare : boolean
-    -effettoInizialeInAttesa : Ieffetto
     -vincitore : Giocatore
     -giocoIniziato : boolean
     -saltaProssimoTurno : boolean
     -coloreAttuale : Colore
     -sensoOrario : boolean
-    +Partita(giocatori : List<Giocatore>, mazzo : Mazzo, pilaDegliScarti : PilaDegliScarti, indiceGiocatoreAttivo : int)
-    +Partita(giocatori : List<Giocatore>, mazzo : Mazzo, pilaDegliScarti : PilaDegliScarti, indiceGiocatoreAttivo : int, regole : RegoleDiGioco)
+    +Partita(giocatori : List<Giocatore>, mazzo : Mazzo, pilaDegliScarti : PilaDegliScarti, regole : RegoleDiGioco)
     +iniziaGioco() : void
     -getGiocatoreAttivo() : Giocatore
     +getNomeGiocatoreAttivo() : String
     +getManoGiocatoreAttivo() : List<Carta>
-    +isCartaPescataDaGiocare() : boolean
+    +getFase() : FaseTurno
     +getCartaAppenaPescata() : Carta
-    +getRichiestaInputIniziale() : RichiestaInput
-    +isPartitaTerminata() : boolean
+    +getRichiestaInputInAttesa() : RichiestaInput
     +getNomeVincitore() : String
     +getIndiceGiocatoreAttivo() : int
-    +getNumeroCarteNelMazzo() : int
-    +getMazzoDaPesca() : Mazzo
     +getPilaDegliScarti() : PilaDegliScarti
-    +giocaCarta(indiceCarta : int, unoDichiarato : boolean, rispostaInput : String) : EsitoGiocata
-    +rispondiRichiestaInputIniziale(rispostaInput : String) : boolean
+    +prelevaEventi() : List<EventoPartita>
+    ~registraEvento(evento : EventoPartita) : void
+    +giocaCarta(indiceCarta : int) : boolean
+    +rispondiInput(risposta : String) : boolean
+    +completaDichiarazioneUno(unoDichiarato : boolean) : boolean
     ~applicaColoreScelto(coloreScelto : Colore) : void
     +getColoreAttuale() : Colore
     ~segnalaSaltoTurno() : void
@@ -105,11 +106,43 @@ package "unolegends.model" {
     +pescaSingola(giocatore : Giocatore) : Carta
     +applicaPescaForzata(bersaglio : Giocatore, numeroCarte : int, origine : OriginePesca) : List<Carta>
     +passaTurno() : boolean
-    +tuttiGliAltriGiocatoriHannoPiuDi(giocatore : Giocatore, sogliaCarte : int) : boolean
-    +aggiornaGiocatoreAttivo() : void
-    -avanzaGiocatore() : void
     +cambioGiro() : void
     +getProssimoGiocatore() : Giocatore
+    -mettiInAttesa(effetto : Ieffetto, completamento : Consumer<String>) : void
+    -completaGiocata(carta : Carta, risposta : String) : void
+    -chiudiTurno() : void
+    -aggiornaGiocatoreAttivo() : void
+    -avanzaGiocatore() : void
+  }
+
+  enum FaseTurno {
+    NORMALE
+    POST_PESCA
+    ATTESA_INPUT
+    ATTESA_UNO
+    TERMINATA
+  }
+
+  class AzioneInAttesa <<record>> {
+    +effetto : Ieffetto
+    +completamento : Consumer<String>
+  }
+
+  enum TipoEvento {
+    PESCA_VOLONTARIA
+    PESCA_FORZATA
+    TURNO_SALTATO
+    SENSO_INVERTITO
+    COLORE_SCELTO
+    UNO_DICHIARATO
+  }
+
+  class EventoPartita <<record>> {
+    +tipo : TipoEvento
+    +nomeGiocatore : String
+    +quantita : int
+    +origine : OriginePesca
+    +colore : Colore
   }
 
   class RegoleDiGioco {
@@ -186,25 +219,17 @@ package "unolegends.model" {
     +origine : OriginePesca
   }
 
-  class RichiestaInput {
-    -messaggio : String
-    -opzioni : List<String>
-    +RichiestaInput(messaggio : String, opzioni : List<String>)
-    +getMessaggio() : String
-    +getOpzioni() : List<String>
+  enum TipoRichiesta {
+    SCELTA_COLORE
+    SCELTA_GIOCATORE
   }
 
-  class EsitoGiocata {
-    -giocata : boolean
-    -richiestaInput : RichiestaInput
-    -penalizzataPerMancatoUno : boolean
-    -EsitoGiocata(giocata : boolean, richiestaInput : RichiestaInput, penalizzataPerMancatoUno : boolean)
-    +{static} completata(giocata : boolean) : EsitoGiocata
-    +{static} completata(giocata : boolean, penalizzataPerMancatoUno : boolean) : EsitoGiocata
-    +{static} inAttesa(richiestaInput : RichiestaInput) : EsitoGiocata
-    +isGiocata() : boolean
-    +getRichiestaInput(partita : Partita) : RichiestaInput
-    +isPenalizzataPerMancatoUno() : boolean
+  class RichiestaInput {
+    -tipo : TipoRichiesta
+    -opzioni : List<String>
+    +RichiestaInput(tipo : TipoRichiesta, opzioni : List<String>)
+    +getTipo() : TipoRichiesta
+    +getOpzioni() : List<String>
   }
 
   interface MazzoFactory {
@@ -296,10 +321,16 @@ Partita "1" --> "1" Mazzo : mazzo
 Partita "1" --> "1" PilaDegliScarti : pilaDegliScarti
 Partita "1" --> "1" RegoleDiGioco : regole
 Partita "1" --> "0..1" Carta : cartaAppenaPescata
-Partita "1" --> "0..1" Ieffetto : effettoInizialeInAttesa
+Partita "1" --> "1" FaseTurno : fase
+Partita "1" --> "0..1" AzioneInAttesa : azioneInAttesa
+Partita "1" --> "0..*" EventoPartita : eventi
+AzioneInAttesa --> "1" Ieffetto : effetto
+EventoPartita --> "1" TipoEvento : tipo
+EventoPartita --> "0..1" OriginePesca : origine
+EventoPartita --> "0..1" Colore : colore
 Partita "1" --> "0..1" Giocatore : vincitore
 Partita "1" --> "0..1" Colore : coloreAttuale
-EsitoGiocata "1" --> "0..1" RichiestaInput : richiestaInput
+RichiestaInput --> "1" TipoRichiesta : tipo
 
 PartitaFactory ..> MazzoFactory : usa
 PartitaFactory ..> RegoleDiGioco : configura

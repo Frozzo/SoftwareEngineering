@@ -32,10 +32,11 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  CONTROLLER / FACADE  (package: unolegends.controller)                  │
-│  UnoLegendsGame, StatoPartitaDto, EsitoGiocataDto, RichiestaInputDto    │
+│  UnoLegendsGame, StatoPartitaDto, RichiestaInputDto, FaseTurnoDto       │
 │  - Unico punto d'ingresso della UI                                      │
 │  - Avvia la partita tramite PartitaFactory                              │
-│  - Converte oggetti del model in DTO immutabili (stringhe/booleani)     │
+│  - Converte oggetti del model in DTO immutabili (stringhe/enum)         │
+│  - Traduce eventi e tipi di richiesta del model in frasi per la UI      │
 └───────────────────────────────────┬─────────────────────────────────────┘
                                     │ delega operazioni di dominio
                                     ▼
@@ -43,7 +44,8 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 │  MODEL / DOMINIO  (package: unolegends.model)                           │
 │  Partita (Coordinator), Giocatore, Mazzo, PilaDegliScarti,              │
 │  Carta / CartaNumero / CartaSpeciale, Colore, ValoreCarta, TipoMazzo,   │
-│  Ieffetto + implementazioni, RichiestaInput, EsitoGiocata,              │
+│  Ieffetto + implementazioni, FaseTurno, AzioneInAttesa,                 │
+│  RichiestaInput, TipoRichiesta, EventoPartita, TipoEvento,              │
 │  PartitaFactory, MazzoFactory, StandardMazzoFactory, RegoleDiGioco      │
 └───────────────────────────────────┬─────────────────────────────────────┘
                                     │ Protected Variations (Strategy)
@@ -62,9 +64,9 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 
 - **`UnoLegendsCli`** (`final class`, costruttore privato, entrypoint `main`):
   - Gestisce l'interazione testuale su `System.in` / `System.out` tramite `BufferedReader`.
-  - Contiene il menu iniziale (`0` avvia partita demo standard, `1` esce) e il **loop principale di gioco (`while (true)`)**.
-  - A ogni iterazione interroga il controller tramite `controller.richiediStato()` ottenendo uno `StatoPartitaDto`.
-  - Gestisce i prompt interattivi (`richiediInput`, `gestisciGiocata`), la finestra temporizzata di 5 secondi per la dichiarazione UNO (`attendiDichiarazioneUno`), il parsing degli indici (`parseIndice`) e la formattazione ANSI delle opzioni colore (`formattaOpzione`).
+  - Contiene il menu iniziale (`0` avvia partita demo standard, `1` esce) e il **loop principale di gioco**.
+  - A ogni iterazione stampa i messaggi degli eventi (`controller.prelevaMessaggi()`), legge lo stato (`controller.richiediStato()`) e fa un unico `switch` esaustivo su `stato.getFase()`: `turnoNormale`, `turnoDopoPesca`, `gestisciRichiestaInput`, dichiarazione UNO, fine partita.
+  - Gestisce i prompt interattivi (`richiediInput`), la finestra temporizzata di 5 secondi per la dichiarazione UNO (`attendiDichiarazioneUno`), il parsing degli indici (`parseIndice`) e la formattazione ANSI delle opzioni colore (`formattaOpzione`).
 
 ### 3.2 Package `unolegends.controller`
 
@@ -73,17 +75,18 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
   - Factory method statico `avviaPartitaStandard()`: crea una `Partita` per `2` giocatori tramite `PartitaFactory.creaPartita(StandardMazzoFactory.getInstance(), 2, RegoleDiGioco.standard())`, invoca `partita.iniziaGioco()` e restituisce il controller.
   - API esposte alla UI:
     - `richiediStato() : StatoPartitaDto` — costruisce uno snapshot testuale immutabile della partita; formatta la carta in cima con `coloreAttuale` se è una `CartaSpeciale` nera il cui colore è già stato scelto.
-    - `giocaCarta(int indiceCarta, String rispostaInput) : EsitoGiocataDto` — inoltra a `partita.giocaCarta(...)` e converte `EsitoGiocata` in `EsitoGiocataDto`.
-    - `completaDichiarazioneUno(boolean unoDichiarato) : boolean` — inoltra a `partita.completaDichiarazioneUno(...)`.
-    - `rispondiRichiestaInputIniziale(String rispostaInput) : boolean` — inoltra a `partita.rispondiRichiestaInputIniziale(...)`.
+    - `giocaCarta(int indiceCarta) : boolean` — inoltra a `partita.giocaCarta(...)`; `true` se la giocata è accettata (completata oppure in attesa di input).
+    - `rispondiInput(String risposta) : boolean` — unico punto per rispondere a qualunque richiesta di input; inoltra a `partita.rispondiInput(...)`.
+    - `completaDichiarazioneUno(boolean unoDichiarato) : boolean` — inoltra a `partita.completaDichiarazioneUno(...)`; `true` se il comando è accettato (la penalità arriva come evento).
     - `pescaCarta() : boolean` — inoltra a `partita.pescaCarta()`.
     - `passaTurno() : boolean` — inoltra a `partita.passaTurno()`.
+    - `prelevaMessaggi() : List<String>` — preleva gli `EventoPartita` registrati da `Partita` e li traduce in frasi (`descriviEvento`, con `switch` esaustivi su `TipoEvento` e `OriginePesca`).
+  - Conversioni private: `convertiFase` (`FaseTurno` → `FaseTurnoDto`), `convertiRichiesta` + `messaggioPer` (`TipoRichiesta` → frase), `formattaCarta`.
+- **`FaseTurnoDto`** *(enum)*: copia di `FaseTurno` per la UI, che non può importare il model.
 - **`StatoPartitaDto`** *(DTO immutabile)*:
-  - Campi: `nomeGiocatoreAttivo` (`String`), `manoGiocatoreAttivo` (`List<String>`, copia immutabile), `cartaInCima` (`String`), `deveGiocareCartaPescata` (`boolean`), `cartaAppenaPescata` (`String`), `richiestaInput` (`RichiestaInputDto`), `partitaTerminata` (`boolean`), `nomeVincitore` (`String`).
-- **`EsitoGiocataDto`** *(DTO immutabile)*:
-  - Campi: `giocata` (`boolean`), `richiestaInput` (`RichiestaInputDto`), `richiedeDichiarazioneUno` (`boolean`).
+  - Campi: `fase` (`FaseTurnoDto`), `nomeGiocatoreAttivo` (`String`), `manoGiocatoreAttivo` (`List<String>`, copia immutabile), `cartaInCima` (`String`), `cartaAppenaPescata` (`String`, solo in `POST_PESCA`), `richiestaInput` (`RichiestaInputDto`, solo in `ATTESA_INPUT`), `nomeVincitore` (`String`, solo in `TERMINATA`).
 - **`RichiestaInputDto`** *(DTO immutabile)*:
-  - Campi: `messaggio` (`String`), `opzioni` (`List<String>`, copia immutabile).
+  - Campi: `messaggio` (`String`, scritto dal controller), `opzioni` (`List<String>`, copia immutabile).
 
 ### 3.3 Package `unolegends.model` — Entità Core
 
@@ -108,7 +111,7 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
   - Valore attuale: `STANDARD` (predisposto per configurazioni future).
 - **`Giocatore`** *(GRASP Information Expert)*:
   - Campi: `nome` (`String`), `mano` (`List<Carta>`).
-  - Metodi: `getNome()`, `getMano()` (restituisce `Collections.unmodifiableList(mano)`), `getCartaInPosizione(int)` (ritorna `null` se indice fuori range), `estraiCarta(int)` (rimuove e ritorna la carta, o `null` se fuori range), `aggiungiCarta(Carta)`.
+  - Metodi: `getNome()`, `getMano()` (restituisce `Collections.unmodifiableList(mano)`), `getCartaInPosizione(int)` (ritorna `null` se indice fuori range), `estraiCarta(int)` (rimuove e ritorna la carta, o `null` se fuori range), `rimuoviCarta(Carta)` (rimuove proprio quella carta, per identità; usato quando la giocata si completa dopo una risposta), `aggiungiCarta(Carta)`.
 - **`Mazzo`** *(GRASP Information Expert)*:
   - Campo: `carte` (`Deque<Carta>` implementata con `ArrayDeque`).
   - `prelevaCarta()` esegue `carte.pollFirst()` (ritorna `null` se vuoto).
@@ -136,7 +139,7 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
   - `attivaEffetto(Partita)`: ottiene `prossimoGiocatore = partita.getProssimoGiocatore()`, invoca una sola volta `partita.applicaPescaForzata(prossimoGiocatore, numeroCarteDaPescare, origine)` e infine `partita.segnalaSaltoTurno()`.
 - **`Effetto_Cambia_colore`**:
   - `attivaEffetto(Partita)` (senza risposta) lancia `IllegalStateException`.
-  - `getRichiestaInput(Partita)` ritorna `RichiestaInput("Scegli il colore da assegnare alla carta:", ["Rosso", "Verde", "Blu", "Giallo"])`.
+  - `getRichiestaInput(Partita)` ritorna `RichiestaInput(TipoRichiesta.SCELTA_COLORE, ["Rosso", "Verde", "Blu", "Giallo"])`.
   - `validaRispostaInput(String, Partita)` controlla se la stringa (case-insensitive, trimmed) corrisponde a uno dei 4 colori (escluso `NERO`).
   - `attivaEffetto(Partita, String)` converte la stringa in `Colore` e chiama `partita.applicaColoreScelto(colore)`.
 - **`EffettoComposito`** *(GoF Composite)*:
@@ -145,11 +148,11 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
   - `getRichiestaInput(Partita)` restituisce la prima richiesta non nulla tra i sotto-effetti.
   - `validaRispostaInput(String, Partita)` delega la validazione al primo sotto-effetto con richiesta di input.
   - `attivaEffetto(Partita, String)` esegue tutti i sotto-effetti in ordine: passa `risposta` al primo sotto-effetto che richiede input, e chiama `attivaEffetto(partita)` senza argomenti su tutti gli altri.
-- **`RichiestaInput`**: oggetto valore immutabile del dominio con `messaggio` (`String`) e `opzioni` (`List<String>`).
-- **`EsitoGiocata`**: oggetto valore immutabile del dominio con 3 factory statiche:
-  - `completata(boolean giocata)` → giocata completata (`true`) o rifiutata (`false`), senza input né attesa UNO.
-  - `inAttesa(RichiestaInput richiesta)` → `giocata = false`, `richiestaInput != null`.
-  - `richiedeDichiarazioneUno()` → `giocata = true`, `richiedeDichiarazioneUno = true`.
+- **`RichiestaInput`**: oggetto valore immutabile del dominio con `tipo` (`TipoRichiesta`) e `opzioni` (`List<String>`). Non contiene testo per l'utente.
+- **`TipoRichiesta`** *(enum)*: `SCELTA_COLORE`, `SCELTA_GIOCATORE` (quest'ultimo predisposto per carta 7 e abilità attive).
+- **`AzioneInAttesa`** *(record package-private, GoF Command)*: `(Ieffetto effetto, Consumer<String> completamento)`. L'effetto sa cosa chiedere e validare; il completamento è ciò che `Partita` esegue quando arriva una risposta valida.
+- **`FaseTurno`** *(enum)*: `NORMALE`, `POST_PESCA`, `ATTESA_INPUT`, `ATTESA_UNO`, `TERMINATA`. Vedi sezione 4.
+- **`EventoPartita`** *(record)* + **`TipoEvento`** *(enum)*: registro dei fatti accaduti (`PESCA_VOLONTARIA`, `PESCA_FORZATA`, `TURNO_SALTATO`, `SENSO_INVERTITO`, `COLORE_SCELTO`, `UNO_DICHIARATO`). Campi: `tipo`, `nomeGiocatore`, `quantita`, `origine`, `colore`; si creano con factory statiche package-private.
 - **`OriginePesca`** *(enum)*: causa di una pesca (`VOLONTARIA`, `PIU_DUE`, `PIU_QUATTRO`, `PENALITA_UNO`). Permette alle regole (e in futuro alle passive dei Legend) di distinguere le pescate.
 - **`ContestoPesca`** *(record immutabile)*: `(Giocatore bersaglio, int numeroCarte, OriginePesca origine)`, passato a `RegoleDiGioco.calcolaCartePescaForzata(...)`.
 
@@ -204,7 +207,7 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 
 ## 4. Stato Interno di `Partita` e Macchina a Fasi del Turno
 
-`Partita` (in `unolegends.model.Partita`) è il **GRASP Coordinator / radice del dominio**. Mantiene tutto lo stato persistente e di coordinamento del turno nei seguenti **14 campi**:
+`Partita` (in `unolegends.model.Partita`) è il **GRASP Coordinator / radice del dominio**. Dallo Step 2 lo stato del turno è descritto da **un solo campo `fase`** (`FaseTurno`) invece che da più variabili sparse. Campi:
 
 | Campo | Tipo | Significato e ciclo di vita |
 |---|---|---|
@@ -212,26 +215,30 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 | `mazzo` | `Mazzo` | Mazzo da cui pescare le carte. |
 | `pilaDegliScarti` | `PilaDegliScarti` | Pila delle carte giocate; l'ultima è la carta in cima. |
 | `regole` | `RegoleDiGioco` | Profilo di strategie di gioco attivo. |
+| `eventi` | `List<EventoPartita>` | Registro degli eventi accaduti dall'ultima lettura; svuotato da `prelevaEventi()`. |
 | `indiceGiocatoreAttivo` | `int` | Indice in `giocatori` del giocatore di turno (`0 .. n-1`). |
-| `cartaAppenaPescata` | `Carta` | Riferimento all'ultima carta pescata volontariamente nel turno corrente (o `null`). |
-| `cartaPescataDaGiocare` | `boolean` | `true` dopo `pescaCarta()` finché il giocatore non gioca una carta o chiama `passaTurno()`. |
-| `effettoInizialeInAttesa` | `Ieffetto` | Se la prima carta scoperta negli scarti richiede input (`Cambia Colore` o `+4`), conserva qui l'effetto finché il primo giocatore non risponde. |
-| `vincitore` | `Giocatore` | `null` finché la partita è in corso; valorizzato quando `regole.isVincitore(...)` diventa `true`. |
-| `giocatoreInAttesaDichiarazioneUno` | `Giocatore` | Valorizzato quando un giocatore passa da 2 carte a 1 carta; blocca altre mosse finché non viene chiamato `completaDichiarazioneUno(...)`. |
+| `fase` | `FaseTurno` | Fase corrente del turno (vedi tabella sotto). |
+| `azioneInAttesa` | `AzioneInAttesa` | Valorizzata solo in `ATTESA_INPUT`: effetto da completare e completamento da eseguire. |
+| `cartaAppenaPescata` | `Carta` | Ultima carta pescata volontariamente; esposta solo in `POST_PESCA`. |
+| `vincitore` | `Giocatore` | Dato del vincitore, valorizzato insieme a `fase = TERMINATA`. |
 | `giocoIniziato` | `boolean` | Rende `iniziaGioco()` idempotente (evita la doppia applicazione dell'effetto iniziale). |
-| `saltaProssimoTurno` | `boolean` | Flag impostato da `segnalaSaltoTurno()` (package-private, chiamato da `Effetto_Blocca_Turno` ed `Effetto_pescata_carte`) e consumato da `aggiornaGiocatoreAttivo()`. |
+| `saltaProssimoTurno` | `boolean` | Non è una fase: è un'informazione per il prossimo avanzamento, impostata da `segnalaSaltoTurno()` e consumata da `aggiornaGiocatoreAttivo()`. |
 | `coloreAttuale` | `Colore` | Colore attivo per la compatibilità delle carte. Inizializzato al colore della prima carta; aggiornato sulle giocate colorate o tramite `applicaColoreScelto(Colore)` (package-private) sulle carte nere. |
 | `sensoOrario` | `boolean` | Direzione di avanzamento turni (default `true`, invertito da `cambioGiro()`). |
 
-### Stati Operativi / Guardie di `Partita`
+Rimossi nello Step 2: `cartaPescataDaGiocare`, `effettoInizialeInAttesa`, `giocatoreInAttesaDichiarazioneUno` (il giocatore in attesa di UNO è sempre quello attivo, perché il turno non è ancora avanzato).
 
-Ogni comando pubblico controlla prima le guardie di stato per rifiutare azioni non coerenti senza corrompere lo stato:
+### Fasi del turno e comandi permessi
 
-1. **Partita terminata** (`vincitore != null`): rifiuta `giocaCarta`, `pescaCarta`, `passaTurno`.
-2. **In attesa di input iniziale** (`effettoInizialeInAttesa != null`): rifiuta `giocaCarta`; accetta `rispondiRichiestaInputIniziale(risposta)`.
-3. **In attesa di dichiarazione UNO** (`giocatoreInAttesaDichiarazioneUno != null`): rifiuta `giocaCarta`, `pescaCarta`, `passaTurno`; accetta `completaDichiarazioneUno(boolean)`.
-4. **Dopo pesca volontaria** (`cartaPescataDaGiocare == true`): rifiuta un'altra `pescaCarta()`; accetta `giocaCarta(...)` oppure `passaTurno()`.
-5. **Turno normale** (tutti i flag di attesa a `false`/`null`): accetta `giocaCarta(...)` oppure `pescaCarta()`; rifiuta `passaTurno()`.
+Ogni comando pubblico dichiara le fasi in cui è **permesso** (lista di ammissione): una fase nuova viene rifiutata da tutti i comandi finché non la si abilita.
+
+| Fase | Comandi accettati | Si entra con | Si esce con |
+|---|---|---|---|
+| `NORMALE` | `giocaCarta`, `pescaCarta` | fine del turno precedente | giocata, pesca |
+| `POST_PESCA` | `giocaCarta` (qualsiasi carta della mano), `passaTurno` | `pescaCarta` | giocata, `passaTurno` |
+| `ATTESA_INPUT` | `rispondiInput` | carta iniziale o carta giocata che richiede input | risposta valida → il completamento decide la fase |
+| `ATTESA_UNO` | `completaDichiarazioneUno` | giocata che lascia una sola carta | dichiarazione (con o senza penalità) |
+| `TERMINATA` | nessuno | giocata che svuota la mano | — |
 
 ---
 
@@ -247,127 +254,112 @@ UnoLegendsCli.main
         │     ├─> distribuisciCarteAiGiocatori(mazzo, 2) -> 7 carte a Giocatore1, 7 a Giocatore2
         │     ├─> primaCarta = mazzo.prelevaCarta()
         │     ├─> pilaDegliScarti = new PilaDegliScarti([primaCarta])
-        │     └─> new Partita(...) -> imposta coloreAttuale = primaCarta.getColore();
-        │         se primaCarta.getEffetto().getRichiestaInput(this) != null, salva effettoInizialeInAttesa;
-        │         calcola indiceGiocatoreAttivo iniziale (vedi dettaglio sotto)
+        │     └─> new Partita(...) -> coloreAttuale = primaCarta.getColore();
+        │                             indiceGiocatoreAttivo = giocatori.size() - 1
         └─> partita.iniziaGioco()
 ```
 
-**Dettaglio fondamentale sul giocatore iniziale (calcolato nel costruttore di `Partita`):**
 - **Caso A — La prima carta NON richiede input** (carta numerica, `+2`, `Blocca Turno`, `Cambia Giro`):
-  - `Partita` imposta `indiceGiocatoreAttivo = giocatori.size() - 1` (con 2 giocatori vale `1`, cioè l'ultimo giocatore).
-  - In `partita.iniziaGioco()`:
-    1. Applica `primaCarta.getEffetto().attivaEffetto(this)`.
-    2. Se la prima carta era un `+2`, `getProssimoGiocatore()` (partendo da `1` in senso orario) è `Giocatore1` (indice `0`): `Giocatore1` pesca 2 carte e viene impostato `saltaProssimoTurno = true`.
-    3. Subito dopo chiama `aggiornaGiocatoreAttivo()`:
-       - Per carta numerica / `Effetto_Nullo`: avanza da `1` a `0` → inizia `Giocatore1`.
-       - Per `+2` o `Blocca Turno`: avanza da `1` a `0` e poi salta a `1` → `Giocatore1` salta il turno e inizia `Giocatore2`.
-       - Per `Cambia Giro`: inverte `sensoOrario` a `false` e poi avanza in senso antiorario.
+  1. `iniziaGioco()` applica `primaCarta.getEffetto().attivaEffetto(this)`.
+  2. Se la prima carta era un `+2`, `getProssimoGiocatore()` (partendo da `1` in senso orario) è `Giocatore1`: pesca 2 carte (evento `PESCA_FORZATA`) e viene impostato `saltaProssimoTurno = true`.
+  3. Chiama `aggiornaGiocatoreAttivo()`:
+     - per carta numerica: avanza da `1` a `0` → inizia `Giocatore1`;
+     - per `+2` o `Blocca Turno`: avanza a `0`, registra `TURNO_SALTATO` e avanza a `1` → inizia `Giocatore2`;
+     - per `Cambia Giro`: `sensoOrario` è già `false` (evento `SENSO_INVERTITO`) e avanza in senso antiorario.
 - **Caso B — La prima carta richiede input** (`Cambia Colore` o `+4`):
-  - `Partita` imposta `indiceGiocatoreAttivo = 0` (`Giocatore1`).
-  - Il costruttore di `Partita` valorizza `effettoInizialeInAttesa`.
-  - `iniziaGioco()` vede `effettoInizialeInAttesa != null`, quindi **non** applica l'effetto né avanza il turno.
-  - Al primo giro della CLI, `richiediStato()` espone `richiestaInput != null` (preso da `partita.getRichiestaInputIniziale()`).
-  - La CLI chiede il colore a `Giocatore1` e chiama `controller.rispondiRichiestaInputIniziale(risposta)`:
-    - Se valida: azzera `effettoInizialeInAttesa`, applica `effetto.attivaEffetto(this, risposta)` (che per `+4` cambia il colore e fa pescare 4 carte al `prossimoGiocatore`, cioè `Giocatore2`, segnalando salto turno), e chiama `aggiornaGiocatoreAttivo()`.
+  1. `iniziaGioco()` imposta `indiceGiocatoreAttivo = 0` e chiama `mettiInAttesa(effetto, completamento)`: la fase diventa `ATTESA_INPUT`.
+  2. Il completamento è `risposta -> { effetto.attivaEffetto(this, risposta); chiudiTurno(); }`.
+  3. Al primo giro la CLI vede `ATTESA_INPUT`, chiede il colore a `Giocatore1` e chiama `controller.rispondiInput(risposta)`: è lo **stesso** meccanismo delle carte giocate nel turno (Flusso 4).
 
 ---
 
 ### Flusso 2 — Ciclo Principale della CLI e Snapshot dello Stato
 
-A ogni iterazione del `while (true)` in `UnoLegendsCli.main`:
-1. Chiama `StatoPartitaDto stato = controller.richiediStato()`.
-2. **Se `stato.isPartitaTerminata()`**: stampa il vincitore (`stato.getNomeVincitore()`) e termina il programma.
-3. **Se `stato.getRichiestaInput() != null`**: risolve la richiesta iniziale pendente tramite `richiediInput(...)` e `controller.rispondiRichiestaInputIniziale(risposta)`, poi `continue`.
-4. Stampa lo stato del turno (`mostraStato(stato)`): nome giocatore attivo, carta in cima agli scarti (formattata con il colore attivo se carta nera risolta), mano numerata da `0` a `N-1`.
-5. **Se `stato.isDeveGiocareCartaPescata()`**: mostra `cartaAppenaPescata` e consente solo di inserire un indice carta da giocare oppure `'p'` per chiamare `controller.passaTurno()`.
-6. **Altrimenti (turno normale)**: mostra il menu `0) gioca carta`, `1) pesca carta`, `2) esci`.
+A ogni iterazione del ciclo in `UnoLegendsCli.main`:
+1. Stampa i messaggi di `controller.prelevaMessaggi()` (eventi accaduti dall'ultimo comando).
+2. Legge `StatoPartitaDto stato = controller.richiediStato()`.
+3. Fa uno `switch` esaustivo su `stato.getFase()`:
+   - `TERMINATA` → stampa il vincitore ed esce;
+   - `ATTESA_INPUT` → `gestisciRichiestaInput` (stampa messaggio e opzioni, chiama `rispondiInput`);
+   - `ATTESA_UNO` → `attendiDichiarazioneUno` e `completaDichiarazioneUno`;
+   - `POST_PESCA` → `turnoDopoPesca`: mostra stato e carta pescata, accetta un indice oppure `'p'`;
+   - `NORMALE` → `turnoNormale`: mostra stato e il menu `0) gioca carta`, `1) pesca carta`, `2) esci`.
+
+La CLI non deduce più la fase combinando flag: la legge dal model.
 
 ---
 
-### Flusso 3 — Giocare una Carta (`giocaCarta`) — Tutti gli 8 Passaggi
+### Flusso 3 — Giocare una Carta (`giocaCarta`)
 
-Quando l'utente seleziona una carta (indice `i`), la CLI invoca `gestisciGiocata(i, controller, reader)`:
+`Partita.giocaCarta(int indiceCarta)`:
+1. **Fase**: se non è `NORMALE` né `POST_PESCA` → `false`.
+2. **Indice**: `cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta)`; se `null` → `false`.
+3. **Compatibilità**: `regole.isGiocabile(giocatoreAttivo, cartaSelezionata, cartaInCima, this)`; se `false` → `false` (mano intatta).
+4. **Input**: se `effetto.getRichiestaInput(this) != null` → `mettiInAttesa(effetto, risposta -> completaGiocata(carta, risposta))`, fase `ATTESA_INPUT`, ritorna `true`. **La carta resta in mano** fino alla risposta.
+5. Altrimenti `completaGiocata(carta, null)` e ritorna `true`.
 
-1. **Prima chiamata**: `EsitoGiocataDto esito = controller.giocaCarta(indiceCarta, null)`.
-2. **Dentro `Partita.giocaCarta(indiceCarta, rispostaInput)`** (ordine atomico per non alterare lo stato in caso di errore/attesa):
-   - **Caso 1 (Guardie)**: se `vincitore != null || effettoInizialeInAttesa != null || giocatoreInAttesaDichiarazioneUno != null` → ritorna `EsitoGiocata.completata(false)`.
-   - **Caso 2 (Indice valido)**: legge `cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta)` e registra `avevaDueCarte = (giocatoreAttivo.getMano().size() == 2)`. Se `cartaSelezionata == null` → `completata(false)`.
-   - **Caso 3 (Compatibilità)**: chiama `regole.isGiocabile(giocatoreAttivo, cartaSelezionata, cartaInCima, this)`. Se `false` → `completata(false)` (mano intatta).
-   - **Caso 4 (Richiesta input mancante)**: ottiene `effetto = cartaSelezionata.getEffetto()` e `richiesta = effetto.getRichiestaInput(this)`. Se `richiesta != null && rispostaInput == null` → ritorna `EsitoGiocata.inAttesa(richiesta)` **senza** rimuovere la carta dalla mano.
-   - **Caso 5 (Validazione risposta)**: chiama `effetto.validaRispostaInput(rispostaInput, this)`. Se `false`: ritorna `inAttesa(richiesta)` se era previsto un input, altrimenti `completata(false)`.
-   - **Mutazione dello stato (punto di non ritorno)**:
-     - `giocatoreAttivo.estraiCarta(indiceCarta)`
-     - `pilaDegliScarti.aggiungiCarta(cartaSelezionata)`
-   - **Caso 6 (Aggiornamento colore)**: se `cartaSelezionata.getColore() != Colore.NERO`, imposta `coloreAttuale = cartaSelezionata.getColore()`. (Se è `NERO`, il colore verrà aggiornato dall'effetto `Effetto_Cambia_colore`).
-   - **Reset stato post-pesca**: `cartaAppenaPescata = null; cartaPescataDaGiocare = false;`.
-   - **Attivazione effetto**: `effetto.attivaEffetto(this, rispostaInput)`.
-   - **Caso 7 (Vittoria)**: se `regole.isVincitore(giocatoreAttivo, this)` (mano vuota) → imposta `vincitore = giocatoreAttivo` e ritorna `EsitoGiocata.completata(true)` senza avanzare il turno.
-   - **Caso 8 (Finestra UNO)**: se `avevaDueCarte && giocatoreAttivo.getMano().size() == 1` → salva `giocatoreInAttesaDichiarazioneUno = giocatoreAttivo` e ritorna `EsitoGiocata.richiedeDichiarazioneUno()` **senza** avanzare ancora il turno.
-   - **Avanzamento turno standard**: chiama `aggiornaGiocatoreAttivo()` e ritorna `EsitoGiocata.completata(true)`.
+`completaGiocata(Carta, String risposta)` (privato, comune ai due casi):
+1. Calcola `avevaDueCarte`, toglie la carta (`rimuoviCarta`) e la mette negli scarti.
+2. Se la carta non è `NERO`, aggiorna `coloreAttuale`; azzera `cartaAppenaPescata`.
+3. Applica `effetto.attivaEffetto(this, risposta)`.
+4. **Vittoria**: se `regole.isVincitore(...)` → `vincitore`, fase `TERMINATA`.
+5. **Finestra UNO**: se `avevaDueCarte` e ora ha una carta → fase `ATTESA_UNO` (il turno non avanza).
+6. Altrimenti `chiudiTurno()`: fase `NORMALE` e `aggiornaGiocatoreAttivo()`.
 
 ---
 
-### Flusso 4 — Carte con Input Interattivo (`Cambia Colore` e `+4`)
+### Flusso 4 — Input Unificato (`Cambia Colore`, `+4`, carta iniziale)
 
-Quando la carta giocata ha `getRichiestaInput(partita) != null`:
-1. La prima chiamata `controller.giocaCarta(indiceCarta, null)` ritorna `EsitoGiocataDto(giocata=false, richiestaInput!=null, richiedeDichiarazioneUno=false)`.
-2. In `UnoLegendsCli.gestisciGiocata`, il ciclo `while (esito.getRichiestaInput() != null)`:
-   - Stampa `messaggio` e `opzioni` numerate (`0) Rosso`, `1) Verde`, `2) Blu`, `3) Giallo`).
-   - Legge l'indice digitato dall'utente e lo traduce nella stringa dell'opzione scelta (oppure `""` se indice non valido).
-   - Richiama `controller.giocaCarta(indiceCarta, risposta)` passando lo **stesso `indiceCarta`** e la stringa scelta.
-3. Se la stringa non è valida, `Partita` ritorna di nuovo `EsitoGiocata.inAttesa(richiesta)` e il `while` richiede l'input.
-4. Se la stringa è valida:
-   - Per **`Cambia Colore`**: `Effetto_Cambia_colore.attivaEffetto(partita, risposta)` chiama `partita.applicaColoreScelto(colore)`.
-   - Per **`+4`**: `EffettoComposito.attivaEffetto(partita, risposta)` esegue nell'ordine:
-     1. `Effetto_Cambia_colore.attivaEffetto(partita, risposta)` → cambia `coloreAttuale`.
-     2. `Effetto_pescata_carte(4, PIU_QUATTRO).attivaEffetto(partita)` → fa pescare 4 carte al `prossimoGiocatore` tramite `applicaPescaForzata` e chiama `partita.segnalaSaltoTurno()`.
+1. `giocaCarta` (o `iniziaGioco`) crea un'`AzioneInAttesa` e porta la fase in `ATTESA_INPUT`.
+2. `richiediStato()` espone `partita.getRichiestaInputInAttesa()`: il controller converte `TipoRichiesta.SCELTA_COLORE` nella frase "Scegli il colore da assegnare alla carta:".
+3. La CLI stampa le opzioni numerate e chiama `controller.rispondiInput(risposta)`.
+4. `Partita.rispondiInput(risposta)`:
+   - fuori da `ATTESA_INPUT` → `false`;
+   - `azione.effetto().validaRispostaInput(risposta, this)` falsa → `false` (la richiesta resta aperta, la CLI richiede);
+   - altrimenti azzera l'azione, riporta la fase a `NORMALE` ed esegue `azione.completamento().accept(risposta)`, che decide la fase successiva.
+5. Per **`+4`**, `EffettoComposito.attivaEffetto(partita, risposta)` esegue:
+   1. `Effetto_Cambia_colore` → `applicaColoreScelto(colore)` (evento `COLORE_SCELTO`);
+   2. `Effetto_pescata_carte(4, PIU_QUATTRO)` → `applicaPescaForzata` (evento `PESCA_FORZATA`) e `segnalaSaltoTurno()`.
 
 ---
 
 ### Flusso 5 — Dichiarazione UNO e Penalità
 
-1. Se `EsitoGiocataDto.isRichiedeDichiarazioneUno()` è `true`, il turno in `Partita` è sospeso (`giocatoreInAttesaDichiarazioneUno != null`).
-2. `UnoLegendsCli.attendiDichiarazioneUno(reader)` apre una finestra di **5 secondi** controllando `reader.ready()` ogni 50 ms:
-   - Se l'utente digita `"uno"` (case-insensitive) entro 5 secondi → `unoDichiarato = true`.
-   - Altrimenti (input diverso o timeout) → `unoDichiarato = false`.
-3. La CLI chiama `controller.completaDichiarazioneUno(unoDichiarato)` → `partita.completaDichiarazioneUno(unoDichiarato)`:
-   - Recupera `giocatore = giocatoreInAttesaDichiarazioneUno` e azzera il campo.
-   - Chiama `regole.mancatoUno(giocatore, unoDichiarato, this)`:
-     - Se `giocatore.getMano().size() == 1 && !unoDichiarato`: invoca `StrategiaPenalitaMancatoUno.applica(giocatore, partita)` che chiama `partita.applicaPescaForzata(giocatore, 2, PENALITA_UNO)` e ritorna `true`.
-     - Altrimenti ritorna `false`.
-   - Chiama `aggiornaGiocatoreAttivo()` per passare finalmente il turno.
-4. Se il valore ritornato alla CLI è `true`, la CLI stampa il messaggio di penalità.
+1. Dopo la giocata la fase è `ATTESA_UNO`.
+2. `UnoLegendsCli.attendiDichiarazioneUno(reader)` apre una finestra di **5 secondi** controllando `reader.ready()` ogni 50 ms: `"uno"` entro il tempo → `true`, altrimenti `false`.
+3. `partita.completaDichiarazioneUno(unoDichiarato)`:
+   - fuori da `ATTESA_UNO` → `false`;
+   - se dichiarato registra `UNO_DICHIARATO`;
+   - `regole.mancatoUno(giocatoreAttivo, unoDichiarato, this)`: se non dichiarato `StrategiaPenalitaMancatoUno` chiama `applicaPescaForzata(giocatore, 2, PENALITA_UNO)`, che registra `PESCA_FORZATA`;
+   - `chiudiTurno()`.
+4. La CLI non stampa più un messaggio di penalità proprio: arriva dagli eventi.
 
 ---
 
 ### Flusso 6 — Pesca Volontaria, Passa Turno e Rimescolamento Automatico
 
-1. **Pesca volontaria (`controller.pescaCarta()` → `partita.pescaCarta()`)**:
-   - Rifiutata (`false`) se `vincitore != null || cartaPescataDaGiocare || giocatoreInAttesaDichiarazioneUno != null`.
-   - Invoca `regole.pescaVolontaria(getGiocatoreAttivo(), this)`; con le regole standard `StrategiaPescaSingola` chiama `pescaSingola(giocatore)`:
-     - Chiama `mazzo.prelevaCarta()`.
-     - Se `null` (mazzo vuoto), chiama `mazzo.rimescolaDaScarti(pilaDegliScarti)` (che mantiene intatta la carta in cima agli scarti e rimescola le sottostanti) e riprova `mazzo.prelevaCarta()`.
-     - Se trova una carta, la aggiunge alla mano del giocatore (`giocatore.aggiungiCarta(carta)`).
-   - Imposta `cartaAppenaPescata` all'ultima carta pescata (o `null`) e `cartaPescataDaGiocare = true`.
-   - Ritorna `true` (anche se il mazzo ed eventuali scarti erano completamente vuoti).
-2. **Passa turno (`controller.passaTurno()` → `partita.passaTurno()`)**:
-   - Accettato **solo** se `vincitore == null && cartaPescataDaGiocare && giocatoreInAttesaDichiarazioneUno == null`.
-   - Azzera `cartaAppenaPescata = null`, `cartaPescataDaGiocare = false`, e invoca `aggiornaGiocatoreAttivo()`.
+1. **Pesca volontaria (`partita.pescaCarta()`)**:
+   - Permessa solo in `NORMALE`.
+   - `regole.pescaVolontaria(giocatore, this)`; con le regole standard `StrategiaPescaSingola` chiama `pescaSingola(giocatore)`, che se il mazzo è vuoto rimescola gli scarti (la carta in cima resta) e riprova.
+   - Registra `PESCA_VOLONTARIA` con il numero di carte pescate, imposta `cartaAppenaPescata` e porta la fase in `POST_PESCA`.
+   - Ritorna `true` anche se mazzo e scarti erano vuoti (l'evento lo segnala con quantità 0).
+2. **Passa turno (`partita.passaTurno()`)**: permesso solo in `POST_PESCA`; chiama `chiudiTurno()`.
+3. In `POST_PESCA` si può giocare **qualsiasi** carta compatibile della mano, non solo quella pescata.
 
 ---
 
-### Flusso 7 — Pesca Forzata e Avanzamento / Salto / Inversione del Turno
+### Flusso 7 — Pesca Forzata, Eventi e Avanzamento / Salto / Inversione del Turno
 
 1. **Pesca forzata (`partita.applicaPescaForzata(Giocatore, int, OriginePesca)`)**:
    - Unico punto d'ingresso per tutte le pesche forzate: `Effetto_pescata_carte` (`+2`, `+4`) e `StrategiaPenalitaMancatoUno`.
    - Costruisce un `ContestoPesca` e chiede a `regole.calcolaCartePescaForzata(contesto)` quante carte pescare davvero.
    - Chiama `pescaSingola(bersaglio)` quel numero di volte, fermandosi se mazzo e scarti sono esauriti.
-   - Ritorna la lista delle carte effettivamente pescate.
-2. **Calcolo prossimo giocatore e avanzamento turno**:
-   - `getProssimoGiocatore()` calcola `(indice + 1) % n` se `sensoOrario`, oppure `(indice - 1 + n) % n` se antiorario, **senza** modificare `indiceGiocatoreAttivo`.
-   - `aggiornaGiocatoreAttivo()` chiama `avanzaGiocatore()`; se `saltaProssimoTurno == true`, azzera il flag e chiama `avanzaGiocatore()` una **seconda volta**.
-   - `cambioGiro()` inverte `sensoOrario = !sensoOrario`.
+   - Registra **un** evento `PESCA_FORZATA` con le carte effettivamente pescate e l'origine.
+2. **Avanzamento turno**:
+   - `getProssimoGiocatore()` calcola `(indice + 1) % n` se `sensoOrario`, oppure `(indice - 1 + n) % n`, **senza** modificare `indiceGiocatoreAttivo`.
+   - `aggiornaGiocatoreAttivo()` (ora privato) chiama `avanzaGiocatore()`; se `saltaProssimoTurno`, azzera il flag, registra `TURNO_SALTATO` e avanza una **seconda volta**.
+   - `cambioGiro()` inverte `sensoOrario` e registra `SENSO_INVERTITO`.
+3. **Lettura degli eventi**: `Partita.prelevaEventi()` restituisce una copia del registro e lo svuota; `UnoLegendsGame.prelevaMessaggi()` traduce ogni evento in frase.
 
 ---
 
@@ -376,7 +368,7 @@ Quando la carta giocata ha `getRichiestaInput(partita) != null`:
 | Pattern | Tipo | Classi nel Codice | Ruolo Effettivo |
 |---|---|---|---|
 | **Facade / Controller** | GoF / GRASP | `UnoLegendsGame` | Espone API semplificate alla UI e disaccoppia `ui` da `model`. |
-| **DTO (Data Transfer Object)** | Architetturale | `StatoPartitaDto`, `EsitoGiocataDto`, `RichiestaInputDto` | Trasporta dati immutabili privi di dipendenze dal dominio verso la UI. |
+| **DTO (Data Transfer Object)** | Architetturale | `StatoPartitaDto`, `RichiestaInputDto`, `FaseTurnoDto` | Trasporta dati immutabili privi di dipendenze dal dominio verso la UI. |
 | **Coordinator** | GRASP | `Partita` | Coordina turni, stato partita, delega a regole, effetti ed expert. |
 | **Information Expert** | GRASP | `Giocatore`, `Mazzo`, `PilaDegliScarti`, `Effetto_Cambia_colore` | Ogni classe gestisce i dati di cui è esperta (mano, deck, scarti, validazione colore). |
 | **Creator / Factory** | GRASP / GoF | `PartitaFactory` | Centralizza la costruzione e il setup iniziale di `Partita`. |
@@ -385,6 +377,8 @@ Quando la carta giocata ha `getRichiestaInput(partita) != null`:
 | **Strategy / Protected Variations** | GoF / GRASP | `RegoleDiGioco`, `IStrategia*`, `Ieffetto` | Rende intercambiabili compatibilità carte, pesca, vittoria, sconfitta, penalità UNO ed effetti delle carte. |
 | **Composite** | GoF | `EffettoComposito` | Compone più `Ieffetto` in sequenza trattandoli come un unico `Ieffetto` (usato per `+4`). |
 | **Null Object** | Design Pattern | `Effetto_Nullo` | Evita controlli `if (effetto != null)` sulle carte numeriche. |
+| **Command** | GoF | `AzioneInAttesa` | Incapsula un'azione sospesa (effetto + completamento) da eseguire quando arriva la risposta del giocatore. |
+| **Pure Fabrication / Indirection** | GRASP | `EventoPartita`, `TipoEvento` | Registro eventi: il model registra cosa succede senza sapere chi lo leggerà; il controller lo traduce in testo. |
 
 ---
 
@@ -394,15 +388,12 @@ Per comprendere con precisione ciò che il codice fa *effettivamente* oggi rispe
 
 1. **Numero di carte iniziali**: `PartitaFactory.CARTE_PER_GIOCATORE` distribuisce **7 carte** per giocatore (mentre `docs/roles_and_patterns.md` cita ancora 5 carte da una revisione precedente).
 2. **Disallineamento `domain_class_diagram.puml` vs codice reale**:
-   - Nel codice reale `Partita.giocaCarta` ha firma `(int indiceCarta, String rispostaInput)` (non ha più il parametro `boolean unoDichiarato`, ora gestito nella fase separata `completaDichiarazioneUno(boolean)`).
+   - Nel codice reale `Partita.giocaCarta` ha firma `(int indiceCarta) : boolean`: la risposta agli input passa da `rispondiInput(String)` e la dichiarazione UNO da `completaDichiarazioneUno(boolean)`.
    - Nel codice reale `CartaNumero` non ha il campo `id : int`.
    - In `Mazzo`, il metodo si chiama `getNumeroCarte()` (non `getNumeroCarteRestanti()`).
    - `Partita` non espone `getMazzoDaPesca()`, `getNumeroCarteNelMazzo()` né `tuttiGliAltriGiocatoriHannoPiuDi(...)`.
 3. **Strategia di sconfitta predisposta ma non ancora agganciata**: `RegoleDiGioco` espone `isEliminato(Giocatore, Partita)` con `StrategiaSconfittaStandard` (che ritorna sempre `false`), ma `Partita` attualmente non invoca `regole.isEliminato(...)` durante il turno.
-4. **Vincolo "solo carta appena pescata"**: dopo `pescaCarta()`, la CLI guida l'utente a giocare la carta appena pescata o passare, ma `Partita.giocaCarta(indiceCarta, rispostaInput)` attualmente verifica soltanto `regole.isGiocabile(...)` senza controllare che la carta scelta coincida con `cartaAppenaPescata`.
+4. **Dopo la pesca si gioca qualsiasi carta**: in `POST_PESCA` `Partita.giocaCarta` accetta ogni carta compatibile della mano, non solo `cartaAppenaPescata` (regola scelta per il progetto).
 5. **Cambia Giro con 2 giocatori**: `Effetto_cambio_giro` inverte `sensoOrario`, ma con `giocatori.size() == 2` avanzare di `+1` o `-1` modulo `2` seleziona comunque l'altro giocatore (non equivale a un salta turno in 2 giocatori, a differenza della variante UNO 2-player ufficiale).
-6. **Gestione eterogenea delle attese di input in `Partita`**:
-   - La carta iniziale nera usa stato salvato in `Partita` (`effettoInizialeInAttesa`) + `StatoPartitaDto` + `rispondiRichiestaInputIniziale`.
-   - La carta nera giocata nel turno usa `EsitoGiocata.inAttesa` e una seconda chiamata a `giocaCarta(indiceCarta, risposta)` senza stato salvato in `Partita`.
-   - La dichiarazione UNO usa stato salvato in `Partita` (`giocatoreInAttesaDichiarazioneUno`) + `EsitoGiocata.richiedeDichiarazioneUno()` + `completaDichiarazioneUno`.
+6. **Attese di input unificate (Step 2)**: carta iniziale nera e carta nera giocata nel turno passano entrambe da `AzioneInAttesa` + `rispondiInput(String)`. La dichiarazione UNO resta un comando separato (`completaDichiarazioneUno`) perché ha il timer di 5 secondi ed è un'interazione diversa da "scegli fra opzioni".
 7. **Assenza di `Personaggio` / abilità passive e stacking `+2`/`+4`**: non sono ancora presenti nel codice attuale; `Partita` e `RegoleDiGioco` implementano al momento il solo set di regole UNO standard senza personaggi né accumulo di penalità.

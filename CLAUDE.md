@@ -25,6 +25,9 @@ SoftwareEngineering/
     ├── docs/
     │   ├── domain_class_diagram.puml
     │   ├── roles_and_patterns.md            # mappa classi → pattern (in parte datata)
+    │   ├── ROADMAP.md                       # roadmap di riferimento (7 step)
+    │   ├── step2_seconda_iter.md            # resoconto dello Step 2: cosa e perché
+    │   ├── GiocaTurno_Step2_SequenceDiagram.puml
     │   └── refactoring_e_update_soluzioni.md # roadmap/proposte di refactoring futuro
     └── src/main/java/unolegends/
         ├── ui/          UnoLegendsCli               (View)
@@ -49,8 +52,10 @@ Per verificare una modifica, ricompilare con il comando sopra; `out/` è un outp
 
 **Regola fondamentale: la UI non importa mai classi di `unolegends.model`.**
 Comunica solo con `UnoLegendsGame` e riceve DTO immutabili (`StatoPartitaDto`,
-`EsitoGiocataDto`, `RichiestaInputDto`). Il controller converte model → DTO
-(es. `formattaCarta`). Ogni nuovo dato da mostrare alla UI passa da un DTO.
+`RichiestaInputDto`, `FaseTurnoDto`) e messaggi già tradotti (`prelevaMessaggi()`).
+Il controller converte model → DTO (es. `formattaCarta`, `convertiFase`) e scrive tutti i
+testi (frasi delle richieste, messaggi degli eventi): il model non produce testo.
+Ogni nuovo dato da mostrare alla UI passa da un DTO.
 
 Flusso: `UnoLegendsCli` → `UnoLegendsGame` (Facade) → `Partita` (Coordinator) → expert
 (`Giocatore`, `Mazzo`, `PilaDegliScarti`, `RegoleDiGioco`, `Ieffetto`).
@@ -58,15 +63,26 @@ Flusso: `UnoLegendsCli` → `UnoLegendsGame` (Facade) → `Partita` (Coordinator
 ### Classi chiave
 
 - **`Partita`** — radice del dominio e coordinatore del turno. Stato: giocatori, indice attivo,
-  `coloreAttuale`, `sensoOrario`, `saltaProssimoTurno`, carta appena pescata, effetto iniziale
-  in attesa, giocatore in attesa di dichiarazione UNO, vincitore.
-  - `giocaCarta(indice, risposta)` valida **tutto prima** di modificare lo stato (partita finita,
-    indice, compatibilità, input dell'effetto), poi sposta la carta, applica l'effetto, controlla
-    vittoria e finestra UNO, e infine avanza il turno. Restituisce `EsitoGiocata`
-    (`completata` / `inAttesa(richiesta)` / `richiedeDichiarazioneUno`).
-  - L'avanzamento del turno è centralizzato in `aggiornaGiocatoreAttivo()` (gestisce salto e senso).
-  - Metodi package-private (`applicaColoreScelto`, `segnalaSaltoTurno`) sono usati dagli effetti
-    nello stesso package `model`.
+  **`fase` (`FaseTurno`)**, `azioneInAttesa`, `coloreAttuale`, `sensoOrario`, `saltaProssimoTurno`,
+  carta appena pescata, vincitore, registro `eventi`.
+  - **`FaseTurno`**: `NORMALE`, `POST_PESCA`, `ATTESA_INPUT`, `ATTESA_UNO`, `TERMINATA`. Ogni comando
+    pubblico controlla per prima cosa le fasi in cui è **permesso** (lista di ammissione). Non
+    reintrodurre flag booleani per descrivere la fase del turno: aggiungere un valore all'enum.
+  - `giocaCarta(indice) : boolean` valida **tutto prima** di modificare lo stato (fase, indice,
+    compatibilità). Se l'effetto richiede input la carta resta in mano e si apre un'`AzioneInAttesa`;
+    altrimenti `completaGiocata` sposta la carta, applica l'effetto e decide la fase successiva
+    (vittoria, finestra UNO, o `chiudiTurno()`).
+  - **Input unificato**: ogni richiesta passa da `mettiInAttesa(effetto, completamento)` e si
+    risponde solo con `rispondiInput(String)`. `AzioneInAttesa` (Command) contiene l'effetto, che
+    valida, e il completamento da eseguire. Nuove richieste (bersaglio, abilità) usano lo stesso
+    meccanismo: niente metodi `rispondiXxx` dedicati.
+  - **Eventi**: ciò che la UI deve raccontare si registra con `registraEvento(EventoPartita.xxx(...))`
+    (record + enum `TipoEvento`); la UI li legge con `UnoLegendsGame.prelevaMessaggi()`.
+    È stato scelto un registro "pull" e **non** un Observer. Per un evento nuovo: valore in
+    `TipoEvento`, factory in `EventoPartita`, caso nello `switch` di `UnoLegendsGame.descriviEvento`.
+  - L'avanzamento del turno è centralizzato in `aggiornaGiocatoreAttivo()` (privato; gestisce salto e senso).
+  - Metodi package-private (`applicaColoreScelto`, `segnalaSaltoTurno`, `registraEvento`) sono usati
+    dagli effetti nello stesso package `model`.
 - **`RegoleDiGioco`** — contenitore delle strategie (punto di variazione protetto). `standard()`
   crea il profilo di default. Strategie: vittoria, sconfitta, compatibilità, pesca, penalità UNO.
 - **`PartitaFactory`** — crea la partita: mazzo da `MazzoFactory`, 7 carte a testa, prima carta
@@ -77,23 +93,26 @@ Flusso: `UnoLegendsCli` → `UnoLegendsGame` (Facade) → `Partita` (Coordinator
   (le numeriche usano `Effetto_Nullo`, Null Object). `Colore` include `NERO` per le jolly e
   gestisce la colorazione ANSI. `ValoreCarta` è l'enum dei valori.
 - **Effetti (`Ieffetto`)** — Strategy/Command. Un effetto che richiede input espone
-  `getRichiestaInput()` e `validaRispostaInput()`, e viene attivato con `attivaEffetto(partita, risposta)`.
+  `getRichiestaInput()` (una `RichiestaInput(TipoRichiesta, opzioni)`, **senza testo**) e
+  `validaRispostaInput()`, e viene attivato con `attivaEffetto(partita, risposta)`.
   `EffettoComposito` (Composite) combina effetti: es. +4 = cambia colore + pesca 4.
 
 ### Meccaniche da ricordare
 
 - Le carte nere non cambiano `coloreAttuale` da sole: lo imposta l'effetto con il colore scelto.
   La UI mostra la carta in cima con il colore scelto (`CartaSpeciale.getDescrizioneBreve(Colore)`).
-- Interazione in due passi: prima `giocaCarta(i, null)`; se l'esito è "in attesa" la UI chiede
-  l'input e richiama `giocaCarta(i, risposta)`.
-- Dopo una pesca volontaria si può giocare solo la carta pescata o passare (`passaTurno`).
-- Giocando la penultima carta si apre la finestra UNO: `completaDichiarazioneUno(bool)`;
-  se non dichiarato si pescano 2 carte di penalità.
+- Interazione con input: `giocaCarta(i)` → fase `ATTESA_INPUT` → la UI legge la richiesta dallo
+  stato e chiama `rispondiInput(risposta)`. Anche la carta iniziale nera usa questo meccanismo.
+- La CLI fa un unico `switch` esaustivo su `stato.getFase()`: non deve dedurre la fase da flag.
+- Dopo una pesca volontaria si può scegliere se giocare qualsiasi carta in  mano o passare (`passaTurno`).
+- Giocando la penultima carta si apre la finestra UNO (fase `ATTESA_UNO`): `completaDichiarazioneUno(bool)`;
+  se non dichiarato si pescano 2 carte di penalità (comunicate come evento).
 - Mazzo vuoto → rimescolamento dagli scarti (la carta in cima resta).
 - **Tutte le pesche forzate** (+2, +4, penalità UNO, e in futuro abilità e stacking) passano da
   `Partita.applicaPescaForzata(bersaglio, n, OriginePesca)`, che chiede a
   `RegoleDiGioco.calcolaCartePescaForzata(ContestoPesca)` quante carte pescare davvero.
-  Non scrivere cicli di `pescaSingola` negli effetti.
+  Non scrivere cicli di `pescaSingola` negli effetti. `applicaPescaForzata` registra anche l'evento
+  `PESCA_FORZATA`: non registrarlo di nuovo negli effetti.
 - La pesca **volontaria** passa da `RegoleDiGioco.pescaVolontaria` (`IStrategiaPesca`).
 - Gli effetti ricevono `Partita` anche in `getRichiestaInput` e `validaRispostaInput`.
 
@@ -116,15 +135,24 @@ lavorare su quelle funzionalità.
 
 Obiettivo: implementarle in modo **flessibile e manutenibile** (GRASP, GoF, SOLID,
 Protected Variations, niente `instanceof`/`if` sul tipo concreto dentro `Partita`).
-Le proposte di design già scritte sono in `Codice/docs/refactoring_e_update_soluzioni.md`
-(roadmap in 6 step): partire da lì.
+**La roadmap di riferimento è `Codice/docs/ROADMAP.md`** (7 step, con alternative e scelte
+consigliate): seguire quella. I dettagli di design più approfonditi sono in
+`Codice/docs/refactoring_e_update_soluzioni.md`. Dove i due documenti non sono d'accordo vale
+ROADMAP.md: per esempio, Endless non fa parte degli obiettivi.
 
 **Avanzamento roadmap:**
+
 - ✅ Step 1 (fondamenta), sul branch `ci-aiuta-claudio`. Scelte approvate:
   - `Ieffetto` riceve `Partita`;
   - `OriginePesca` ha un valore per ogni causa;
   - `isGiocabile` riceve il `Giocatore` (non è stato creato un record `ContestoGiocata`).
-- ⏭️ Prossimo: Step 2 (Observer/Listener e input unificati).
+- ✅ Step 2 (fasi del turno, input unificato, eventi), sul branch `ci-aiuta-claudio`.
+  Resoconto: `Codice/docs/step2_seconda_iter.md`. Scelte approvate:
+  - enum `FaseTurno` (non ancora il pattern State; da rivalutare allo Step 5);
+  - registro eventi tipizzato (`EventoPartita` + `TipoEvento`) al posto dell'Observer;
+  - le frasi di richieste ed eventi le scrive il controller;
+  - `EsitoGiocata`/`EsitoGiocataDto` eliminati: i comandi restituiscono `boolean`.
+- ⏭️ Prossimo: Step 3 (N giocatori, eliminati, configurazione e menu di setup).
 
 Legenda della difficoltà (classificazione dell'utente):
 
@@ -201,21 +229,25 @@ Il menu costruisce la configurazione che arriva a `PartitaFactory` (mazzo + `Reg
 ### Decisioni prese (vincolanti)
 
 - **Abilità attiva:**
+
   - ogni abilità ha un **cooldown in turni**, cioè un semplice `int` configurabile per Legend;
   - usarla **non** consuma il turno: dopo puoi ancora giocare o pescare.
 - **La Roccia:**
+
   - è immune solo a un **+2 singolo, senza accumulo**;
   - se c'è uno stacking in corso subisce l'accumulo come tutti, ma in No Mercy può comunque rispondere con un +2 o superiore.
 - **Salesman** (variante scelta: "pesca una carta in meno"):
+
   - vale per ogni penalità di pesca: +2/+4/+6/+10, accumulo dello stacking, Castigatore;
   - vale anche per la penalità del mancato UNO, perché applicarla sempre rende l'implementazione più semplice.
 - **Ghost:**
+
   - non è bersagliabile dagli effetti in cui l'utente sceglie il giocatore (carta 7, Scambia mazzo, Gifted card, Castigatore);
   - è bersagliabile dagli effetti automatici (carta 0, +2 al successivo, ecc.).
 - **Giocatore eliminato:** le sue carte vengono **subito rimescolate nel mazzo**. Qui ci si discosta dalla regola ufficiale.
-- **Roulette:** il colore lo sceglie chi gioca la carta. Anche qui ci si discosta dalla regola ufficiale.
+- **Roulette:** il colore lo sceglie chi gioca la carta. Anche qui ci si discosta dalla regola ufficiale. ed l'efffetto passivo del salesman non si attiva
+- Il gioco finale potra essere giocato fino a 6 giocatori ma con i legend per ora se non riusciamo a pensare a 6 legends diversi dobbiamo inventare qualcosa
 
 ### Ancora da decidere
 
 - Il valore del cooldown di ogni abilità attiva.
-- Salesman e Jolly roulette: la roulette conta come penalità di pesca? Se sì, "una carta in meno" non è ben definito.

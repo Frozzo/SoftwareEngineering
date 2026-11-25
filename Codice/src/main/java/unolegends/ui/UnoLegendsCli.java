@@ -5,7 +5,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import unolegends.controller.EsitoGiocataDto;
 import unolegends.controller.RichiestaInputDto;
 import unolegends.controller.StatoPartitaDto;
 import unolegends.controller.UnoLegendsGame;
@@ -40,94 +39,115 @@ public final class UnoLegendsCli {
             // GRASP Controller: UnoLegendsGame rimane pura facade per i comandi di controller
             UnoLegendsGame controller = UnoLegendsGame.avviaPartitaStandard();
 
-            System.out.println("Demo base: puoi giocare una carta dalla mano oppure pescare; dopo la pesca puoi solo giocare quella carta o passare.");
+            System.out.println("Demo base: puoi giocare una carta dalla mano oppure pescare; dopo la pesca puoi giocare una carta o passare.");
             System.out.println("Le carte in mano sono numerate da 0 in poi e vengono mostrate come 'numero colore'.");
             System.out.println("Il sistema mostra automaticamente lo stato dopo ogni scelta.");
             System.out.println();
-            while (true) {
+            boolean continua = true;
+            while (continua) {
+                // Prima racconta cosa è successo dall'ultimo comando (pesche, salti, colori scelti...).
+                controller.prelevaMessaggi().forEach(System.out::println);
                 // Rilegge lo stato a ogni iterazione: le scelte precedenti possono averlo modificato.
                 StatoPartitaDto stato = controller.richiediStato();
-                // La partita non richiede altre mosse; mostra il vincitore e termina la CLI.
-                if (stato.isPartitaTerminata()) {
-                    System.out.println("Partita terminata. Vince " + stato.getNomeVincitore() + "!");
-                    return;
-                }
-                // Risolve prima eventuali richieste rimaste in sospeso (per esempio il colore iniziale).
-                // Poi riparte dal controllo dello stato, senza mostrare o chiedere una mossa normale.
-                if (stato.getRichiestaInput() != null) {
-                    String risposta = richiediInput(reader, stato.getRichiestaInput());
-                    if (!controller.rispondiRichiestaInputIniziale(risposta)) {
-                        System.out.println("Risposta non valida. Riprova.");
+                // La fase la decide il model: la CLI non la deduce da più flag, sceglie solo
+                // come presentarla. Lo switch è esaustivo: una fase nuova va gestita qui.
+                continua = switch (stato.getFase()) {
+                    case TERMINATA -> {
+                        System.out.println("Partita terminata. Vince " + stato.getNomeVincitore() + "!");
+                        yield false;
                     }
-                    continue;
-                }
-                mostraStato(stato);
-
-                // Dopo una pesca. il turno è vincolato: si può giocare solo una carta
-                // oppure passare. Il continue fa ripartire il ciclo per aggiornare lo stato.
-                if (stato.isDeveGiocareCartaPescata()) {
-                    System.out.println("Carta pescata: " + stato.getCartaAppenaPescata());
-                    System.out.println("Scegli: indica l'indice della carta che vuoi giocare oppure 'p' per passare il turno.");
-                    System.out.print("> ");
-                    String scelta = reader.readLine().trim();
-                    if ("p".equalsIgnoreCase(scelta)) {
-                        if (controller.passaTurno()) {
-                            System.out.println("Turno passato.");
-                        } else {
-                            System.out.println("Passaggio turno non consentito.");
-                        }
-                        continue;
+                    case ATTESA_INPUT -> {
+                        gestisciRichiestaInput(stato, controller, reader);
+                        yield true;
                     }
-
-                    Integer indiceCarta = parseIndice(scelta);
-                    if (indiceCarta == null) {
-                        System.out.println("Valore non valido.");
-                        continue;
+                    case ATTESA_UNO -> {
+                        controller.completaDichiarazioneUno(attendiDichiarazioneUno(reader));
+                        System.out.println();
+                        yield true;
                     }
-
-                    if (gestisciGiocata(indiceCarta, controller, reader)) {
-                        System.out.println("Carta giocata.");
-                    } else {
-                        System.out.println("Mossa non valida.");
-                    }
-                    continue;
-                }
-
-                // Se non ci sono richieste pendenti né una carta pescata da risolvere,
-                // il giocatore può giocare una carta, pescare oppure uscire.
-                System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci");
-                System.out.print("> ");
-                String scelta = reader.readLine().trim();
-
-                if ("2".equals(scelta)) {
-                    return;
-                }
-                if ("0".equals(scelta)) {
-                    System.out.println("Digita l'indice della carta da giocare.");
-                    System.out.print("> ");
-                    Integer indiceCarta = parseIndice(reader.readLine().trim());
-                    if (indiceCarta == null) {
-                        System.out.println("Valore non valido.");
-                        continue;
-                    }
-                    if (gestisciGiocata(indiceCarta, controller, reader)) {
-                        System.out.println("Carta giocata.");
-                    } else {
-                        System.out.println("Mossa non valida.");
-                    }
-                    continue;
-                }
-                if ("1".equals(scelta)) {
-                    if (!controller.pescaCarta()) {
-                        System.out.println("Mazzo esaurito.");
-                    } else {
-                        System.out.println("Hai pescato una carta: ora puoi solo giocare una carta oppure passare.");
-                    }
-                    continue;
-                }
-
-                System.out.println("Comando non riconosciuto.");
+                    case POST_PESCA -> turnoDopoPesca(stato, controller, reader);
+                    case NORMALE -> turnoNormale(stato, controller, reader);
+                };
             }
+        }
+    }
+
+    /**
+     * Inizio del turno: il giocatore può giocare una carta, pescare oppure uscire.
+     *
+     * @return false se il giocatore ha scelto di uscire
+     */
+    private static boolean turnoNormale(StatoPartitaDto stato, UnoLegendsGame controller,
+                                        BufferedReader reader) throws IOException {
+        mostraStato(stato);
+        System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci");
+        System.out.print("> ");
+        String scelta = reader.readLine().trim();
+
+        if ("2".equals(scelta)) {
+            return false;
+        }
+        if ("0".equals(scelta)) {
+            System.out.println("Digita l'indice della carta da giocare.");
+            System.out.print("> ");
+            giocaCarta(reader.readLine().trim(), controller);
+            return true;
+        }
+        if ("1".equals(scelta)) {
+            if (!controller.pescaCarta()) {
+                System.out.println("Pesca non consentita.");
+            }
+            return true;
+        }
+        System.out.println("Comando non riconosciuto.");
+        return true;
+    }
+
+    /**
+     * Dopo una pesca volontaria il giocatore può giocare una carta della mano
+     * oppure passare il turno.
+     */
+    private static boolean turnoDopoPesca(StatoPartitaDto stato, UnoLegendsGame controller,
+                                          BufferedReader reader) throws IOException {
+        mostraStato(stato);
+        if (stato.getCartaAppenaPescata() != null) {
+            System.out.println("Carta pescata: " + stato.getCartaAppenaPescata());
+        }
+        System.out.println("Scegli: indica l'indice della carta che vuoi giocare oppure 'p' per passare il turno.");
+        System.out.print("> ");
+        String scelta = reader.readLine().trim();
+        if ("p".equalsIgnoreCase(scelta)) {
+            System.out.println(controller.passaTurno() ? "Turno passato." : "Passaggio turno non consentito.");
+            return true;
+        }
+        giocaCarta(scelta, controller);
+        return true;
+    }
+
+    /**
+     * Interpreta l'indice e chiede la giocata al controller. Se la carta richiede
+     * un input (per esempio un colore), la richiesta arriverà al prossimo giro del
+     * ciclo, con la fase ATTESA_INPUT.
+     */
+    private static void giocaCarta(String testoIndice, UnoLegendsGame controller) {
+        Integer indiceCarta = parseIndice(testoIndice);
+        if (indiceCarta == null) {
+            System.out.println("Valore non valido.");
+            return;
+        }
+        System.out.println(controller.giocaCarta(indiceCarta) ? "Carta giocata." : "Mossa non valida.");
+    }
+
+    /**
+     * Unico punto della CLI che risponde alle richieste di input, qualunque sia
+     * la loro origine (carta iniziale, jolly giocato, in futuro bersagli e abilità).
+     */
+    private static void gestisciRichiestaInput(StatoPartitaDto stato, UnoLegendsGame controller,
+                                               BufferedReader reader) throws IOException {
+        System.out.println(stato.getNomeGiocatoreAttivo() + ", rispondi:");
+        String risposta = richiediInput(reader, stato.getRichiestaInput());
+        if (!controller.rispondiInput(risposta)) {
+            System.out.println("Risposta non valida. Riprova.");
         }
     }
 
@@ -146,23 +166,6 @@ public final class UnoLegendsCli {
             System.out.println(i + ") " + mano.get(i));
         }
         System.out.println();
-    }
-
-    private static boolean gestisciGiocata(int indiceCarta, UnoLegendsGame controller,
-                                           BufferedReader reader) throws IOException {
-        EsitoGiocataDto esito = controller.giocaCarta(indiceCarta, null);
-        while (esito.getRichiestaInput() != null) {
-            String risposta = richiediInput(reader, esito.getRichiestaInput());
-            esito = controller.giocaCarta(indiceCarta, risposta);
-        }
-        boolean giocataValida = esito.isGiocata();
-        if (giocataValida && esito.isRichiedeDichiarazioneUno()) {
-            boolean unoDichiarato = attendiDichiarazioneUno(reader);
-            if (controller.completaDichiarazioneUno(unoDichiarato)) {
-                System.out.println("\nUNO non dichiarato: hai pescato due carte di penalita.");
-            }
-        }
-        return giocataValida;
     }
 
     /**

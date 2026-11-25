@@ -50,11 +50,16 @@ Classi e responsabilità
 
 - UnoLegendsGame
   - Pattern: Facade / Controller (GRASP)
-  - Responsabilità: esporre API semplici alla UI, tradurre stato, richieste ed esiti in DTO del controller e coordinare i comandi di gioco con la `Partita`.
+  - Responsabilità: esporre API semplici alla UI, tradurre stato e richieste in DTO del controller, tradurre gli eventi della partita in messaggi e coordinare i comandi di gioco con la `Partita`.
   - Mantiene un riferimento persistente a `Partita` (associazione 1); le API UI-facing non espongono tipi del model.
 
-- StatoPartita, RichiestaInputDto ed EsitoGiocataDto
-  - Responsabilità: trasferire alla UI snapshot, richieste interattive ed esiti usando solo dati immutabili indipendenti dal model.
+- StatoPartitaDto, RichiestaInputDto e FaseTurnoDto
+  - Responsabilità: trasferire alla UI snapshot (con la fase del turno) e richieste interattive usando solo dati immutabili indipendenti dal model.
+
+- FaseTurno, AzioneInAttesa, EventoPartita / TipoEvento (Step 2)
+  - FaseTurno: un solo campo descrive la fase del turno; ogni comando di `Partita` dichiara le fasi in cui è permesso.
+  - AzioneInAttesa (Command): azione sospesa in attesa di input, completata da `Partita.rispondiInput`.
+  - EventoPartita (Pure Fabrication): registro dei fatti accaduti, letto dalla UI tramite il controller.
 
 - UnoLegendsCli
   - Pattern: View / UI

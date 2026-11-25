@@ -3,35 +3,46 @@ package unolegends.model;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * GRASP Coordinator / oggetto radice del dominio: coordina il turno delegando agli expert.
+ *
+ * <p>Lo stato del turno è descritto da un solo campo, {@link FaseTurno}. Ogni comando
+ * pubblico controlla per prima cosa di essere permesso nella fase corrente; le
+ * richieste di input passano tutte da {@link AzioneInAttesa} e
+ * {@link #rispondiInput(String)}; ciò che accade durante il turno viene registrato
+ * come {@link EventoPartita} e letto dalla UI con {@link #prelevaEventi()}.</p>
  */
 public class Partita {
     private final List<Giocatore> giocatori;
     private final Mazzo mazzo;
     private final PilaDegliScarti pilaDegliScarti;
     private final RegoleDiGioco regole;
+    private final List<EventoPartita> eventi = new ArrayList<>();
     private int indiceGiocatoreAttivo;
+    private FaseTurno fase = FaseTurno.NORMALE;
+    private AzioneInAttesa azioneInAttesa;
     private Carta cartaAppenaPescata;
-    private boolean cartaPescataDaGiocare;
-    private Ieffetto effettoInizialeInAttesa;
     private Giocatore vincitore;
-    private Giocatore giocatoreInAttesaDichiarazioneUno;
     private boolean giocoIniziato;
+    /**
+     * Non è una fase del turno ma un'informazione per il prossimo avanzamento:
+     * un effetto (blocca, +2...) chiede di saltare il giocatore successivo e
+     * {@link #aggiornaGiocatoreAttivo()} la consuma. Per questo resta separata da
+     * {@link FaseTurno}.
+     */
     private boolean saltaProssimoTurno;
     private Colore coloreAttuale;
     private boolean sensoOrario = true; // Variabile per tenere traccia del senso di gioco
 
     /**
      * Costruisce lo stato iniziale della partita e ricava il colore attivo dalla
-     * carta iniziale. Se il suo effetto richiede input, lo conserva in attesa:
-     * non può essere applicato correttamente finché il giocatore non risponde.
+     * carta iniziale. L'effetto della carta iniziale viene applicato (o messo in
+     * attesa di input) da {@link #iniziaGioco()}.
      *
-     * <p>Il giocatore iniziale dipende dalla carta iniziale, quindi lo decide
-     * Partita (Information Expert) e non la factory: se la carta richiede input
-     * risponde il primo giocatore; altrimenti l'indice parte dall'ultimo, così
-     * l'avanzamento eseguito da {@link #iniziaGioco()} porta il turno al primo.</p>
+     * <p>L'indice parte dall'ultimo giocatore, così l'avanzamento eseguito da
+     * {@link #iniziaGioco()} porta il turno al primo.</p>
      */
     public Partita(List<Giocatore> giocatori, Mazzo mazzo, PilaDegliScarti pilaDegliScarti, RegoleDiGioco regole) {
         this.giocatori = new ArrayList<>(giocatori);
@@ -40,30 +51,39 @@ public class Partita {
         this.regole = regole;
         Carta cartaInCima = pilaDegliScarti.getCartaInCima();
         this.coloreAttuale = cartaInCima == null ? null : cartaInCima.getColore();
-        if (cartaInCima != null && cartaInCima.getEffetto().getRichiestaInput(this) != null) {
-            this.effettoInizialeInAttesa = cartaInCima.getEffetto();
-        }
-        this.indiceGiocatoreAttivo = effettoInizialeInAttesa != null ? 0 : this.giocatori.size() - 1;
+        this.indiceGiocatoreAttivo = this.giocatori.size() - 1;
     }
+
     /**
      * Completa l'inizializzazione della partita applicando l'effetto della prima carta.
-     * È idempotente per non applicare due volte lo stesso effetto. Se la carta
-     * iniziale richiede input, ne rimanda l'applicazione a
-     * {@link #rispondiRichiestaInputIniziale(String)}; altrimenti applica l'effetto
-     * e aggiorna il giocatore attivo.
+     * È idempotente per non applicare due volte lo stesso effetto.
+     *
+     * <p>Se la carta iniziale richiede input, risponde il primo giocatore: la
+     * richiesta diventa un'{@link AzioneInAttesa} come tutte le altre e, quando
+     * arriva la risposta, l'effetto viene applicato e il turno avanza. Prima esisteva
+     * un meccanismo dedicato ({@code effettoInizialeInAttesa} +
+     * {@code rispondiRichiestaInputIniziale}); ora è lo stesso delle carte giocate.</p>
      */
     public void iniziaGioco() {
         if (giocoIniziato) {
             return;
         }
         this.giocoIniziato = true;
-        if (effettoInizialeInAttesa == null) {
-            Carta cartaInCima = pilaDegliScarti.getCartaInCima();
-            if (cartaInCima != null) {
-                cartaInCima.getEffetto().attivaEffetto(this);
-                aggiornaGiocatoreAttivo();
-            }
+        Carta cartaInCima = pilaDegliScarti.getCartaInCima();
+        if (cartaInCima == null) {
+            return;
         }
+        Ieffetto effetto = cartaInCima.getEffetto();
+        if (effetto.getRichiestaInput(this) != null) {
+            indiceGiocatoreAttivo = 0;
+            mettiInAttesa(effetto, risposta -> {
+                effetto.attivaEffetto(this, risposta);
+                chiudiTurno();
+            });
+            return;
+        }
+        effetto.attivaEffetto(this);
+        aggiornaGiocatoreAttivo();
     }
 
     private Giocatore getGiocatoreAttivo() {
@@ -78,20 +98,23 @@ public class Partita {
         return getGiocatoreAttivo().getMano();
     }
 
-    public boolean isCartaPescataDaGiocare() {
-        return cartaPescataDaGiocare;
+    /** Fase corrente del turno: è l'unica informazione che la UI deve leggere per sapere cosa chiedere. */
+    public FaseTurno getFase() {
+        return fase;
     }
 
+    /** Carta ottenuta con l'ultima pesca volontaria; significativa solo in {@link FaseTurno#POST_PESCA}. */
     public Carta getCartaAppenaPescata() {
-        return cartaAppenaPescata;
+        return fase == FaseTurno.POST_PESCA ? cartaAppenaPescata : null;
     }
 
-    public RichiestaInput getRichiestaInputIniziale() {
-        return effettoInizialeInAttesa == null ? null : effettoInizialeInAttesa.getRichiestaInput(this);
-    }
-
-    public boolean isPartitaTerminata() {
-        return vincitore != null;
+    /**
+     * Richiesta dell'azione in attesa, oppure null se non si è in
+     * {@link FaseTurno#ATTESA_INPUT}. La calcola l'effetto (Information Expert),
+     * perché può dipendere dallo stato attuale della partita.
+     */
+    public RichiestaInput getRichiestaInputInAttesa() {
+        return fase == FaseTurno.ATTESA_INPUT ? azioneInAttesa.effetto().getRichiestaInput(this) : null;
     }
 
     public String getNomeVincitore() {
@@ -105,101 +128,109 @@ public class Partita {
     public PilaDegliScarti getPilaDegliScarti() {
         return pilaDegliScarti;
     }
-    /**
-     * Coordina una giocata nell'ordine necessario a non alterare lo stato per mosse
-     * rifiutate: controlla prima partita, indice, compatibilità e input dell'effetto;
-     * solo dopo rimuove la carta dalla mano, la sposta negli scarti e applica l'effetto.
-     * Infine controlla la penalità UNO e la vittoria, avanzando il turno solo se la
-     * partita continua. Restituisce un esito distinto anche quando serve un input,
-     * così la UI può chiedere una risposta senza considerare conclusa la giocata.
-     */
-    public EsitoGiocata giocaCarta(int indiceCarta, String rispostaInput) {
-         // Caso 1: rifiuta la giocata se la partita è terminata o c'è già un'azione in attesa.
-         if (vincitore != null || effettoInizialeInAttesa != null
-                 || giocatoreInAttesaDichiarazioneUno != null) {
-             return EsitoGiocata.completata(false);
-         }
-        Giocatore giocatoreAttivo = getGiocatoreAttivo();
-        boolean avevaDueCarte = giocatoreAttivo.getMano().size() == 2;
-        Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
-        // Caso 2: l'indice è fuori dalla mano; non esiste una carta da giocare.
-        if (cartaSelezionata == null) {
-            return EsitoGiocata.completata(false);
-        }
 
-        Carta cartaInCima = pilaDegliScarti.getCartaInCima();
-        // Caso 3: la carta non rispetta le regole di compatibilità; la mano resta invariata.
-        if (!regole.isGiocabile(giocatoreAttivo, cartaSelezionata, cartaInCima, this)) {
-            return EsitoGiocata.completata(false);
+    /**
+     * Restituisce gli eventi registrati dall'ultima lettura e svuota il registro.
+     * La UI lo chiama (tramite il controller) dopo ogni comando per raccontare
+     * cosa è successo: è un modello "pull", più semplice di un Observer per una
+     * CLI sincrona.
+     */
+    public List<EventoPartita> prelevaEventi() {
+        List<EventoPartita> copia = List.copyOf(eventi);
+        eventi.clear();
+        return copia;
+    }
+
+    /**
+     * Registra un fatto da mostrare alla UI. Package-private: lo usano Partita
+     * stessa e, se servirà, gli effetti nello stesso package.
+     */
+    void registraEvento(EventoPartita evento) {
+        eventi.add(Objects.requireNonNull(evento, "evento non puo essere null"));
+    }
+
+    /**
+     * Gioca la carta in posizione {@code indiceCarta} del giocatore attivo.
+     * Permesso in {@link FaseTurno#NORMALE} e {@link FaseTurno#POST_PESCA}
+     * (dopo una pesca si può giocare qualsiasi carta della mano).
+     *
+     * <p>Valida tutto prima di modificare lo stato (indice, compatibilità). Se
+     * l'effetto richiede un input, la carta resta in mano e la giocata diventa
+     * un'{@link AzioneInAttesa}: la fase passa a {@link FaseTurno#ATTESA_INPUT} e
+     * la giocata si completa in {@link #rispondiInput(String)}. Prima la UI doveva
+     * richiamare {@code giocaCarta(indice, risposta)} ricordandosi l'indice, e
+     * Partita rifaceva tutte le validazioni.</p>
+     *
+     * @return true se la giocata è stata accettata (completata o in attesa di input)
+     */
+    public boolean giocaCarta(int indiceCarta) {
+        if (fase != FaseTurno.NORMALE && fase != FaseTurno.POST_PESCA) {
+            return false;
+        }
+        Giocatore giocatoreAttivo = getGiocatoreAttivo();
+        Carta cartaSelezionata = giocatoreAttivo.getCartaInPosizione(indiceCarta);
+        if (cartaSelezionata == null) {
+            return false;
+        }
+        if (!regole.isGiocabile(giocatoreAttivo, cartaSelezionata, pilaDegliScarti.getCartaInCima(), this)) {
+            return false;
         }
 
         Ieffetto effetto = cartaSelezionata.getEffetto();
-        RichiestaInput richiesta = effetto.getRichiestaInput(this);
-        // Caso 4: l'effetto ha bisogno di una risposta (per esempio un colore),
-        // ma questa è la prima chiamata; restituisce la richiesta senza giocare la carta.
-        if (richiesta != null && rispostaInput == null) {
-            return EsitoGiocata.inAttesa(richiesta);
+        if (effetto.getRichiestaInput(this) != null) {
+            mettiInAttesa(effetto, risposta -> completaGiocata(cartaSelezionata, risposta));
+            return true;
         }
-        // Caso 5: la risposta non rispetta l'effetto. Se è previsto un input,
-        // lascia la giocata in attesa; altrimenti rifiuta la mossa.
-        if (!effetto.validaRispostaInput(rispostaInput, this)) {
-            return richiesta == null
-                    ? EsitoGiocata.completata(false)
-                    : EsitoGiocata.inAttesa(richiesta);
-        }
+        completaGiocata(cartaSelezionata, null);
+        return true;
+    }
 
-        giocatoreAttivo.estraiCarta(indiceCarta);
-        pilaDegliScarti.aggiungiCarta(cartaSelezionata);
-        
-        // Caso 6: le carte colorate aggiornano subito il colore attivo.
-        // Una carta nera delegando all'effetto di impostare il colore scelto.
-        if (cartaSelezionata.getColore() != Colore.NERO) { 
-            coloreAttuale = cartaSelezionata.getColore();
+    /**
+     * Unico punto d'ingresso per rispondere a qualunque richiesta di input
+     * (colore della carta iniziale, colore di un jolly, in futuro bersagli e
+     * abilità). Valida la risposta con l'effetto in attesa (Information Expert) e,
+     * se è valida, esegue il completamento salvato nell'{@link AzioneInAttesa}.
+     *
+     * <p>Prima di eseguirlo la fase torna a {@link FaseTurno#NORMALE}: è il
+     * completamento a decidere la fase successiva (attesa UNO, fine partita, turno
+     * del prossimo giocatore...).</p>
+     *
+     * @return true se la risposta è stata accettata; false se non si è in attesa
+     *         di input o se la risposta non è valida (la richiesta resta aperta)
+     */
+    public boolean rispondiInput(String risposta) {
+        if (fase != FaseTurno.ATTESA_INPUT) {
+            return false;
         }
-        cartaAppenaPescata = null;
-        cartaPescataDaGiocare = false;
-        effetto.attivaEffetto(this, rispostaInput);
-        // Caso 7: se la giocata lascia il giocatore senza carte, termina la partita.
-        if (regole.isVincitore(giocatoreAttivo, this)) {
-            vincitore = giocatoreAttivo;
-            return EsitoGiocata.completata(true);
+        AzioneInAttesa azione = azioneInAttesa;
+        if (!azione.effetto().validaRispostaInput(risposta, this)) {
+            return false;
         }
-        boolean richiedeDichiarazioneUno = avevaDueCarte
-                && giocatoreAttivo.getMano().size() == 1;
-        // Caso 8: con una sola carta in mano, attende la dichiarazione UNO prima di passare il turno.
-        if (richiedeDichiarazioneUno) {
-            giocatoreInAttesaDichiarazioneUno = giocatoreAttivo;
-            return EsitoGiocata.richiedeDichiarazioneUno();
-        }
-        aggiornaGiocatoreAttivo();
-        return EsitoGiocata.completata(true);
+        azioneInAttesa = null;
+        fase = FaseTurno.NORMALE;
+        azione.completamento().accept(risposta);
+        return true;
     }
 
     /**
      * Completa la finestra di dichiarazione UNO dopo una giocata valida.
+     * Permesso solo in {@link FaseTurno#ATTESA_UNO}; il giocatore in attesa è
+     * sempre quello attivo, perché il turno non è ancora avanzato. Se UNO non è
+     * stato dichiarato, le regole applicano la penalità, che passa da
+     * {@link #applicaPescaForzata} e quindi produce il proprio evento.
      *
-     * @return true se e stata applicata la penalita per mancata dichiarazione
+     * @return true se il comando è stato accettato
      */
     public boolean completaDichiarazioneUno(boolean unoDichiarato) {
-        if (giocatoreInAttesaDichiarazioneUno == null) {
+        if (fase != FaseTurno.ATTESA_UNO) {
             return false;
         }
-        Giocatore giocatore = giocatoreInAttesaDichiarazioneUno;
-        giocatoreInAttesaDichiarazioneUno = null;
-        boolean mancatoUno = regole.mancatoUno(giocatore, unoDichiarato, this);
-        aggiornaGiocatoreAttivo();
-        return mancatoUno;
-    }
-
-    public boolean rispondiRichiestaInputIniziale(String rispostaInput) {
-        if (effettoInizialeInAttesa == null || !effettoInizialeInAttesa.validaRispostaInput(rispostaInput, this)) {
-            return false;
+        Giocatore giocatore = getGiocatoreAttivo();
+        if (unoDichiarato) {
+            registraEvento(EventoPartita.unoDichiarato(giocatore));
         }
-
-        Ieffetto effetto = effettoInizialeInAttesa;
-        effettoInizialeInAttesa = null;
-        effetto.attivaEffetto(this, rispostaInput);
-        aggiornaGiocatoreAttivo();
+        regole.mancatoUno(giocatore, unoDichiarato, this);
+        chiudiTurno();
         return true;
     }
 
@@ -209,6 +240,7 @@ public class Partita {
      */
     void applicaColoreScelto(Colore coloreScelto) {
         coloreAttuale = Objects.requireNonNull(coloreScelto, "coloreScelto non puo essere null");
+        registraEvento(EventoPartita.coloreScelto(getGiocatoreAttivo(), coloreScelto));
     }
 
     public Colore getColoreAttuale() {
@@ -224,24 +256,24 @@ public class Partita {
     }
 
     /**
-     * Gestisce la pesca volontaria del giocatore attivo. La rifiuta se la partita
-     * è terminata o se esiste già una carta pescata da risolvere; altrimenti pesca
-     * e registra la carta come unica giocabile prima del passaggio del turno.
+     * Gestisce la pesca volontaria del giocatore attivo. Permessa solo in
+     * {@link FaseTurno#NORMALE}: dopo la pesca la fase diventa
+     * {@link FaseTurno#POST_PESCA}, quindi non si può pescare due volte.
      * Il valore true indica che la richiesta è stata accettata, anche se il mazzo
      * e gli scarti non forniscono una carta.
      *
      * <p>Quante carte pescare lo decide la strategia di pesca volontaria delle
-     * regole; la carta giocabile subito è l'ultima pescata.</p>
+     * regole; la carta mostrata come "appena pescata" è l'ultima.</p>
      */
     public boolean pescaCarta() {
-        if (vincitore != null || cartaPescataDaGiocare
-                || giocatoreInAttesaDichiarazioneUno != null) {
+        if (fase != FaseTurno.NORMALE) {
             return false;
         }
-
-        List<Carta> cartePescate = regole.pescaVolontaria(getGiocatoreAttivo(), this);
+        Giocatore giocatore = getGiocatoreAttivo();
+        List<Carta> cartePescate = regole.pescaVolontaria(giocatore, this);
+        registraEvento(EventoPartita.pescaVolontaria(giocatore, cartePescate.size()));
         cartaAppenaPescata = cartePescate.isEmpty() ? null : cartePescate.get(cartePescate.size() - 1);
-        cartaPescataDaGiocare = true;
+        fase = FaseTurno.POST_PESCA;
         return true;
     }
 
@@ -249,8 +281,8 @@ public class Partita {
      * Pesca una carta per il giocatore indicato. Se il mazzo è vuoto, prova a
      * ricostituirlo rimescolando gli scarti (la carta in cima resta agli scarti)
      * e riprova. Aggiunge la carta alla mano solo se ne ha trovata una.
-     * Non modifica lo stato del turno o della carta appena pescata, così può
-     * essere riutilizzato anche per effetti e penalità.
+     * Non modifica lo stato del turno né registra eventi, così può essere
+     * riutilizzato da pesca volontaria, effetti e penalità.
      */
     public Carta pescaSingola(Giocatore giocatore) {
         Objects.requireNonNull(giocatore, "giocatore non puo essere null");
@@ -272,6 +304,10 @@ public class Partita {
      * regole quante carte vanno pescate davvero in base al contesto, poi le pesca
      * una alla volta fermandosi se mazzo e scarti sono esauriti.
      *
+     * <p>Essendo l'unico punto, è anche l'unico in cui registrare l'evento
+     * {@link TipoEvento#PESCA_FORZATA}: ogni causa di pesca presente e futura viene
+     * comunicata alla UI senza toccare gli effetti.</p>
+     *
      * @return le carte effettivamente pescate
      */
     public List<Carta> applicaPescaForzata(Giocatore bersaglio, int numeroCarte, OriginePesca origine) {
@@ -286,37 +322,107 @@ public class Partita {
             }
             cartePescate.add(carta);
         }
+        registraEvento(EventoPartita.pescaForzata(bersaglio, cartePescate.size(), origine));
         return cartePescate;
     }
 
     /**
-     * GRASP Coordinator: gestisce il cambio turno tramite self-message dedicato.
-     */
-    /**
-     * Consente di passare solo dopo una pesca e solo finché la partita è attiva.
-     * Se il controllo passa, elimina lo stato della carta pescata e aggiorna il
-     * giocatore attivo; altrimenti non modifica la partita.
+     * Consente di passare solo in {@link FaseTurno#POST_PESCA}, cioè dopo una
+     * pesca volontaria.
      */
     public boolean passaTurno() {
-        if (vincitore != null || !cartaPescataDaGiocare
-                || giocatoreInAttesaDichiarazioneUno != null) {
+        if (fase != FaseTurno.POST_PESCA) {
             return false;
         }
-
-        cartaAppenaPescata = null;
-        cartaPescataDaGiocare = false;
-        aggiornaGiocatoreAttivo();
+        chiudiTurno();
         return true;
     }
 
     /**
-     * Avanza al giocatore successivo. Se un effetto ha richiesto di saltare il
-     * prossimo turno, consuma il flag e avanza una seconda volta.
+     * Inverte il senso di avanzamento dei turni, come richiesto dall'effetto
+     * della carta cambio giro.
      */
-    public void aggiornaGiocatoreAttivo() {
+    public void cambioGiro() {
+        this.sensoOrario = !sensoOrario; // Inverte il senso di gioco
+        registraEvento(EventoPartita.sensoInvertito());
+    }
+
+    /**
+     * Calcola il prossimo giocatore rispettando il senso corrente, senza
+     * modificare l'indice del giocatore attivo. È usato dagli effetti che
+     * agiscono sul giocatore successivo, come la pescata forzata.
+     */
+    public Giocatore getProssimoGiocatore() {
+        if (sensoOrario) {
+            return giocatori.get((indiceGiocatoreAttivo + 1) % giocatori.size());
+        } else {
+            return giocatori.get((indiceGiocatoreAttivo - 1 + giocatori.size()) % giocatori.size());
+        }
+    }
+
+    /**
+     * Sospende un'azione in attesa di risposta e porta il turno in
+     * {@link FaseTurno#ATTESA_INPUT}. È l'unico modo in cui Partita apre una
+     * richiesta di input.
+     */
+    private void mettiInAttesa(Ieffetto effetto, Consumer<String> completamento) {
+        azioneInAttesa = new AzioneInAttesa(effetto, completamento);
+        fase = FaseTurno.ATTESA_INPUT;
+    }
+
+    /**
+     * Parte finale di una giocata, comune al caso con e senza input: sposta la
+     * carta negli scarti, applica l'effetto e decide la fase successiva
+     * (vittoria, finestra UNO, oppure turno del prossimo giocatore).
+     */
+    private void completaGiocata(Carta carta, String risposta) {
+        Giocatore giocatoreAttivo = getGiocatoreAttivo();
+        boolean avevaDueCarte = giocatoreAttivo.getMano().size() == 2;
+        giocatoreAttivo.rimuoviCarta(carta);
+        pilaDegliScarti.aggiungiCarta(carta);
+
+        // Le carte colorate aggiornano subito il colore attivo;
+        // per una carta nera è l'effetto a impostare il colore scelto.
+        if (carta.getColore() != Colore.NERO) {
+            coloreAttuale = carta.getColore();
+        }
+        cartaAppenaPescata = null;
+        carta.getEffetto().attivaEffetto(this, risposta);
+
+        if (regole.isVincitore(giocatoreAttivo, this)) {
+            vincitore = giocatoreAttivo;
+            fase = FaseTurno.TERMINATA;
+            return;
+        }
+        // Con una sola carta in mano, il turno resta al giocatore finché non dichiara UNO.
+        if (avevaDueCarte && giocatoreAttivo.getMano().size() == 1) {
+            fase = FaseTurno.ATTESA_UNO;
+            return;
+        }
+        chiudiTurno();
+    }
+
+    /**
+     * Chiude il turno del giocatore attivo: azzera i dati del turno, riporta la
+     * fase a {@link FaseTurno#NORMALE} e passa al giocatore successivo.
+     */
+    private void chiudiTurno() {
+        cartaAppenaPescata = null;
+        fase = FaseTurno.NORMALE;
+        aggiornaGiocatoreAttivo();
+    }
+
+    /**
+     * Avanza al giocatore successivo. Se un effetto ha richiesto di saltare il
+     * prossimo turno, consuma il flag, registra l'evento e avanza una seconda volta.
+     * È privato: l'avanzamento passa sempre da un comando che ha già controllato
+     * la fase.
+     */
+    private void aggiornaGiocatoreAttivo() {
         avanzaGiocatore();
         if (saltaProssimoTurno) {
             saltaProssimoTurno = false;
+            registraEvento(EventoPartita.turnoSaltato(getGiocatoreAttivo()));
             avanzaGiocatore();
         }
     }
@@ -331,25 +437,6 @@ public class Partita {
             indiceGiocatoreAttivo = (indiceGiocatoreAttivo + 1) % giocatori.size();
         } else {
             indiceGiocatoreAttivo = (indiceGiocatoreAttivo - 1 + giocatori.size()) % giocatori.size();
-        }
-    }
-    /**
-     * Inverte il senso di avanzamento dei turni, come richiesto dall'effetto
-     * della carta cambio giro.
-     */
-    public void cambioGiro(){
-        this.sensoOrario = !sensoOrario; // Inverte il senso di gioco
-    }
-    /**
-     * Calcola il prossimo giocatore rispettando il senso corrente, senza
-     * modificare l'indice del giocatore attivo. È usato dagli effetti che
-     * agiscono sul giocatore successivo, come la pescata forzata.
-     */
-    public Giocatore getProssimoGiocatore() {
-        if (sensoOrario) {
-            return giocatori.get((indiceGiocatoreAttivo + 1) % giocatori.size());
-        } else {
-            return giocatori.get((indiceGiocatoreAttivo - 1 + giocatori.size()) % giocatori.size());
         }
     }
 }

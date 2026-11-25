@@ -11,7 +11,7 @@ public class Effetto_Cambia_colore implements Ieffetto {
 
     @Override
     public RichiestaInput getRichiestaInput(Partita partita) {
-        return new RichiestaInput("Scegli il colore da assegnare alla carta:",
+        return new RichiestaInput(TipoRichiesta.SCELTA_COLORE,
                 List.of(Colore.ROSSO.getNome(), Colore.VERDE.getNome(),
                         Colore.BLU.getNome(), Colore.GIALLO.getNome()));
     }
