@@ -1,16 +1,23 @@
 package unolegends.ui;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import unolegends.controller.RichiestaInputDto;
 import unolegends.controller.StatoPartitaDto;
 import unolegends.controller.UnoLegendsGame;
 
 /**
- * Punto di avvio CLI per provare il caso d'uso GiocaTurno in una partita demo.
+ * Punto di avvio CLI (hotseat, da 2 a 6 giocatori).
+ *
+ * <p>Prima il menu di setup (modalità, opzioni, giocatori), poi il ciclo del
+ * caso d'uso GiocaTurno. La CLI non conosce le regole: le modalità e le opzioni
+ * da proporre le elenca il controller, e la validità delle scelte la verifica il
+ * model.</p>
  */
 public final class UnoLegendsCli {
     private UnoLegendsCli() {
@@ -20,26 +27,26 @@ public final class UnoLegendsCli {
         System.out.println("UnoLegends - CLI");
         System.out.println();
 
-        // Menù iniziale indicizzato: scala per future opzioni (0 avvia partita)
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
             System.out.println("Menu iniziale:");
-            System.out.println("0) Avvia partita demo standard (2 giocatori)");
+            System.out.println("0) Nuova partita");
             System.out.println("1) Esci");
             System.out.print("> ");
-            String sceltaIniziale = reader.readLine().trim();
+            String sceltaIniziale = leggiRiga(reader);
             if ("1".equals(sceltaIniziale)) {
                 System.out.println("Uscita.");
                 return;
             }
             if (!"0".equals(sceltaIniziale)) {
-                System.out.println("Scelta non valida. Digita '0' per avviare oppure '1' per uscire.");
+                System.out.println("Scelta non valida. Digita '0' per iniziare oppure '1' per uscire.");
                 return;
             }
 
             // GRASP Controller: UnoLegendsGame rimane pura facade per i comandi di controller
-            UnoLegendsGame controller = UnoLegendsGame.avviaPartitaStandard();
+            UnoLegendsGame controller = configuraPartita(reader);
 
-            System.out.println("Demo base: puoi giocare una carta dalla mano oppure pescare; dopo la pesca puoi giocare una carta o passare.");
+            System.out.println();
+            System.out.println("Puoi giocare una carta dalla mano oppure pescare; dopo la pesca puoi giocare una carta o passare.");
             System.out.println("Le carte in mano sono numerate da 0 in poi e vengono mostrate come 'numero colore'.");
             System.out.println("Il sistema mostra automaticamente lo stato dopo ogni scelta.");
             System.out.println();
@@ -51,9 +58,9 @@ public final class UnoLegendsCli {
                 StatoPartitaDto stato = controller.richiediStato();
                 // La fase la decide il model: la CLI non la deduce da più flag, sceglie solo
                 // come presentarla. Lo switch è esaustivo: una fase nuova va gestita qui.
-                continua = switch (stato.getFase()) {
+                continua = switch (stato.fase()) {
                     case TERMINATA -> {
-                        System.out.println("Partita terminata. Vince " + stato.getNomeVincitore() + "!");
+                        mostraClassifica(stato);
                         yield false;
                     }
                     case ATTESA_INPUT -> {
@@ -72,6 +79,114 @@ public final class UnoLegendsCli {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Menu di setup
+    // ------------------------------------------------------------------
+
+    /**
+     * Raccoglie le scelte del setup e avvia la partita. Ordine: modalità, opzioni
+     * (una domanda sì/no ciascuna), numero e nomi dei giocatori. Se le scelte non
+     * sono valide (per esempio Endless con 2 giocatori) mostra il motivo, scritto
+     * dal controller, e ripete il setup. Le scelte si verificano prima di avviare
+     * la partita: il controller restituisce la frase d'errore oppure null.
+     */
+    private static UnoLegendsGame configuraPartita(BufferedReader reader) throws IOException {
+        while (true) {
+            System.out.println();
+            System.out.println("=== Nuova partita ===");
+            String modalita = scegliModalita(reader);
+            Set<String> opzioniAttive = scegliOpzioni(reader, modalita);
+            List<String> nomi = scegliGiocatori(reader);
+            String errore = UnoLegendsGame.verificaImpostazioni(modalita, opzioniAttive, nomi);
+            if (errore == null) {
+                return UnoLegendsGame.avviaPartita(modalita, opzioniAttive, nomi);
+            }
+            System.out.println("Impostazioni non valide: " + errore);
+            System.out.println("Ripetiamo la configurazione.");
+        }
+    }
+
+    private static String scegliModalita(BufferedReader reader) throws IOException {
+        List<String> modalita = UnoLegendsGame.getModalitaDisponibili();
+        if (modalita.size() == 1) {
+            System.out.println("Modalita: " + modalita.get(0));
+            return modalita.get(0);
+        }
+        while (true) {
+            System.out.println("Scegli la modalita:");
+            for (int i = 0; i < modalita.size(); i++) {
+                System.out.println(i + ") " + modalita.get(i));
+            }
+            System.out.print("> ");
+            Integer indice = parseIndice(leggiRiga(reader));
+            if (indice != null && indice < modalita.size()) {
+                return modalita.get(indice);
+            }
+            System.out.println("Scelta non valida.");
+        }
+    }
+
+    private static Set<String> scegliOpzioni(BufferedReader reader, String modalita) throws IOException {
+        Set<String> attive = new HashSet<>();
+        for (String opzione : UnoLegendsGame.getOpzioniConfigurabili(modalita)) {
+            System.out.println(opzione + ": " + UnoLegendsGame.descriviOpzione(opzione) + ".");
+            if (chiediSiNo(reader, "Attivare " + opzione + "?")) {
+                attive.add(opzione);
+            }
+        }
+        return attive;
+    }
+
+    private static List<String> scegliGiocatori(BufferedReader reader) throws IOException {
+        int minimo = UnoLegendsGame.getMinimoGiocatori();
+        int massimo = UnoLegendsGame.getMassimoGiocatori();
+        int numero;
+        while (true) {
+            System.out.print("Numero di giocatori (" + minimo + "-" + massimo + "): ");
+            Integer letto = parseIndice(leggiRiga(reader));
+            if (letto != null && letto >= minimo && letto <= massimo) {
+                numero = letto;
+                break;
+            }
+            System.out.println("Valore non valido.");
+        }
+        List<String> nomi = new ArrayList<>();
+        for (int i = 1; i <= numero; i++) {
+            String predefinito = "Giocatore" + i;
+            System.out.print("Nome del giocatore " + i + " (invio = " + predefinito + "): ");
+            String nome = leggiRiga(reader);
+            nomi.add(nome.isEmpty() ? predefinito : nome);
+        }
+        return nomi;
+    }
+
+    private static boolean chiediSiNo(BufferedReader reader, String domanda) throws IOException {
+        while (true) {
+            System.out.print(domanda + " (s/n): ");
+            String risposta = leggiRiga(reader);
+            if ("s".equalsIgnoreCase(risposta)) {
+                return true;
+            }
+            if ("n".equalsIgnoreCase(risposta)) {
+                return false;
+            }
+            System.out.println("Rispondi 's' oppure 'n'.");
+        }
+    }
+
+    /** Legge una riga senza spazi esterni; se l'input finisce (Ctrl+Z / Ctrl+D) chiude la CLI con IOException. */
+    private static String leggiRiga(BufferedReader reader) throws IOException {
+        String riga = reader.readLine();
+        if (riga == null) {
+            throw new IOException("Input terminato.");
+        }
+        return riga.trim();
+    }
+
+    // ------------------------------------------------------------------
+    // Partita in corso
+    // ------------------------------------------------------------------
+
     /**
      * Inizio del turno: il giocatore può giocare una carta, pescare oppure uscire.
      *
@@ -82,7 +197,7 @@ public final class UnoLegendsCli {
         mostraStato(stato);
         System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci");
         System.out.print("> ");
-        String scelta = reader.readLine().trim();
+        String scelta = leggiRiga(reader);
 
         if ("2".equals(scelta)) {
             return false;
@@ -90,7 +205,7 @@ public final class UnoLegendsCli {
         if ("0".equals(scelta)) {
             System.out.println("Digita l'indice della carta da giocare.");
             System.out.print("> ");
-            giocaCarta(reader.readLine().trim(), controller);
+            giocaCarta(leggiRiga(reader), controller);
             return true;
         }
         if ("1".equals(scelta)) {
@@ -110,12 +225,12 @@ public final class UnoLegendsCli {
     private static boolean turnoDopoPesca(StatoPartitaDto stato, UnoLegendsGame controller,
                                           BufferedReader reader) throws IOException {
         mostraStato(stato);
-        if (stato.getCartaAppenaPescata() != null) {
-            System.out.println("Carta pescata: " + stato.getCartaAppenaPescata());
+        if (stato.cartaAppenaPescata() != null) {
+            System.out.println("Carta pescata: " + stato.cartaAppenaPescata());
         }
         System.out.println("Scegli: indica l'indice della carta che vuoi giocare oppure 'p' per passare il turno.");
         System.out.print("> ");
-        String scelta = reader.readLine().trim();
+        String scelta = leggiRiga(reader);
         if ("p".equalsIgnoreCase(scelta)) {
             System.out.println(controller.passaTurno() ? "Turno passato." : "Passaggio turno non consentito.");
             return true;
@@ -144,8 +259,8 @@ public final class UnoLegendsCli {
      */
     private static void gestisciRichiestaInput(StatoPartitaDto stato, UnoLegendsGame controller,
                                                BufferedReader reader) throws IOException {
-        System.out.println(stato.getNomeGiocatoreAttivo() + ", rispondi:");
-        String risposta = richiediInput(reader, stato.getRichiestaInput());
+        System.out.println(stato.nomeGiocatoreAttivo() + ", rispondi:");
+        String risposta = richiediInput(reader, stato.richiestaInput());
         if (!controller.rispondiInput(risposta)) {
             System.out.println("Risposta non valida. Riprova.");
         }
@@ -158,14 +273,30 @@ public final class UnoLegendsCli {
      */
     private static void mostraStato(StatoPartitaDto stato) {
         System.out.println();
-        System.out.println("Giocatore attivo: " + stato.getNomeGiocatoreAttivo());
-        System.out.println("Carta in cima: " + (stato.getCartaInCima() == null ? "nessuna" : stato.getCartaInCima()));
+        System.out.println("Giocatori (senso " + (stato.sensoOrario() ? "orario" : "antiorario") + "):");
+        for (StatoPartitaDto.Giocatore giocatore : stato.giocatori()) {
+            System.out.println((giocatore.diTurno() ? " > " : "   ") + giocatore.nome()
+                    + " - " + giocatore.numeroCarte() + (giocatore.numeroCarte() == 1 ? " carta" : " carte")
+                    + " (" + giocatore.stato() + ")");
+        }
+        System.out.println("Giocatore attivo: " + stato.nomeGiocatoreAttivo());
+        System.out.println("Carta in cima: " + (stato.cartaInCima() == null ? "nessuna" : stato.cartaInCima()));
         System.out.println("Mano:");
-        List<String> mano = stato.getManoGiocatoreAttivo();
+        List<String> mano = stato.mano();
         for (int i = 0; i < mano.size(); i++) {
             System.out.println(i + ") " + mano.get(i));
         }
         System.out.println();
+    }
+
+    private static void mostraClassifica(StatoPartitaDto stato) {
+        System.out.println();
+        System.out.println("Partita terminata. Vince " + stato.nomeVincitore() + "!");
+        System.out.println("Classifica:");
+        List<String> classifica = stato.classifica();
+        for (int i = 0; i < classifica.size(); i++) {
+            System.out.println(" " + (i + 1) + ". " + classifica.get(i));
+        }
     }
 
     /**
@@ -176,15 +307,15 @@ public final class UnoLegendsCli {
      * scelto un colore, ne mostra anche il nome formattato. Senza opzioni,
      * legge e restituisce direttamente la riga inserita dall'utente.
      */
-    private static String richiediInput(BufferedReader reader, RichiestaInputDto richiesta) throws IOException {
-        System.out.println(richiesta.getMessaggio());
-        if (!richiesta.getOpzioni().isEmpty()) {
-            List<String> opzioni = richiesta.getOpzioni();
+    private static String richiediInput(BufferedReader reader, StatoPartitaDto.Richiesta richiesta) throws IOException {
+        System.out.println(richiesta.messaggio());
+        if (!richiesta.opzioni().isEmpty()) {
+            List<String> opzioni = richiesta.opzioni();
             for (int i = 0; i < opzioni.size(); i++) {
                 System.out.println(i + ") " + opzioni.get(i));
             }
             System.out.print("> ");
-            Integer indice = parseIndice(reader.readLine().trim());
+            Integer indice = parseIndice(leggiRiga(reader));
             String scelta = indice != null && indice < opzioni.size()
                     ? opzioni.get(indice)
                     : "nessuna opzione valida";
@@ -192,7 +323,7 @@ public final class UnoLegendsCli {
             return indice != null && indice < opzioni.size() ? opzioni.get(indice) : "";
         }
         System.out.print("> ");
-        return reader.readLine().trim();
+        return leggiRiga(reader);
     }
 
     private static String formattaOpzione(String opzione) {
@@ -219,7 +350,7 @@ public final class UnoLegendsCli {
             long fineAttesa = System.currentTimeMillis() + 1000;
             while (System.currentTimeMillis() < fineAttesa) {
                 if (reader.ready()) {
-                    return "uno".equalsIgnoreCase(reader.readLine().trim());
+                    return "uno".equalsIgnoreCase(leggiRiga(reader));
                 }
                 try {
                     Thread.sleep(50);

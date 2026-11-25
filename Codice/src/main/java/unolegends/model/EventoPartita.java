@@ -20,7 +20,8 @@ import java.util.Objects;
  *
  * @param tipo          cosa è successo
  * @param nomeGiocatore il giocatore coinvolto ({@code null} per {@link TipoEvento#SENSO_INVERTITO})
- * @param quantita      numero di carte, per le pesche; 0 altrimenti
+ * @param quantita      numero di carte, per le pesche; posizione in classifica, per
+ *                      {@link TipoEvento#GIOCATORE_TERMINATO}; 0 altrimenti
  * @param origine       causa della pesca forzata, solo per {@link TipoEvento#PESCA_FORZATA}
  * @param colore        colore scelto, solo per {@link TipoEvento#COLORE_SCELTO}
  */
@@ -55,5 +56,13 @@ public record EventoPartita(TipoEvento tipo, String nomeGiocatore, int quantita,
 
     static EventoPartita unoDichiarato(Giocatore giocatore) {
         return new EventoPartita(TipoEvento.UNO_DICHIARATO, giocatore.getNome(), 0, null, null);
+    }
+
+    static EventoPartita giocatoreTerminato(Giocatore giocatore, int posizione) {
+        return new EventoPartita(TipoEvento.GIOCATORE_TERMINATO, giocatore.getNome(), posizione, null, null);
+    }
+
+    static EventoPartita giocatoreEliminato(Giocatore giocatore) {
+        return new EventoPartita(TipoEvento.GIOCATORE_ELIMINATO, giocatore.getNome(), 0, null, null);
     }
 }

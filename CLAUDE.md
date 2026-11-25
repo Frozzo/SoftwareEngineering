@@ -1,7 +1,7 @@
 # CLAUDE.md — UnoLegends
 
 Progetto universitario di Ingegneria del Software: **UnoLegends**, variante di UNO in Java
-giocabile da CLI (hotseat, 2 giocatori). Il progetto segue il processo UP a iterazioni
+giocabile da CLI (hotseat, da 2 a 6 giocatori). Il progetto segue il processo UP a iterazioni
 e i principi GRASP/GoF: il design conta quanto il codice funzionante.
 
 ## Lingua e convenzioni
@@ -27,6 +27,7 @@ SoftwareEngineering/
     │   ├── roles_and_patterns.md            # mappa classi → pattern (in parte datata)
     │   ├── ROADMAP.md                       # roadmap di riferimento (7 step)
     │   ├── step2_seconda_iter.md            # resoconto dello Step 2: cosa e perché
+│   ├── step3_terza_iter.md              # resoconto dello Step 3: cosa e perché
     │   ├── GiocaTurno_Step2_SequenceDiagram.puml
     │   └── refactoring_e_update_soluzioni.md # roadmap/proposte di refactoring futuro
     └── src/main/java/unolegends/
@@ -51,8 +52,13 @@ Per verificare una modifica, ricompilare con il comando sopra; `out/` è un outp
 ## Architettura (MVC + GRASP)
 
 **Regola fondamentale: la UI non importa mai classi di `unolegends.model`.**
-Comunica solo con `UnoLegendsGame` e riceve DTO immutabili (`StatoPartitaDto`,
-`RichiestaInputDto`, `FaseTurnoDto`) e messaggi già tradotti (`prelevaMessaggi()`).
+Comunica solo con `UnoLegendsGame` e riceve **un solo DTO**, il record `StatoPartitaDto`, con i
+tipi interni `StatoPartitaDto.Fase`, `.Richiesta` e `.Giocatore`, più i messaggi già tradotti (`prelevaMessaggi()`).
+Non aggiungere file DTO separati: un pezzo nuovo dello stato diventa un campo o un tipo interno di
+`StatoPartitaDto`. Il setup usa **solo stringhe**: `getModalitaDisponibili()`, `getOpzioniConfigurabili(m)`,
+`descriviOpzione(o)`, `verificaImpostazioni(m, opzioni, nomi)` (frase d'errore oppure `null`) e
+`avviaPartita(m, opzioni, nomi)`. **Niente classi di eccezione nostre** (scelta dell'utente): gli errori
+previsti si restituiscono (`boolean`, `null`, enum), gli errori di programmazione usano le eccezioni di Java.
 Il controller converte model → DTO (es. `formattaCarta`, `convertiFase`) e scrive tutti i
 testi (frasi delle richieste, messaggi degli eventi): il model non produce testo.
 Ogni nuovo dato da mostrare alla UI passa da un DTO.
@@ -81,16 +87,42 @@ Flusso: `UnoLegendsCli` → `UnoLegendsGame` (Facade) → `Partita` (Coordinator
     È stato scelto un registro "pull" e **non** un Observer. Per un evento nuovo: valore in
     `TipoEvento`, factory in `EventoPartita`, caso nello `switch` di `UnoLegendsGame.descriviEvento`.
   - L'avanzamento del turno è centralizzato in `aggiornaGiocatoreAttivo()` (privato; gestisce salto e senso).
+    "Chi viene dopo" lo calcola **solo** `trovaProssimoIndiceInGioco(...)`, che salta i giocatori non
+    `IN_GIOCO`: non scrivere `(i ± 1) % n` altrove.
+  - **`StatoGiocatore`** (`IN_GIOCO`, `TERMINATO`, `ELIMINATO`) sta in `Giocatore`. Si chiama `IN_GIOCO`
+    e non `ATTIVO` perché "giocatore attivo" = giocatore di turno. Chi esce resta nella lista `giocatori`.
+  - **Fine partita:** chi finisce le carte → `registraTerminato` → `verificaFinePartita()` chiede a
+    `RegoleDiGioco.isPartitaTerminata` (`IStrategiaFinePartita`: Standard o Endless). A fine partita
+    `concludiPartita()` stila la `classifica` (terminati, poi in gioco per numero di carte, poi eliminati
+    dal più recente); il vincitore è il primo. `eliminaGiocatore` (package-private) è pronto per lo Step 4.
   - Metodi package-private (`applicaColoreScelto`, `segnalaSaltoTurno`, `registraEvento`) sono usati
     dagli effetti nello stesso package `model`.
-- **`RegoleDiGioco`** — contenitore delle strategie (punto di variazione protetto). `standard()`
-  crea il profilo di default. Strategie: vittoria, sconfitta, compatibilità, pesca, penalità UNO.
-- **`PartitaFactory`** — crea la partita: mazzo da `MazzoFactory`, 7 carte a testa, prima carta
-  sugli scarti. Se la prima carta richiede input inizia il giocatore 0.
+- **`RegoleDiGioco`** — contenitore delle strategie (punto di variazione protetto). Si crea con
+  un metodo statico per modalità che riceve le opzioni: `standard(Set<OpzionePartita>)` (e allo
+  Step 4 `noMercy(...)`); `standard()` = senza opzioni. Strategie: vittoria, sconfitta,
+  compatibilità, pesca, penalità UNO, fine partita. **Niente Builder per ora** (scelta dell'utente:
+  `builder()...build()` è meno leggibile); da rivalutare quando le strategie cresceranno.
+  Un'opzione nuova = valore in `OpzionePartita` + una riga nel metodo della modalità + testi nel controller.
+- **Configurazione (Step 3)** — `ModalitaDiGioco` (enum di **soli dati**: `MazzoFactory` + opzioni
+  obbligatorie; oggi solo `NORMALE`) e `OpzionePartita` (enum di soli dati; oggi solo `ENDLESS`)
+  non contengono logica. `ConfigurazionePartita` è un `record` che si valida nel costruttore
+  (2–6 giocatori, nomi validi, Endless ≥ 3). La validazione è `ConfigurazionePartita.verifica(...)`, che
+  restituisce un `ErroreConfigurazione` oppure `null`: la frase la scrive il controller. Il costruttore
+  ripete il controllo e lancia una semplice `IllegalArgumentException` (errore di programmazione). Le modalità sono due **per sempre**:
+  non progettare estensibilità sulle modalità, ma sulle regole/opzioni.
+- **`PartitaFactory`** — `creaPartita(ConfigurazionePartita)`: mazzo dalla modalità, regole da
+  `creaRegole(config)` (`switch` esaustivo sulla modalità: è l'unico punto, fuori da `RegoleDiGioco`,
+  in cui si sceglie in base alla modalità), 7 carte a testa con i nomi scelti, prima carta sugli
+  scarti. Se la prima carta richiede input inizia il giocatore 0.
+- Il menu mostra **solo opzioni/modalità già implementate** (Stacking dallo Step 5, Legend dallo
+  Step 6, No Mercy dallo Step 4): la CLI le elenca chiedendole al controller, non le conosce.
 - **`MazzoFactory` / `StandardMazzoFactory`** — Abstract Factory + Singleton. Mazzo UNO standard
   da 108 carte (numeri, +2, blocca, cambia giro, cambia colore, +4).
-- **Carte** — `Carta` (astratta) → `CartaNumero`, `CartaSpeciale`. Ogni carta ha un `Ieffetto`
-  (le numeriche usano `Effetto_Nullo`, Null Object). `Colore` include `NERO` per le jolly e
+- **Carte** — un'unica classe concreta e `final` **`Carta`** (colore, valore, effetto). `CartaNumero` e
+  `CartaSpeciale` sono state eliminate (2026-11-25): erano identiche, e il comportamento di una carta
+  dipende solo dal suo `Ieffetto` (composizione al posto dell'ereditarietà). `new Carta(colore, valore)`
+  usa `Effetto_Nullo` (Null Object), `new Carta(colore, valore, effetto)` per le altre. Non
+  reintrodurre sottoclassi di `Carta` per far variare il comportamento: si cambia l'effetto. `Colore` include `NERO` per le jolly e
   gestisce la colorazione ANSI. `ValoreCarta` è l'enum dei valori.
 - **Effetti (`Ieffetto`)** — Strategy/Command. Un effetto che richiede input espone
   `getRichiestaInput()` (una `RichiestaInput(TipoRichiesta, opzioni)`, **senza testo**) e
@@ -100,7 +132,7 @@ Flusso: `UnoLegendsCli` → `UnoLegendsGame` (Facade) → `Partita` (Coordinator
 ### Meccaniche da ricordare
 
 - Le carte nere non cambiano `coloreAttuale` da sole: lo imposta l'effetto con il colore scelto.
-  La UI mostra la carta in cima con il colore scelto (`CartaSpeciale.getDescrizioneBreve(Colore)`).
+  La UI mostra la carta in cima con il colore scelto (`Carta.getDescrizioneBreve(Colore)`).
 - Interazione con input: `giocaCarta(i)` → fase `ATTESA_INPUT` → la UI legge la richiesta dallo
   stato e chiama `rispondiInput(risposta)`. Anche la carta iniziale nera usa questo meccanismo.
 - La CLI fa un unico `switch` esaustivo su `stato.getFase()`: non deve dedurre la fase da flag.
@@ -138,7 +170,8 @@ Protected Variations, niente `instanceof`/`if` sul tipo concreto dentro `Partita
 **La roadmap di riferimento è `Codice/docs/ROADMAP.md`** (7 step, con alternative e scelte
 consigliate): seguire quella. I dettagli di design più approfonditi sono in
 `Codice/docs/refactoring_e_update_soluzioni.md`. Dove i due documenti non sono d'accordo vale
-ROADMAP.md: per esempio, Endless non fa parte degli obiettivi.
+ROADMAP.md. **Endless fa parte degli obiettivi** (decisione del 2026-11-25, implementato nello Step 3):
+è un'opzione combinabile con la modalità.
 
 **Avanzamento roadmap:**
 
@@ -152,7 +185,15 @@ ROADMAP.md: per esempio, Endless non fa parte degli obiettivi.
   - registro eventi tipizzato (`EventoPartita` + `TipoEvento`) al posto dell'Observer;
   - le frasi di richieste ed eventi le scrive il controller;
   - `EsitoGiocata`/`EsitoGiocataDto` eliminati: i comandi restituiscono `boolean`.
-- ⏭️ Prossimo: Step 3 (N giocatori, eliminati, configurazione e menu di setup).
+- ✅ Step 3 (N giocatori, stato giocatore, Endless e classifica, configurazione, menu di setup), sul
+  branch `ci-aiuta-claudio`. Resoconto: `Codice/docs/step3_terza_iter.md`. Scelte approvate:
+  - "modalità + opzioni": `ModalitaDiGioco` e `OpzionePartita` enum di soli dati, regole scelte da
+    `RegoleDiGioco.standard(opzioni)`;
+  - nessun Builder (né su `ConfigurazionePartita`, che è un `record`, né su `RegoleDiGioco`);
+  - Endless: chi finisce le carte esce, si gioca fino all'ultimo, classifica finale (≥ 3 giocatori);
+  - menu: modalità → opzioni (sì/no) → numero e nomi dei giocatori.
+- ⏭️ Prossimo: Step 4 (No Mercy: `ModalitaDiGioco.NO_MERCY`, `NoMercyMazzoFactory`,
+  `RegoleDiGioco.noMercy(opzioni)`, Mercy rule che usa `eliminaGiocatore`).
 
 Legenda della difficoltà (classificazione dell'utente):
 
@@ -170,6 +211,7 @@ Ogni giocatore può scegliere un **Legend**, che ha un'abilità **passiva** e un
 - 🟢 **Double card** — puoi giocare due carte nello stesso turno; si implementa come l'effetto "salta tutti".
 - 🟢 **Gifted card** — dai due carte della tua mano, scelte a caso, a un giocatore a tua scelta; il loro effetto non si attiva.
 - 🟢 **Il castigatore** — un giocatore a tua scelta pesca 4 carte.
+- freezer blocca il per due turni un giocatore (il giocatore bloccato non puo essere bersaglio di carte ne scelto da effetti e ovviamente non puo eseguire il suo turno)
 - ❌ **Jolly** — attiva un effetto a tua scelta (scartata).
 
 **Abilità passive** (tutte 🔴)
@@ -179,6 +221,7 @@ Ogni giocatore può scegliere un **Legend**, che ha un'abilità **passiva** e un
 - **Salesman** — quando subisce una penalità di pesca pesca una carta in meno (vedi "Decisioni prese").
 - **Ghost** — non può essere bersaglio degli effetti che scelgono un giocatore a piacere.
 - *(Solo partita normale)* Ogni volta che pesca volontariamente, pesca due carte e sceglie quale tenere.
+- 
 
 ### 2. Modalità No Mercy
 
@@ -244,6 +287,10 @@ Il menu costruisce la configurazione che arriva a `PartitaFactory` (mazzo + `Reg
 
   - non è bersagliabile dagli effetti in cui l'utente sceglie il giocatore (carta 7, Scambia mazzo, Gifted card, Castigatore);
   - è bersagliabile dagli effetti automatici (carta 0, +2 al successivo, ecc.).
+- **Endless:** chi finisce le carte esce e si continua finché resta un solo giocatore; il primo a
+  finire è primo in classifica. Richiede almeno 3 giocatori. È combinabile con entrambe le modalità.
+- **Stacking nella partita normale** (opzione, Step 5): +2 si copre con +2 o +4, +4 solo con +4.
+  In No Mercy lo stacking è sempre attivo (opzione obbligatoria della modalità).
 - **Giocatore eliminato:** le sue carte vengono **subito rimescolate nel mazzo**. Qui ci si discosta dalla regola ufficiale.
 - **Roulette:** il colore lo sceglie chi gioca la carta. Anche qui ci si discosta dalla regola ufficiale. ed l'efffetto passivo del salesman non si attiva
 - Il gioco finale potra essere giocato fino a 6 giocatori ma con i legend per ora se non riusciamo a pensare a 6 legends diversi dobbiamo inventare qualcosa
@@ -251,3 +298,5 @@ Il menu costruisce la configurazione che arriva a `PartitaFactory` (mazzo + `Reg
 ### Ancora da decidere
 
 - Il valore del cooldown di ogni abilità attiva.
+
+per il testing gioca solo 100 partite non di piu

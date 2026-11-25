@@ -6,11 +6,17 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * GRASP Information Expert: gestisce e conosce la propria mano.
+ * GRASP Information Expert: gestisce e conosce la propria mano e il proprio
+ * {@link StatoGiocatore}.
+ *
+ * <p>Lo stato lo cambia solo {@link Partita} (metodi package-private), perché
+ * l'uscita di un giocatore ha conseguenze sul turno e sulla classifica che solo
+ * il Coordinator conosce.</p>
  */
 public class Giocatore {
     private final String nome;
     private final List<Carta> mano;
+    private StatoGiocatore stato = StatoGiocatore.IN_GIOCO;
 
     public Giocatore(String nome, List<Carta> manoIniziale) {
         this.nome = Objects.requireNonNull(nome, "nome non puo essere null");
@@ -19,6 +25,33 @@ public class Giocatore {
 
     public String getNome() {
         return nome;
+    }
+
+    public StatoGiocatore getStato() {
+        return stato;
+    }
+
+    /** true se il giocatore partecipa ancora ai turni. */
+    public boolean isInGioco() {
+        return stato == StatoGiocatore.IN_GIOCO;
+    }
+
+    void segnaComeTerminato() {
+        stato = StatoGiocatore.TERMINATO;
+    }
+
+    void segnaComeEliminato() {
+        stato = StatoGiocatore.ELIMINATO;
+    }
+
+    /**
+     * Toglie tutte le carte dalla mano e le restituisce. Serve all'eliminazione:
+     * le carte dell'eliminato tornano subito nel mazzo (decisione del progetto).
+     */
+    List<Carta> svuotaMano() {
+        List<Carta> carte = new ArrayList<>(mano);
+        mano.clear();
+        return carte;
     }
 
     public List<Carta> getMano() {

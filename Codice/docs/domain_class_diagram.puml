@@ -5,49 +5,49 @@ hide empty members
 scale max 7600 width
 
 package "unolegends.model" {
-  abstract class Carta {
-    +getColore() : Colore
-    +getValoreCarta() : ValoreCarta
-    +getEffetto() : Ieffetto
-    +getDescrizioneBreve() : String
-  }
-
-  class CartaNumero {
+  class Carta <<final>> {
     -colore : Colore
     -valore : ValoreCarta
-    -id : int
     -effetto : Ieffetto
-    +CartaNumero(id : int, colore : Colore, valore : ValoreCarta)
+    +Carta(colore : Colore, valore : ValoreCarta, effetto : Ieffetto)
+    +Carta(colore : Colore, valore : ValoreCarta)
     +getColore() : Colore
     +getValoreCarta() : ValoreCarta
     +getEffetto() : Ieffetto
     +toTestoBase() : String
     +getDescrizioneBreve() : String
+    +getDescrizioneBreve(coloreVisualizzato : Colore) : String
   }
 
-  class CartaSpeciale {
-    -colore : Colore
-    -valoreCarta : ValoreCarta
-    -effetto : Ieffetto
-    +CartaSpeciale(colore : Colore, valoreCarta : ValoreCarta, effetto : Ieffetto)
-    +getColore() : Colore
-    +getValoreCarta() : ValoreCarta
-    +getEffetto() : Ieffetto
-    +attivaEffetto(partita : Partita) : void
-    +toTestoBase() : String
-    +getDescrizioneBreve() : String
-  }
+  note right of Carta
+    Unica classe di carta: il comportamento
+    varia solo tramite l'Ieffetto (Strategy).
+    Le numeriche usano Effetto_Nullo (Null Object).
+    Sostituisce CartaNumero e CartaSpeciale.
+  end note
 
   class Giocatore {
     -nome : String
     -mano : List<Carta>
+    -stato : StatoGiocatore
     +Giocatore(nome : String, manoIniziale : List<Carta>)
     +getNome() : String
+    +getStato() : StatoGiocatore
+    +isInGioco() : boolean
+    ~segnaComeTerminato() : void
+    ~segnaComeEliminato() : void
+    ~svuotaMano() : List<Carta>
     +getMano() : List<Carta>
     +getCartaInPosizione(indiceCarta : int) : Carta
     +estraiCarta(indiceCarta : int) : Carta
     +rimuoviCarta(carta : Carta) : boolean
     +aggiungiCarta(carta : Carta) : void
+  }
+
+  enum StatoGiocatore {
+    IN_GIOCO
+    TERMINATO
+    ELIMINATO
   }
 
   class Mazzo {
@@ -58,6 +58,7 @@ package "unolegends.model" {
     +getNumeroCarteRestanti() : int
     +mischia() : void
     +rimescolaDaScarti(pilaDegliScarti : PilaDegliScarti) : void
+    +aggiungiCarteERimescola(nuoveCarte : Collection<Carta>) : void
   }
 
   class PilaDegliScarti {
@@ -78,7 +79,9 @@ package "unolegends.model" {
     -fase : FaseTurno
     -azioneInAttesa : AzioneInAttesa
     -cartaAppenaPescata : Carta
-    -vincitore : Giocatore
+    -terminati : List<Giocatore>
+    -eliminati : List<Giocatore>
+    -classifica : List<Giocatore>
     -giocoIniziato : boolean
     -saltaProssimoTurno : boolean
     -coloreAttuale : Colore
@@ -92,6 +95,13 @@ package "unolegends.model" {
     +getCartaAppenaPescata() : Carta
     +getRichiestaInputInAttesa() : RichiestaInput
     +getNomeVincitore() : String
+    +getGiocatori() : List<Giocatore>
+    +getAvversariInGioco() : List<Giocatore>
+    +getNumeroGiocatoriInGioco() : int
+    +getNumeroGiocatoriTerminati() : int
+    +getGiocatoriTerminati() : List<Giocatore>
+    +getClassifica() : List<Giocatore>
+    +isSensoOrario() : boolean
     +getIndiceGiocatoreAttivo() : int
     +getPilaDegliScarti() : PilaDegliScarti
     +prelevaEventi() : List<EventoPartita>
@@ -108,11 +118,16 @@ package "unolegends.model" {
     +passaTurno() : boolean
     +cambioGiro() : void
     +getProssimoGiocatore() : Giocatore
+    ~eliminaGiocatore(giocatore : Giocatore) : void
     -mettiInAttesa(effetto : Ieffetto, completamento : Consumer<String>) : void
     -completaGiocata(carta : Carta, risposta : String) : void
+    -registraTerminato(giocatore : Giocatore) : void
+    -verificaFinePartita() : void
+    -concludiPartita() : void
     -chiudiTurno() : void
     -aggiornaGiocatoreAttivo() : void
     -avanzaGiocatore() : void
+    -trovaProssimoIndiceInGioco(daIndice : int) : int
   }
 
   enum FaseTurno {
@@ -135,6 +150,8 @@ package "unolegends.model" {
     SENSO_INVERTITO
     COLORE_SCELTO
     UNO_DICHIARATO
+    GIOCATORE_TERMINATO
+    GIOCATORE_ELIMINATO
   }
 
   class EventoPartita <<record>> {
@@ -151,14 +168,17 @@ package "unolegends.model" {
     -strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte
     -strategiaPescaVolontaria : IStrategiaPesca
     -strategiaPenalitaUno : IStrategiaPenalitaUno
-    +RegoleDiGioco(strategiaVittoria : IStrategiaCondizioneVittoria, strategiaSconfitta : IStrategiaCondizioneSconfitta, strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte, strategiaPescaVolontaria : IStrategiaPesca, strategiaPenalitaUno : IStrategiaPenalitaUno)
+    -strategiaFinePartita : IStrategiaFinePartita
+    +RegoleDiGioco(strategiaVittoria : IStrategiaCondizioneVittoria, strategiaSconfitta : IStrategiaCondizioneSconfitta, strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte, strategiaPescaVolontaria : IStrategiaPesca, strategiaPenalitaUno : IStrategiaPenalitaUno, strategiaFinePartita : IStrategiaFinePartita)
     +isGiocabile(giocatore : Giocatore, candidata : Carta, inCima : Carta, partita : Partita) : boolean
     +isVincitore(giocatore : Giocatore, partita : Partita) : boolean
     +isEliminato(giocatore : Giocatore, partita : Partita) : boolean
+    +isPartitaTerminata(partita : Partita) : boolean
     +pescaVolontaria(giocatore : Giocatore, partita : Partita) : List<Carta>
     +calcolaCartePescaForzata(contesto : ContestoPesca) : int
     +mancatoUno(giocatore : Giocatore, unoDichiarato : boolean, partita : Partita) : boolean
     +{static} standard() : RegoleDiGioco
+    +{static} standard(opzioni : Set<OpzionePartita>) : RegoleDiGioco
   }
 
   interface Ieffetto {
@@ -245,10 +265,45 @@ package "unolegends.model" {
 
   class PartitaFactory {
     -{static} CARTE_PER_GIOCATORE : int
-    +{static} creaRegoleStandard() : RegoleDiGioco
-    +{static} creaPartita(mazzoFactory : MazzoFactory, numeroDiGiocatori : int, regole : RegoleDiGioco) : Partita
-    -{static} distribuisciCarteAiGiocatori(mazzo : Mazzo, numeroDiGiocatori : int) : List<Giocatore>
+    +{static} creaPartita(config : ConfigurazionePartita) : Partita
+    +{static} creaPartita(mazzoFactory : MazzoFactory, nomiGiocatori : List<String>, regole : RegoleDiGioco) : Partita
+    -{static} creaRegole(config : ConfigurazionePartita) : RegoleDiGioco
+    -{static} distribuisciCarteAiGiocatori(mazzo : Mazzo, nomiGiocatori : List<String>) : List<Giocatore>
   }
+
+  enum ModalitaDiGioco {
+    NORMALE
+    --
+    -mazzoFactory : MazzoFactory
+    -opzioniObbligatorie : Set<OpzionePartita>
+    +getMazzoFactory() : MazzoFactory
+    +getOpzioniObbligatorie() : Set<OpzionePartita>
+    +isConfigurabile(opzione : OpzionePartita) : boolean
+  }
+
+  enum OpzionePartita {
+    ENDLESS
+  }
+
+  class ConfigurazionePartita <<record>> {
+    +modalita : ModalitaDiGioco
+    +nomiGiocatori : List<String>
+    +opzioni : Set<OpzionePartita>
+    +{static} MIN_GIOCATORI : int
+    +{static} MAX_GIOCATORI : int
+    +{static} MIN_GIOCATORI_ENDLESS : int
+    +{static} verifica(modalita : ModalitaDiGioco, nomiGiocatori : List<String>, opzioni : Set<OpzionePartita>) : ErroreConfigurazione
+    +haOpzione(opzione : OpzionePartita) : boolean
+    +numeroGiocatori() : int
+  }
+
+  enum ErroreConfigurazione {
+    NUMERO_GIOCATORI_NON_VALIDO
+    NOME_VUOTO
+    NOMI_DUPLICATI
+    GIOCATORI_INSUFFICIENTI_PER_ENDLESS
+  }
+
 
   enum Colore {
     ROSSO
@@ -288,14 +343,8 @@ package "unolegends.model" {
     +{static} fromInt(numero : int) : ValoreCarta
     +{static} fromString(testo : String) : ValoreCarta
   }
-
-  enum TipoMazzo {
-    STANDARD
-  }
 }
 
-Carta <|-- CartaNumero
-Carta <|-- CartaSpeciale
 Ieffetto <|.. Effetto_Nullo
 Ieffetto <|.. Effetto_Cambia_colore
 Ieffetto <|.. Effetto_pescata_carte
@@ -304,12 +353,9 @@ Ieffetto <|.. Effetto_cambio_giro
 Ieffetto <|.. EffettoComposito
 MazzoFactory <|.. StandardMazzoFactory
 
-CartaNumero --> "1" Colore
-CartaNumero --> "1" ValoreCarta
-CartaNumero --> "1" Ieffetto : effetto
-CartaSpeciale --> "1" Colore
-CartaSpeciale --> "1" ValoreCarta
-CartaSpeciale --> "1" Ieffetto : effetto
+Carta --> "1" Colore
+Carta --> "1" ValoreCarta
+Carta --> "1" Ieffetto : effetto
 EffettoComposito --> "1..*" Ieffetto : effetti
 Effetto_Cambia_colore ..> RichiestaInput : crea
 
@@ -328,7 +374,15 @@ AzioneInAttesa --> "1" Ieffetto : effetto
 EventoPartita --> "1" TipoEvento : tipo
 EventoPartita --> "0..1" OriginePesca : origine
 EventoPartita --> "0..1" Colore : colore
-Partita "1" --> "0..1" Giocatore : vincitore
+Partita "1" --> "0..*" Giocatore : classifica
+Giocatore --> "1" StatoGiocatore : stato
+ModalitaDiGioco --> "1" MazzoFactory : mazzoFactory
+ModalitaDiGioco --> "0..*" OpzionePartita : opzioniObbligatorie
+ConfigurazionePartita --> "1" ModalitaDiGioco : modalita
+ConfigurazionePartita --> "0..*" OpzionePartita : opzioni
+ConfigurazionePartita ..> ErroreConfigurazione : verifica restituisce
+PartitaFactory ..> ConfigurazionePartita : traduce
+RegoleDiGioco ..> OpzionePartita : sceglie le strategie
 Partita "1" --> "0..1" Colore : coloreAttuale
 RichiestaInput --> "1" TipoRichiesta : tipo
 
@@ -337,8 +391,7 @@ PartitaFactory ..> RegoleDiGioco : configura
 PartitaFactory ..> Partita : crea
 PartitaFactory ..> Giocatore : crea
 StandardMazzoFactory ..> Mazzo : crea
-StandardMazzoFactory ..> CartaNumero : crea
-StandardMazzoFactory ..> CartaSpeciale : crea
+StandardMazzoFactory ..> Carta : crea
 Mazzo ..> PilaDegliScarti : rimescola da scarti
 Effetto_pescata_carte ..> Partita : pesca e salta turno
 Effetto_pescata_carte --> "1" OriginePesca : origine
@@ -351,7 +404,9 @@ Effetto_cambio_giro ..> Partita : cambia giro
 Effetto_Cambia_colore ..> Partita : applica colore
 
 note right of RegoleDiGioco
-  Le interfacce IStrategia* sono dichiarate nel package
+  Le interfacce IStrategia* (compresa IStrategiaFinePartita:
+  StrategiaFinePartitaStandard / StrategiaFinePartitaEndless)
+  sono dichiarate nel package
   unolegends.domain.rules, esterno al model, e qui sono
   riportate come tipi degli attributi senza espanderne
   le classi.

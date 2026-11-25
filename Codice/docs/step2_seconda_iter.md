@@ -140,7 +140,7 @@ Cambia il significato di un valore di ritorno: `completaDichiarazioneUno` restit
 
 ### 2.6 Controller e CLI
 
-- [`FaseTurnoDto`](../src/main/java/unolegends/controller/FaseTurnoDto.java) è una copia dell'enum per la UI, che non può importare il model. La conversione `convertiFase` è uno `switch` esaustivo: una fase nuova nel model che non viene aggiunta anche qui fa fallire la compilazione.
+- `FaseTurnoDto` (dallo Step 3 è il tipo interno `StatoPartitaDto.Fase`) è una copia dell'enum per la UI, che non può importare il model. La conversione `convertiFase` è uno `switch` esaustivo: una fase nuova nel model che non viene aggiunta anche qui fa fallire la compilazione.
 - `StatoPartitaDto` ha `getFase()` al posto di `isDeveGiocareCartaPescata()` e `isPartitaTerminata()`.
 - [`UnoLegendsCli`](../src/main/java/unolegends/ui/UnoLegendsCli.java), a ogni giro:
 

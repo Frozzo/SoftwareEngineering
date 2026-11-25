@@ -1,6 +1,8 @@
 package unolegends.model;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -13,6 +15,12 @@ import java.util.function.Consumer;
  * richieste di input passano tutte da {@link AzioneInAttesa} e
  * {@link #rispondiInput(String)}; ciò che accade durante il turno viene registrato
  * come {@link EventoPartita} e letto dalla UI con {@link #prelevaEventi()}.</p>
+ *
+ * <p>Gestisce da 2 a 6 giocatori. Un giocatore esce dai turni quando finisce le
+ * carte ({@link StatoGiocatore#TERMINATO}) o viene eliminato
+ * ({@link StatoGiocatore#ELIMINATO}). Quando la partita finisce lo decidono le
+ * regole ({@code IStrategiaFinePartita}): così la stessa Partita gestisce sia la
+ * partita normale sia Endless senza sapere quale delle due è attiva.</p>
  */
 public class Partita {
     private final List<Giocatore> giocatori;
@@ -24,7 +32,12 @@ public class Partita {
     private FaseTurno fase = FaseTurno.NORMALE;
     private AzioneInAttesa azioneInAttesa;
     private Carta cartaAppenaPescata;
-    private Giocatore vincitore;
+    /** Giocatori che hanno finito le carte, nell'ordine in cui hanno finito. */
+    private final List<Giocatore> terminati = new ArrayList<>();
+    /** Giocatori eliminati, in ordine di eliminazione. */
+    private final List<Giocatore> eliminati = new ArrayList<>();
+    /** Classifica finale; vuota finché la partita non è {@link FaseTurno#TERMINATA}. */
+    private List<Giocatore> classifica = List.of();
     private boolean giocoIniziato;
     /**
      * Non è una fase del turno ma un'informazione per il prossimo avanzamento:
@@ -117,8 +130,50 @@ public class Partita {
         return fase == FaseTurno.ATTESA_INPUT ? azioneInAttesa.effetto().getRichiestaInput(this) : null;
     }
 
+    /** Primo della classifica, oppure null se la partita non è finita. */
     public String getNomeVincitore() {
-        return vincitore == null ? null : vincitore.getNome();
+        return classifica.isEmpty() ? null : classifica.get(0).getNome();
+    }
+
+    /** Tutti i giocatori, in ordine di turno, qualunque sia il loro stato. */
+    public List<Giocatore> getGiocatori() {
+        return Collections.unmodifiableList(giocatori);
+    }
+
+    /**
+     * Avversari del giocatore attivo che sono ancora in gioco. Servirà agli
+     * effetti con scelta del bersaglio (carta 7, abilità dei Legend).
+     */
+    public List<Giocatore> getAvversariInGioco() {
+        Giocatore attivo = getGiocatoreAttivo();
+        return giocatori.stream().filter(g -> g != attivo && g.isInGioco()).toList();
+    }
+
+    public int getNumeroGiocatoriInGioco() {
+        return (int) giocatori.stream().filter(Giocatore::isInGioco).count();
+    }
+
+    public int getNumeroGiocatoriTerminati() {
+        return terminati.size();
+    }
+
+    /** Giocatori che hanno già finito le carte, nell'ordine in cui hanno finito (posizione = indice + 1). */
+    public List<Giocatore> getGiocatoriTerminati() {
+        return Collections.unmodifiableList(terminati);
+    }
+
+    /**
+     * Classifica finale, dal primo all'ultimo; vuota finché la partita non è finita.
+     * Ordine: chi ha finito le carte (nell'ordine in cui hanno finito), poi chi era ancora in
+     * gioco (meno carte in mano = posizione migliore), poi gli eliminati (l'ultimo
+     * eliminato davanti al primo).
+     */
+    public List<Giocatore> getClassifica() {
+        return classifica;
+    }
+
+    public boolean isSensoOrario() {
+        return sensoOrario;
     }
 
     public int getIndiceGiocatoreAttivo() {
@@ -348,16 +403,34 @@ public class Partita {
     }
 
     /**
-     * Calcola il prossimo giocatore rispettando il senso corrente, senza
+     * Calcola il prossimo giocatore in gioco rispettando il senso corrente, senza
      * modificare l'indice del giocatore attivo. È usato dagli effetti che
      * agiscono sul giocatore successivo, come la pescata forzata.
      */
     public Giocatore getProssimoGiocatore() {
-        if (sensoOrario) {
-            return giocatori.get((indiceGiocatoreAttivo + 1) % giocatori.size());
-        } else {
-            return giocatori.get((indiceGiocatoreAttivo - 1 + giocatori.size()) % giocatori.size());
+        return giocatori.get(trovaProssimoIndiceInGioco(indiceGiocatoreAttivo));
+    }
+
+    /**
+     * Elimina un giocatore: le sue carte tornano subito nel mazzo, che viene
+     * rimescolato (decisione del progetto), e il giocatore finisce in fondo alla
+     * classifica. Se resta un solo giocatore in gioco la partita termina.
+     *
+     * <p>Package-private e preparato per lo Step 4: con le regole attuali
+     * ({@code StrategiaSconfittaStandard}) nessuno viene eliminato. Lo Step 4
+     * aggiungerà il controllo dopo ogni pesca e gestirà i casi in cui
+     * l'eliminato è il giocatore di turno o quello che doveva saltare il turno.</p>
+     */
+    void eliminaGiocatore(Giocatore giocatore) {
+        Objects.requireNonNull(giocatore, "giocatore non puo essere null");
+        if (!giocatore.isInGioco()) {
+            return;
         }
+        mazzo.aggiungiCarteERimescola(giocatore.svuotaMano());
+        giocatore.segnaComeEliminato();
+        eliminati.add(giocatore);
+        registraEvento(EventoPartita.giocatoreEliminato(giocatore));
+        verificaFinePartita();
     }
 
     /**
@@ -390,8 +463,11 @@ public class Partita {
         carta.getEffetto().attivaEffetto(this, risposta);
 
         if (regole.isVincitore(giocatoreAttivo, this)) {
-            vincitore = giocatoreAttivo;
-            fase = FaseTurno.TERMINATA;
+            registraTerminato(giocatoreAttivo);
+            // In Endless la partita può continuare: il turno passa al prossimo in gioco.
+            if (fase != FaseTurno.TERMINATA) {
+                chiudiTurno();
+            }
             return;
         }
         // Con una sola carta in mano, il turno resta al giocatore finché non dichiara UNO.
@@ -400,6 +476,44 @@ public class Partita {
             return;
         }
         chiudiTurno();
+    }
+
+    /**
+     * Il giocatore ha finito le carte: esce dai turni, prende il prossimo posto
+     * in classifica e si chiede alle regole se la partita è finita.
+     */
+    private void registraTerminato(Giocatore giocatore) {
+        giocatore.segnaComeTerminato();
+        terminati.add(giocatore);
+        registraEvento(EventoPartita.giocatoreTerminato(giocatore, terminati.size()));
+        verificaFinePartita();
+    }
+
+    /**
+     * Chiede alle regole se la partita è finita e, in quel caso, la conclude.
+     * È chiamato ogni volta che un giocatore esce di scena.
+     */
+    private void verificaFinePartita() {
+        if (regole.isPartitaTerminata(this)) {
+            concludiPartita();
+        }
+    }
+
+    /** Stila la classifica (ordine descritto in {@link #getClassifica()}) e chiude la partita. */
+    private void concludiPartita() {
+        List<Giocatore> risultato = new ArrayList<>(terminati);
+        giocatori.stream()
+                .filter(Giocatore::isInGioco)
+                .sorted(Comparator.comparingInt(g -> g.getMano().size()))
+                .forEach(risultato::add);
+        List<Giocatore> eliminatiDalPiuRecente = new ArrayList<>(eliminati);
+        Collections.reverse(eliminatiDalPiuRecente);
+        risultato.addAll(eliminatiDalPiuRecente);
+
+        classifica = List.copyOf(risultato);
+        azioneInAttesa = null;
+        cartaAppenaPescata = null;
+        fase = FaseTurno.TERMINATA;
     }
 
     /**
@@ -427,16 +541,30 @@ public class Partita {
         }
     }
 
-    /**
-     * Aggiorna l'indice del giocatore attivo secondo il senso di gioco.
-     * L'aritmetica circolare mantiene l'indice entro i limiti della lista anche
-     * quando si supera il primo o l'ultimo giocatore.
-     */
+    /** Passa il turno al prossimo giocatore in gioco secondo il senso di gioco. */
     private void avanzaGiocatore() {
-        if (sensoOrario) {
-            indiceGiocatoreAttivo = (indiceGiocatoreAttivo + 1) % giocatori.size();
-        } else {
-            indiceGiocatoreAttivo = (indiceGiocatoreAttivo - 1 + giocatori.size()) % giocatori.size();
+        indiceGiocatoreAttivo = trovaProssimoIndiceInGioco(indiceGiocatoreAttivo);
+    }
+
+    /**
+     * Unico punto che calcola "chi viene dopo": parte da {@code daIndice} e
+     * avanza nel senso di gioco saltando i giocatori terminati o eliminati. Prima
+     * {@code avanzaGiocatore} e {@code getProssimoGiocatore} usavano ciascuno
+     * {@code (i ± 1) % n}, che dava per scontato che nessuno uscisse dalla partita.
+     *
+     * <p>Se nessun altro è in gioco restituisce {@code daIndice}: succede solo a
+     * partita finita.</p>
+     */
+    private int trovaProssimoIndiceInGioco(int daIndice) {
+        int numeroGiocatori = giocatori.size();
+        int passo = sensoOrario ? 1 : -1;
+        int indice = daIndice;
+        for (int tentativi = 0; tentativi < numeroGiocatori; tentativi++) {
+            indice = Math.floorMod(indice + passo, numeroGiocatori);
+            if (giocatori.get(indice).isInGioco()) {
+                return indice;
+            }
         }
+        return daIndice;
     }
 }

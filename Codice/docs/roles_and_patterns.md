@@ -53,7 +53,7 @@ Classi e responsabilità
   - Responsabilità: esporre API semplici alla UI, tradurre stato e richieste in DTO del controller, tradurre gli eventi della partita in messaggi e coordinare i comandi di gioco con la `Partita`.
   - Mantiene un riferimento persistente a `Partita` (associazione 1); le API UI-facing non espongono tipi del model.
 
-- StatoPartitaDto, RichiestaInputDto e FaseTurnoDto
+- StatoPartitaDto (record con i tipi interni Fase, Richiesta e Giocatore: dallo Step 3 è l'unico DTO)
   - Responsabilità: trasferire alla UI snapshot (con la fase del turno) e richieste interattive usando solo dati immutabili indipendenti dal model.
 
 - FaseTurno, AzioneInAttesa, EventoPartita / TipoEvento (Step 2)

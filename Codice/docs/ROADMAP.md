@@ -3,8 +3,11 @@
 **Obiettivo finale:** una partita giocabile da CLI. Dal menu iniziale si sceglie:
 
 - **la modalità:** partita normale oppure partita **No Mercy**;
-- **il numero di giocatori;**
-- **se giocare con i Legend.** In quel caso ogni giocatore sceglie il proprio personaggio, che ha un'abilità passiva e un'abilità attiva.
+- **le opzioni**, con una domanda sì/no ciascuna:
+  - **Stacking** (solo in partita normale: in No Mercy è sempre attivo);
+  - **Endless:** chi finisce le carte esce, si continua finché resta un solo giocatore e alla fine si stila la classifica;
+  - **Legend:** ogni giocatore sceglie il proprio personaggio, che ha un'abilità passiva e un'abilità attiva;
+- **il numero di giocatori** (2–6) e i loro nomi.
 
 Questo documento riassume **cosa** implementare, in **che ordine**, **come**, quali **alternative** sono state considerate e quale è **consigliata**.
 I dettagli di design più approfonditi sono in [`refactoring_e_update_soluzioni.md`](refactoring_e_update_soluzioni.md).
@@ -29,8 +32,8 @@ Le regole di gioco e le decisioni prese sono in [`CLAUDE.md`](../../CLAUDE.md), 
 |---|---|---|
 | 1 | Fondamenta del dominio: pesca forzata unica, `OriginePesca`, `Ieffetto` con `Partita` | ✅ fatto (branch `ci-aiuta-claudio`) |
 | 2 | Fasi del turno, input unificato, comunicazione degli eventi alla UI | ✅ fatto (branch `ci-aiuta-claudio`) |
-| 3 | N giocatori, giocatori eliminati, configurazione e menu di setup | ⏭️ prossimo |
-| 4 | Modalità No Mercy: regole speciali e carte nuove | da fare |
+| 3 | N giocatori, giocatori eliminati, Endless, configurazione e menu di setup | ✅ fatto (branch `ci-aiuta-claudio`) |
+| 4 | Modalità No Mercy: regole speciali e carte nuove | ⏭️ prossimo |
 | 5 | Stacking delle carte di pesca | da fare |
 | 6 | Legend: abilità passive, abilità attive con cooldown, scelta nel menu | da fare |
 | 7 | Rifinitura: test, casi limite, bilanciamento, documentazione | da fare |
@@ -113,9 +116,25 @@ C'era anche un difetto: `pescaCarta()` non controllava `effettoInizialeInAttesa`
 
 ---
 
-## Step 3 — N giocatori, giocatori eliminati, configurazione e menu
+## Step 3 — N giocatori, giocatori eliminati, configurazione e menu ✅
 
-### Cosa fare
+Fatto. Resoconto completo (cosa è stato fatto e perché): [`step3_terza_iter.md`](step3_terza_iter.md).
+
+Scelte approvate:
+- **3.A rivista: "modalità + opzioni".** Le modalità sono due e lo resteranno; ciò che crescerà sono le regole. Quindi:
+  - `ModalitaDiGioco` è un enum **di soli dati** (mazzo e opzioni obbligatorie);
+  - `OpzionePartita` è un enum di soli dati (oggi `ENDLESS`);
+  - le regole le sceglie `RegoleDiGioco.standard(opzioni)`, e allo Step 4 `RegoleDiGioco.noMercy(opzioni)`.
+- **3.B rivista: niente Builder, per ora.**
+  - `ConfigurazionePartita` è un `record` che si valida nel costruttore.
+  - Il Builder è stato valutato anche su `RegoleDiGioco` e scartato per ora: `builder()...build()` è meno leggibile di `RegoleDiGioco.standard(opzioni)` finché le strategie sono poche. Va rivalutato agli Step 5–6.
+- **Endless è un obiettivo.** Chi finisce le carte esce (`StatoGiocatore.TERMINATO`) e si continua finché resta un solo giocatore; alla fine si stila la classifica. Il primo che ha finito le carte è il primo in classifica. Richiede almeno 3 giocatori.
+- **Revisione dopo lo Step 3:** un solo DTO (`StatoPartitaDto`, record con i tipi interni `Fase`, `Richiesta`, `Giocatore`); il setup usa solo stringhe; nessuna classe di eccezione nostra (`ConfigurazionePartita.verifica` e `UnoLegendsGame.verificaImpostazioni` restituiscono l'errore oppure `null`); lo stato `TERMINATO` si chiama `TERMINATO`.
+- Nel menu compaiono **solo le opzioni già implementate:** Stacking dallo Step 5, Legend dallo Step 6, No Mercy dallo Step 4.
+
+Il piano originale, per confronto:
+
+### Cosa fare (piano originale)
 1. **Stato del giocatore:** enum `StatoGiocatore` (`ATTIVO`, `ELIMINATO`).
    - Scorrimento dei turni sicuro: un unico helper `trovaProssimoIndiceAttivo(...)` usato sia da `avanzaGiocatore()` sia da `getProssimoGiocatore()`. Oggi entrambi usano `(i ± 1) % n`, che dà per scontato che nessuno esca.
    - `Partita.getAvversariAttivi()` servirà agli effetti con scelta del giocatore.
@@ -137,7 +156,9 @@ C'era anche un difetto: `pescaCarta()` non controllava `effettoInizialeInAttesa`
 | 3.A2 Enum `ModalitaDiGioco` con metodi | `NORMALE`, `NO_MERCY`; ogni valore sa creare il proprio `MazzoFactory` e il proprio `RegoleDiGioco` | Compatto, un solo punto di scelta, facile da elencare nel menu | Aggiungere una modalità vuol dire modificare l'enum (accettabile: le modalità sono poche e note) |
 | 3.A3 Abstract Factory "profilo di modalità" | Interfaccia `ProfiloModalita` (`creaMazzoFactory()`, `creaRegole()`) con una classe per modalità | Massima estensibilità (Open/Closed) | Più classi per lo stesso risultato |
 
-**Opinione:** **3.A2.** Le modalità sono due e chiuse: l'enum è la soluzione più semplice e non sparge `if`. `TipoMazzo`, che oggi non usa nessuno, si può eliminare o assorbire nell'enum. Se un giorno le modalità diventassero combinabili (per esempio Endless + No Mercy), si passa a 3.A3 senza toccare `Partita`.
+**Opinione iniziale:** **3.A2.** Le modalità sono due e chiuse: l'enum è la soluzione più semplice e non sparge `if`. `TipoMazzo`, che oggi non usa nessuno, si può eliminare o assorbire nell'enum. Se un giorno le modalità diventassero combinabili (per esempio Endless + No Mercy), si passa a 3.A3 senza toccare `Partita`.
+
+**Scelta approvata:** una variante della 3.A2, cioè **modalità + opzioni combinabili.** L'enum non crea niente: contiene solo dati. Le regole le sceglie `RegoleDiGioco.standard(opzioni)`. `TipoMazzo` è stato eliminato.
 
 ### Scelta 3.B — Come costruire la configurazione
 
@@ -146,7 +167,9 @@ C'era anche un difetto: `pescaCarta()` non controllava `effettoInizialeInAttesa`
 | Costruttore con tutti i parametri | Semplice | Illeggibile quando i parametri crescono (Legend per giocatore…) |
 | **Builder (GoF)** | Leggibile; valida tutto in `build()` (numero di giocatori, Legend duplicati, ecc.) | Una classe in più |
 
-**Opinione:** **Builder.** È il caso d'uso da manuale e tiene la validazione fuori dalla CLI.
+**Opinione iniziale:** **Builder.** È il caso d'uso da manuale e tiene la validazione fuori dalla CLI.
+
+**Scelta approvata:** **niente Builder.** `ConfigurazionePartita` è un `record` con la validazione nel costruttore: ha pochi campi, e le opzioni nuove finiscono in un `Set`. Anche `RegoleDiGioco` resta senza Builder, con un metodo statico per modalità che riceve le opzioni. Il Builder si rivaluta quando le strategie aumenteranno.
 
 ---
 
@@ -172,7 +195,7 @@ C'era anche un difetto: `pescaCarta()` non controllava `effettoInizialeInAttesa`
 | **Jolly roulette colore** | `EffettoRoulette`: chi gioca sceglie il colore (decisione presa); il successivo pesca una carta alla volta finché esce quel colore, tiene tutto e salta il turno; `OriginePesca.ROULETTE`; il controllo dei 25 carte avviene **durante** la pesca |
 
 Modifiche necessarie al modello delle carte:
-- `CartaNumero` oggi crea `Effetto_Nullo` da sola. Va aggiunto un costruttore che riceve l'effetto, così la factory No Mercy può dare un effetto allo 0 e al 7.
+- ~~`CartaNumero` oggi crea `Effetto_Nullo` da sola. Va aggiunto un costruttore che riceve l'effetto.~~ **Già risolto:** `CartaNumero` e `CartaSpeciale` sono state unificate in un'unica classe `Carta` (vedi [`step3_terza_iter.md`](step3_terza_iter.md), §8). La factory No Mercy crea lo 0 e il 7 con `new Carta(colore, valore, effetto)`.
 - Nuovi valori in `ValoreCarta`: `SCARTA_TUTTO`, `SALTA_TUTTI`, `CAMBIO_GIRO_PIU_QUATTRO`, `PIU_SEI`, `PIU_DIECI`, `ROULETTE`.
 
 ### Casi limite da gestire
@@ -198,7 +221,9 @@ Il mazzo ufficiale ha 168 carte, ma le quantità per tipo non le abbiamo trovate
 
 ## Step 5 — Stacking (+2 / +4 / +6 / +10)
 
-### Regola (No Mercy)
+### Regola (No Mercy, e opzione Stacking della partita normale)
+- In No Mercy lo stacking è **sempre attivo**: è un'opzione obbligatoria di `ModalitaDiGioco.NO_MERCY`. Nella partita normale è l'**opzione** `OpzionePartita.STACKING`, che si aggiunge all'enum in questo step.
+- Nella partita normale (decisione presa): un +2 si copre con un +2 o un +4, un +4 solo con un +4. È la stessa regola "valore uguale o superiore".
 - Si risponde a una carta di pesca con una carta di pesca di **valore uguale o superiore**. Il Jolly cambio giro +4 vale 4.
 - L'accumulo passa al giocatore successivo.
 - Chi non risponde pesca tutto il totale e salta il turno.
@@ -308,7 +333,7 @@ Da decidere: la combinazione fra passive e attive è libera oppure ogni Legend h
 
 ### Menu
 Al setup:
-1. si chiede "Giocare con i Legend? s/n";
+1. si chiede "Giocare con i Legend? s/n". È l'opzione `OpzionePartita.LEGEND`, che si aggiunge all'enum in questo step: il menu la mostra da solo, perché elenca le opzioni configurabili;
 2. se sì, ogni giocatore sceglie dall'elenco, che il controller espone come stringhe.
 
 Durante la partita la CLI mostra il Legend di ogni giocatore e il cooldown, e aggiunge la voce di menu "usa abilità".
@@ -344,6 +369,8 @@ Durante la partita la CLI mostra il Legend di ogni giocatore e il cooldown, e ag
 | 5 | Gifted card che svuota la mano | vale come vittoria |
 | 6 | Coppie passiva/attiva fisse o libere | fisse |
 | 7 | Introdurre Maven + JUnit e quando | sì, entro lo Step 4 |
+| 8 | Cambio giro con 2 giocatori in gioco: vale come blocco (regola ufficiale)? Oggi non fa saltare il turno | da decidere |
+| 9 | Builder per `RegoleDiGioco` quando le strategie cresceranno | da rivalutare agli Step 5–6 |
 
 ## Pattern usati, a lavori finiti
 
@@ -353,10 +380,10 @@ Durante la partita la CLI mostra il Legend di ogni giocatore e il cooldown, e ag
 | DTO | comunicazione controller → UI |
 | Command | `AzioneInAttesa`: azione sospesa in attesa di input (Step 2) |
 | Pure Fabrication | registro eventi `EventoPartita` verso la UI (Step 2) |
-| Strategy | `RegoleDiGioco` (vittoria, sconfitta, compatibilità, pesca, penalità UNO, accumulo), `Ieffetto` |
+| Strategy | `RegoleDiGioco` (vittoria, sconfitta, compatibilità, pesca, penalità UNO, fine partita normale/Endless, accumulo), `Ieffetto` |
 | Composite | `EffettoComposito` (+4, Jolly +6/+10, cambio giro +4) |
 | Null Object | `Effetto_Nullo`, `PassivaNulla` |
 | Abstract Factory + Singleton | `MazzoFactory`, `StandardMazzoFactory`, `NoMercyMazzoFactory` |
-| Builder | `ConfigurazionePartita` |
+| Builder | non usato per ora (vedi scelta 3.B); candidato `RegoleDiGioco` agli Step 5–6 |
 | State (opzionale) | fasi del turno di `Partita` |
 | Protected Variations / Information Expert / Coordinator (GRASP) | `RegoleDiGioco`, effetti, `Partita` |

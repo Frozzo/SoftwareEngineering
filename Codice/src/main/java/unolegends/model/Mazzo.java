@@ -37,6 +37,16 @@ public class Mazzo {
         carte.addAll(listaTemporanea);
     }
     /**
+     * Aggiunge delle carte al mazzo e lo rimescola. Serve quando un giocatore
+     * viene eliminato: le sue carte tornano subito in circolo, così il mazzo non
+     * si esaurisce (decisione del progetto, diversa dalla regola ufficiale).
+     */
+    public void aggiungiCarteERimescola(Collection<Carta> nuoveCarte) {
+        carte.addAll(Objects.requireNonNull(nuoveCarte, "nuoveCarte non puo essere null"));
+        mischia();
+    }
+
+    /**
      * Ricostituisce e mescola il mazzo usando gli scarti, preservando la carta in cima.
      */
     public void rimescolaDaScarti(PilaDegliScarti pilaDegliScarti) {

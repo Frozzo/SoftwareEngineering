@@ -1,20 +1,25 @@
 package unolegends.controller;
 
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import unolegends.model.Carta;
-import unolegends.model.CartaSpeciale;
 import unolegends.model.Colore;
+import unolegends.model.ConfigurazionePartita;
+import unolegends.model.ErroreConfigurazione;
 import unolegends.model.EventoPartita;
 import unolegends.model.FaseTurno;
+import unolegends.model.Giocatore;
+import unolegends.model.ModalitaDiGioco;
+import unolegends.model.OpzionePartita;
 import unolegends.model.OriginePesca;
 import unolegends.model.Partita;
 import unolegends.model.PartitaFactory;
-import unolegends.model.RegoleDiGioco;
 import unolegends.model.RichiestaInput;
-import unolegends.model.StandardMazzoFactory;
 import unolegends.model.TipoRichiesta;
 
 /**
@@ -22,25 +27,147 @@ import unolegends.model.TipoRichiesta;
  *
  * <p>Oltre a inoltrare i comandi a {@link Partita}, fa da traduttore verso la
  * presentazione: converte le carte in testo, la fase del model in
- * {@link FaseTurnoDto}, il {@link TipoRichiesta} in una frase e gli
+ * {@link StatoPartitaDto.Fase}, il {@link TipoRichiesta} in una frase e gli
  * {@link EventoPartita} in messaggi. Così il model non contiene testi di
  * interfaccia e la UI non importa il model.</p>
+ *
+ * <p>Dallo Step 3 espone anche il menu di setup, usando solo stringhe: elenca
+ * modalità e opzioni, verifica le scelte ({@link #verificaImpostazioni}) e avvia
+ * la partita ({@link #avviaPartita}). Non servono DTO né eccezioni dedicate: la
+ * verifica restituisce la frase d'errore oppure {@code null}. La CLI non sa quali
+ * opzioni sono obbligatorie in una modalità: le basta chiedere
+ * {@link #getOpzioniConfigurabili(String)}.</p>
  */
 public class UnoLegendsGame {
     private final Partita partita;
 
+    // ------------------------------------------------------------------
+    // Menu di setup
+    // ------------------------------------------------------------------
+
+    /** Nomi delle modalità selezionabili nel menu, nell'ordine in cui mostrarle. */
+    public static List<String> getModalitaDisponibili() {
+        return Arrays.stream(ModalitaDiGioco.values()).map(UnoLegendsGame::nomeModalita).toList();
+    }
+
     /**
-     * Avvia una partita standard e costruisce la Facade del caso d'uso.
-     * La View non deve conoscere la factory del dominio.
+     * Nomi delle opzioni che l'utente può attivare o no nella modalità indicata.
+     * Quelle obbligatorie per la modalità non compaiono: vengono attivate da sole.
      */
-    public static UnoLegendsGame avviaPartitaStandard() {
-        Partita partita = PartitaFactory.creaPartita(
-                StandardMazzoFactory.getInstance(),
-                2,
-                RegoleDiGioco.standard());
+    public static List<String> getOpzioniConfigurabili(String modalita) {
+        ModalitaDiGioco scelta = Objects.requireNonNull(modalitaDaNome(modalita), "modalita sconosciuta");
+        return Arrays.stream(OpzionePartita.values())
+                .filter(scelta::isConfigurabile)
+                .map(UnoLegendsGame::nomeOpzione)
+                .toList();
+    }
+
+    /** Frase che spiega l'opzione, da mostrare prima di chiedere se attivarla. */
+    public static String descriviOpzione(String opzione) {
+        return descrizioneOpzione(Objects.requireNonNull(opzioneDaNome(opzione), "opzione sconosciuta"));
+    }
+
+    public static int getMinimoGiocatori() {
+        return ConfigurazionePartita.MIN_GIOCATORI;
+    }
+
+    public static int getMassimoGiocatori() {
+        return ConfigurazionePartita.MAX_GIOCATORI;
+    }
+
+    /**
+     * Controlla le scelte del menu prima di avviare la partita. La validazione la
+     * fa il model ({@link ConfigurazionePartita#verifica}); qui il motivo viene
+     * tradotto in una frase per l'utente.
+     *
+     * @return la frase da mostrare se le scelte non sono valide, oppure {@code null} se sono valide
+     */
+    public static String verificaImpostazioni(String modalita, Set<String> opzioni, List<String> nomiGiocatori) {
+        ModalitaDiGioco modalitaScelta = modalitaDaNome(modalita);
+        if (modalitaScelta == null) {
+            return "Modalita sconosciuta: " + modalita + ".";
+        }
+        Set<OpzionePartita> opzioniScelte = EnumSet.noneOf(OpzionePartita.class);
+        for (String nome : opzioni) {
+            OpzionePartita opzione = opzioneDaNome(nome);
+            if (opzione == null) {
+                return "Opzione sconosciuta: " + nome + ".";
+            }
+            opzioniScelte.add(opzione);
+        }
+        ErroreConfigurazione errore = ConfigurazionePartita.verifica(modalitaScelta, nomiGiocatori, opzioniScelte);
+        return errore == null ? null : messaggioPer(errore);
+    }
+
+    /**
+     * Crea e avvia la partita descritta dalle scelte del menu. Le scelte vanno
+     * controllate prima con {@link #verificaImpostazioni}: se non sono valide
+     * questo metodo lancia una {@link IllegalArgumentException}, perché è un errore
+     * di programmazione della UI e non un caso da mostrare all'utente.
+     */
+    public static UnoLegendsGame avviaPartita(String modalita, Set<String> opzioni, List<String> nomiGiocatori) {
+        String errore = verificaImpostazioni(modalita, opzioni, nomiGiocatori);
+        if (errore != null) {
+            throw new IllegalArgumentException(errore);
+        }
+        Set<OpzionePartita> opzioniScelte = EnumSet.noneOf(OpzionePartita.class);
+        opzioni.forEach(nome -> opzioniScelte.add(opzioneDaNome(nome)));
+        ConfigurazionePartita config = new ConfigurazionePartita(modalitaDaNome(modalita), nomiGiocatori, opzioniScelte);
+
+        Partita partita = PartitaFactory.creaPartita(config);
         partita.iniziaGioco();
         return new UnoLegendsGame(partita);
     }
+
+    private static String nomeModalita(ModalitaDiGioco modalita) {
+        return switch (modalita) {
+            case NORMALE -> "Standard";
+        };
+    }
+
+    private static String nomeOpzione(OpzionePartita opzione) {
+        return switch (opzione) {
+            case ENDLESS -> "Endless";
+        };
+    }
+
+    private static String descrizioneOpzione(OpzionePartita opzione) {
+        return switch (opzione) {
+            case ENDLESS -> "chi finisce le carte esce e si continua fino all'ultimo, poi si stila la classifica"
+                    + " (almeno " + ConfigurazionePartita.MIN_GIOCATORI_ENDLESS + " giocatori)";
+        };
+    }
+
+    /** La modalità con quel nome, oppure null se non esiste. */
+    private static ModalitaDiGioco modalitaDaNome(String nome) {
+        return Arrays.stream(ModalitaDiGioco.values())
+                .filter(m -> nomeModalita(m).equalsIgnoreCase(nome))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** L'opzione con quel nome, oppure null se non esiste. */
+    private static OpzionePartita opzioneDaNome(String nome) {
+        return Arrays.stream(OpzionePartita.values())
+                .filter(o -> nomeOpzione(o).equalsIgnoreCase(nome))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static String messaggioPer(ErroreConfigurazione errore) {
+        return switch (errore) {
+            case NUMERO_GIOCATORI_NON_VALIDO -> "Il numero di giocatori deve essere tra "
+                    + ConfigurazionePartita.MIN_GIOCATORI + " e " + ConfigurazionePartita.MAX_GIOCATORI + ".";
+            case NOME_VUOTO -> "Il nome di un giocatore non puo essere vuoto.";
+            case NOMI_DUPLICATI -> "Due giocatori non possono avere lo stesso nome.";
+            case GIOCATORI_INSUFFICIENTI_PER_ENDLESS -> "La modalita Endless richiede almeno "
+                    + ConfigurazionePartita.MIN_GIOCATORI_ENDLESS + " giocatori.";
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Partita in corso
+    // ------------------------------------------------------------------
 
     UnoLegendsGame(Partita partita) {
         this.partita = Objects.requireNonNull(partita, "partita non puo essere null");
@@ -57,7 +184,26 @@ public class UnoLegendsGame {
                 formattaCarta(partita.getPilaDegliScarti().getCartaInCima(), partita.getColoreAttuale()),
                 formattaCarta(partita.getCartaAppenaPescata()),
                 convertiRichiesta(partita.getRichiestaInputInAttesa()),
-                partita.getNomeVincitore());
+                convertiGiocatori(),
+                partita.isSensoOrario(),
+                partita.getClassifica().stream().map(Giocatore::getNome).toList());
+    }
+
+    private List<StatoPartitaDto.Giocatore> convertiGiocatori() {
+        String nomeAttivo = partita.getNomeGiocatoreAttivo();
+        boolean partitaInCorso = partita.getFase() != FaseTurno.TERMINATA;
+        return partita.getGiocatori().stream()
+                .map(g -> new StatoPartitaDto.Giocatore(g.getNome(), g.getMano().size(), descriviStato(g),
+                        partitaInCorso && g.getNome().equals(nomeAttivo)))
+                .toList();
+    }
+
+    private String descriviStato(Giocatore giocatore) {
+        return switch (giocatore.getStato()) {
+            case IN_GIOCO -> "in gioco";
+            case TERMINATO -> "terminato al posto n. " + (partita.getGiocatoriTerminati().indexOf(giocatore) + 1);
+            case ELIMINATO -> "eliminato";
+        };
     }
 
     /**
@@ -135,6 +281,8 @@ public class UnoLegendsGame {
             case COLORE_SCELTO -> giocatore + " sceglie il colore "
                     + evento.colore().formatta(evento.colore().getNome()) + ".";
             case UNO_DICHIARATO -> giocatore + " dichiara UNO!";
+            case GIOCATORE_TERMINATO -> giocatore + " ha finito le carte: si classifica al posto n. " + evento.quantita() + "!";
+            case GIOCATORE_ELIMINATO -> giocatore + " e eliminato: le sue carte tornano nel mazzo.";
         };
     }
 
@@ -151,13 +299,13 @@ public class UnoLegendsGame {
         };
     }
 
-    private static FaseTurnoDto convertiFase(FaseTurno fase) {
+    private static StatoPartitaDto.Fase convertiFase(FaseTurno fase) {
         return switch (fase) {
-            case NORMALE -> FaseTurnoDto.NORMALE;
-            case POST_PESCA -> FaseTurnoDto.POST_PESCA;
-            case ATTESA_INPUT -> FaseTurnoDto.ATTESA_INPUT;
-            case ATTESA_UNO -> FaseTurnoDto.ATTESA_UNO;
-            case TERMINATA -> FaseTurnoDto.TERMINATA;
+            case NORMALE -> StatoPartitaDto.Fase.NORMALE;
+            case POST_PESCA -> StatoPartitaDto.Fase.POST_PESCA;
+            case ATTESA_INPUT -> StatoPartitaDto.Fase.ATTESA_INPUT;
+            case ATTESA_UNO -> StatoPartitaDto.Fase.ATTESA_UNO;
+            case TERMINATA -> StatoPartitaDto.Fase.TERMINATA;
         };
     }
 
@@ -169,13 +317,17 @@ public class UnoLegendsGame {
         return carta == null ? null : carta.getDescrizioneBreve();
     }
 
+    /**
+     * Carta in cima agli scarti: un jolly nero viene mostrato con il colore scelto.
+     * Da quando le carte sono un'unica classe basta guardare il colore, senza
+     * {@code instanceof}.
+     */
     private static String formattaCarta(Carta carta, Colore coloreAttuale) {
         if (carta == null) {
             return null;
         }
-        if (carta instanceof CartaSpeciale && carta.getColore() == Colore.NERO
-                && coloreAttuale != null && coloreAttuale != Colore.NERO) {
-            return ((CartaSpeciale) carta).getDescrizioneBreve(coloreAttuale);
+        if (carta.getColore() == Colore.NERO && coloreAttuale != null && coloreAttuale != Colore.NERO) {
+            return carta.getDescrizioneBreve(coloreAttuale);
         }
         return carta.getDescrizioneBreve();
     }
@@ -184,10 +336,10 @@ public class UnoLegendsGame {
      * Converte la richiesta del model nel DTO, scrivendo qui la frase da mostrare:
      * il model indica solo il {@link TipoRichiesta}.
      */
-    private static RichiestaInputDto convertiRichiesta(RichiestaInput richiesta) {
+    private static StatoPartitaDto.Richiesta convertiRichiesta(RichiestaInput richiesta) {
         return richiesta == null
                 ? null
-                : new RichiestaInputDto(messaggioPer(richiesta.getTipo()), richiesta.getOpzioni());
+                : new StatoPartitaDto.Richiesta(messaggioPer(richiesta.getTipo()), richiesta.getOpzioni());
     }
 
     private static String messaggioPer(TipoRichiesta tipo) {

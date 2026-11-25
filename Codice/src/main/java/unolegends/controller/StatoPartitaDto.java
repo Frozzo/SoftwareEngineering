@@ -3,63 +3,47 @@ package unolegends.controller;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Snapshot immutabile dello stato di gioco esposto alla UI.
- *
- * <p>La {@link FaseTurnoDto} sostituisce i flag {@code deveGiocareCartaPescata} e
- * {@code partitaTerminata}: la UI non deduce più la fase combinando più campi, la
- * legge. {@code richiestaInput} è valorizzata solo in
- * {@link FaseTurnoDto#ATTESA_INPUT}, {@code cartaAppenaPescata} solo in
- * {@link FaseTurnoDto#POST_PESCA}, {@code nomeVincitore} solo in
- * {@link FaseTurnoDto#TERMINATA}.</p>
- */
-public final class StatoPartitaDto {
-    private final FaseTurnoDto fase;
-    private final String nomeGiocatoreAttivo;
-    private final List<String> manoGiocatoreAttivo;
-    private final String cartaInCima;
-    private final String cartaAppenaPescata;
-    private final RichiestaInputDto richiestaInput;
-    private final String nomeVincitore;
+public record StatoPartitaDto(Fase fase, String nomeGiocatoreAttivo, List<String> mano,
+                              String cartaInCima, String cartaAppenaPescata,
+                              Richiesta richiestaInput, List<Giocatore> giocatori,
+                              boolean sensoOrario, List<String> classifica) {
 
-    public StatoPartitaDto(FaseTurnoDto fase, String nomeGiocatoreAttivo, List<String> manoGiocatoreAttivo,
-                           String cartaInCima, String cartaAppenaPescata,
-                           RichiestaInputDto richiestaInput, String nomeVincitore) {
-        this.fase = Objects.requireNonNull(fase, "fase non puo essere null");
-        this.nomeGiocatoreAttivo = Objects.requireNonNull(nomeGiocatoreAttivo, "nomeGiocatoreAttivo non puo essere null");
-        this.manoGiocatoreAttivo = List.copyOf(
-                Objects.requireNonNull(manoGiocatoreAttivo, "manoGiocatoreAttivo non puo essere null"));
-        this.cartaInCima = cartaInCima;
-        this.cartaAppenaPescata = cartaAppenaPescata;
-        this.richiestaInput = richiestaInput;
-        this.nomeVincitore = nomeVincitore;
+    public StatoPartitaDto {
+        Objects.requireNonNull(fase, "fase non puo essere null");
+        Objects.requireNonNull(nomeGiocatoreAttivo, "nomeGiocatoreAttivo non puo essere null");
+        mano = List.copyOf(Objects.requireNonNull(mano, "mano non puo essere null"));
+        giocatori = List.copyOf(Objects.requireNonNull(giocatori, "giocatori non puo essere null"));
+        classifica = List.copyOf(Objects.requireNonNull(classifica, "classifica non puo essere null"));
     }
 
-    public FaseTurnoDto getFase() {
-        return fase;
+    /** Primo della classifica, oppure null se la partita non è finita. */
+    public String nomeVincitore() {
+        return classifica.isEmpty() ? null : classifica.get(0);
     }
 
-    public String getNomeGiocatoreAttivo() {
-        return nomeGiocatoreAttivo;
+    public enum Fase {
+        NORMALE,
+        POST_PESCA,
+        ATTESA_INPUT,
+        ATTESA_UNO,
+        TERMINATA
     }
 
-    public List<String> getManoGiocatoreAttivo() {
-        return manoGiocatoreAttivo;
+    /**
+     * Richiesta di input da mostrare: la frase la scrive il controller, le opzioni
+     * vengono dal model.
+     */
+    public record Richiesta(String messaggio, List<String> opzioni) {
+        public Richiesta {
+            Objects.requireNonNull(messaggio, "messaggio non puo essere null");
+            opzioni = List.copyOf(Objects.requireNonNull(opzioni, "opzioni non puo essere null"));
+        }
     }
 
-    public String getCartaInCima() {
-        return cartaInCima;
-    }
-
-    public String getCartaAppenaPescata() {
-        return cartaAppenaPescata;
-    }
-
-    public RichiestaInputDto getRichiestaInput() {
-        return richiestaInput;
-    }
-
-    public String getNomeVincitore() {
-        return nomeVincitore;
+    public record Giocatore(String nome, int numeroCarte, String stato, boolean diTurno) {
+        public Giocatore {
+            Objects.requireNonNull(nome, "nome non puo essere null");
+            Objects.requireNonNull(stato, "stato non puo essere null");
+        }
     }
 }

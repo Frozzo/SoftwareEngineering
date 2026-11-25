@@ -13,7 +13,7 @@ javac -d out (Get-ChildItem -Recurse src\main\java -Filter *.java).FullName
 java -cp out unolegends.ui.UnoLegendsCli
 ```
 
-La demo avvia una partita hotseat CLI a **2 giocatori** (`Giocatore1` e `Giocatore2`) con mazzo standard (108 carte) e regole standard.
+La CLI apre un **menu di setup** (modalità, opzioni come Endless, numero di giocatori da 2 a 6 e nomi) e poi avvia una partita hotseat con mazzo standard (108 carte). Dallo Step 3; dettagli e motivazioni in [`docs/step3_terza_iter.md`](docs/step3_terza_iter.md).
 
 ---
 
@@ -32,7 +32,7 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  CONTROLLER / FACADE  (package: unolegends.controller)                  │
-│  UnoLegendsGame, StatoPartitaDto, RichiestaInputDto, FaseTurnoDto       │
+│  UnoLegendsGame, StatoPartitaDto (record con Fase, Richiesta, Giocatore)│
 │  - Unico punto d'ingresso della UI                                      │
 │  - Avvia la partita tramite PartitaFactory                              │
 │  - Converte oggetti del model in DTO immutabili (stringhe/enum)         │
@@ -43,7 +43,8 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  MODEL / DOMINIO  (package: unolegends.model)                           │
 │  Partita (Coordinator), Giocatore, Mazzo, PilaDegliScarti,              │
-│  Carta / CartaNumero / CartaSpeciale, Colore, ValoreCarta, TipoMazzo,   │
+│  Carta, Colore, ValoreCarta,                                            │
+│  StatoGiocatore, ModalitaDiGioco, OpzionePartita, ConfigurazionePartita,│
 │  Ieffetto + implementazioni, FaseTurno, AzioneInAttesa,                 │
 │  RichiestaInput, TipoRichiesta, EventoPartita, TipoEvento,              │
 │  PartitaFactory, MazzoFactory, StandardMazzoFactory, RegoleDiGioco      │
@@ -64,7 +65,8 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 
 - **`UnoLegendsCli`** (`final class`, costruttore privato, entrypoint `main`):
   - Gestisce l'interazione testuale su `System.in` / `System.out` tramite `BufferedReader`.
-  - Contiene il menu iniziale (`0` avvia partita demo standard, `1` esce) e il **loop principale di gioco**.
+  - Contiene il menu iniziale (`0` nuova partita, `1` esce), il **menu di setup** (`configuraPartita`: modalità, una domanda sì/no per ogni opzione configurabile, numero e nomi dei giocatori; se il controller rifiuta le scelte mostra il motivo e ripete) e il **loop principale di gioco**.
+  - `mostraStato` stampa anche la tabella dei giocatori (carte in mano, stato, chi è di turno) e il senso di gioco; a fine partita `mostraClassifica` stampa la classifica.
   - A ogni iterazione stampa i messaggi degli eventi (`controller.prelevaMessaggi()`), legge lo stato (`controller.richiediStato()`) e fa un unico `switch` esaustivo su `stato.getFase()`: `turnoNormale`, `turnoDopoPesca`, `gestisciRichiestaInput`, dichiarazione UNO, fine partita.
   - Gestisce i prompt interattivi (`richiediInput`), la finestra temporizzata di 5 secondi per la dichiarazione UNO (`attendiDichiarazioneUno`), il parsing degli indici (`parseIndice`) e la formattazione ANSI delle opzioni colore (`formattaOpzione`).
 
@@ -72,33 +74,37 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 
 - **`UnoLegendsGame`** *(GRASP Controller / GoF Facade)*:
   - Mantiene un riferimento `private final Partita partita`.
-  - Factory method statico `avviaPartitaStandard()`: crea una `Partita` per `2` giocatori tramite `PartitaFactory.creaPartita(StandardMazzoFactory.getInstance(), 2, RegoleDiGioco.standard())`, invoca `partita.iniziaGioco()` e restituisce il controller.
+  - **Menu di setup** (metodi statici, Step 3):
+    - `getModalitaDisponibili() : List<String>`, `getOpzioniConfigurabili(String modalita) : List<String>` (le opzioni obbligatorie della modalità non compaiono) e `descriviOpzione(String) : String`;
+    - `getMinimoGiocatori()` / `getMassimoGiocatori()`;
+    - `verificaImpostazioni(String modalita, Set<String> opzioni, List<String> nomi) : String`: converte le stringhe in `ModalitaDiGioco` / `OpzionePartita`, chiama `ConfigurazionePartita.verifica(...)` e traduce l'eventuale `ErroreConfigurazione` in frase; restituisce `null` se le scelte sono valide.
+    - `avviaPartita(String modalita, Set<String> opzioni, List<String> nomi) : UnoLegendsGame`: crea la `ConfigurazionePartita`, chiama `PartitaFactory.creaPartita(config)` e `iniziaGioco()`. Le scelte vanno verificate prima: se non sono valide lancia `IllegalArgumentException` (errore di programmazione della UI).
+    - Nessun DTO e nessuna classe di eccezione per il setup: solo stringhe, e l'errore come valore restituito.
+    - Sostituisce il vecchio `avviaPartitaStandard()`.
   - API esposte alla UI:
-    - `richiediStato() : StatoPartitaDto` — costruisce uno snapshot testuale immutabile della partita; formatta la carta in cima con `coloreAttuale` se è una `CartaSpeciale` nera il cui colore è già stato scelto.
+    - `richiediStato() : StatoPartitaDto` — costruisce uno snapshot testuale immutabile della partita; formatta la carta in cima con `coloreAttuale` se è una carta nera il cui colore è già stato scelto (basta controllare il colore: nessun `instanceof`).
     - `giocaCarta(int indiceCarta) : boolean` — inoltra a `partita.giocaCarta(...)`; `true` se la giocata è accettata (completata oppure in attesa di input).
     - `rispondiInput(String risposta) : boolean` — unico punto per rispondere a qualunque richiesta di input; inoltra a `partita.rispondiInput(...)`.
     - `completaDichiarazioneUno(boolean unoDichiarato) : boolean` — inoltra a `partita.completaDichiarazioneUno(...)`; `true` se il comando è accettato (la penalità arriva come evento).
     - `pescaCarta() : boolean` — inoltra a `partita.pescaCarta()`.
     - `passaTurno() : boolean` — inoltra a `partita.passaTurno()`.
     - `prelevaMessaggi() : List<String>` — preleva gli `EventoPartita` registrati da `Partita` e li traduce in frasi (`descriviEvento`, con `switch` esaustivi su `TipoEvento` e `OriginePesca`).
-  - Conversioni private: `convertiFase` (`FaseTurno` → `FaseTurnoDto`), `convertiRichiesta` + `messaggioPer` (`TipoRichiesta` → frase), `formattaCarta`.
-- **`FaseTurnoDto`** *(enum)*: copia di `FaseTurno` per la UI, che non può importare il model.
+  - Conversioni private: `convertiFase` (`FaseTurno` → `StatoPartitaDto.Fase`), `convertiRichiesta` + `messaggioPer` (`TipoRichiesta` → frase), `formattaCarta`, `convertiGiocatori` + `descriviStato` (`Giocatore` → `StatoPartitaDto.Giocatore`), `nomeModalita` / `nomeOpzione` / `descrizioneOpzione`, `messaggioPer(ErroreConfigurazione)`.
 - **`StatoPartitaDto`** *(DTO immutabile)*:
-  - Campi: `fase` (`FaseTurnoDto`), `nomeGiocatoreAttivo` (`String`), `manoGiocatoreAttivo` (`List<String>`, copia immutabile), `cartaInCima` (`String`), `cartaAppenaPescata` (`String`, solo in `POST_PESCA`), `richiestaInput` (`RichiestaInputDto`, solo in `ATTESA_INPUT`), `nomeVincitore` (`String`, solo in `TERMINATA`).
-- **`RichiestaInputDto`** *(DTO immutabile)*:
-  - Campi: `messaggio` (`String`, scritto dal controller), `opzioni` (`List<String>`, copia immutabile).
+  - È un `record` ed è l'**unico DTO** del progetto. Componenti: `fase` (`Fase`), `nomeGiocatoreAttivo` (`String`), `mano` (`List<String>`, copia immutabile), `cartaInCima` (`String`), `cartaAppenaPescata` (`String`, solo in `POST_PESCA`), `richiestaInput` (`Richiesta`, solo in `ATTESA_INPUT`), `giocatori` (`List<Giocatore>`), `sensoOrario` (`boolean`), `classifica` (`List<String>`, solo in `TERMINATA`). Il metodo `nomeVincitore()` restituisce il primo della classifica.
+  - Tipi interni (prima erano i file `FaseTurnoDto`, `RichiestaInputDto`, `GiocatoreDto`):
+    - `StatoPartitaDto.Fase` *(enum)*: copia di `FaseTurno` per la UI, che non può importare il model;
+    - `StatoPartitaDto.Richiesta` *(record)*: `messaggio` (scritto dal controller), `opzioni`;
+    - `StatoPartitaDto.Giocatore` *(record)*: `nome`, `numeroCarte`, `stato` (già tradotto: "in gioco", "terminato al posto n. X", "eliminato"), `diTurno`.
 
 ### 3.3 Package `unolegends.model` — Entità Core
 
-- **`Carta`** *(classe astratta)*:
-  - Contratto: `getColore() : Colore`, `getValoreCarta() : ValoreCarta`, `getEffetto() : Ieffetto`, `getDescrizioneBreve() : String`.
-- **`CartaNumero extends Carta`**:
-  - Campi: `colore`, `valore`, `effetto` (sempre istanziato a `new Effetto_Nullo()`).
-  - `toTestoBase()` produce `"<valore> <colore minuscolo>"` (es. `"7 rosso"`).
-  - `getDescrizioneBreve()` applica la formattazione ANSI di `Colore`.
-- **`CartaSpeciale extends Carta`**:
-  - Campi: `colore`, `valoreCarta`, `effetto` (iniettato dal costruttore).
-  - Oltre a `getDescrizioneBreve()`, offre l'overload `getDescrizioneBreve(Colore coloreVisualizzato)` usato dal controller per mostrare una carta nera (`cambia colore` o `+4`) con il colore attualmente attivo scelto dal giocatore.
+- **`Carta`** *(classe concreta e `final`)*:
+  - Campi: `colore`, `valore`, `effetto`.
+  - Costruttori: `Carta(Colore, ValoreCarta, Ieffetto)` e `Carta(Colore, ValoreCarta)`, che usa `Effetto_Nullo` (carte numeriche).
+  - `toTestoBase()` produce `"<valore> <colore minuscolo>"` (es. `"7 rosso"`); `getDescrizioneBreve()` applica la formattazione ANSI di `Colore`.
+  - L'overload `getDescrizioneBreve(Colore coloreVisualizzato)` è usato dal controller per mostrare una carta nera (`cambia colore` o `+4`) con il colore scelto dal giocatore.
+  - **Perché una sola classe:** prima c'erano la classe astratta `Carta` e le sottoclassi `CartaNumero` e `CartaSpeciale`, identiche tranne per il fatto che `CartaNumero` usava sempre `Effetto_Nullo`. Il comportamento di una carta dipende solo dal suo `Ieffetto` (Strategy + Null Object), quindi l'ereditarietà non aggiungeva nulla. Con una sola classe le carte numeriche con effetto della No Mercy (0 e 7) non richiedono classi nuove, e sparisce l'unico `instanceof` del codice.
 - **`Colore`** *(enum)*:
   - Valori: `ROSSO` (`\u001B[31m`), `VERDE` (`\u001B[32m`), `BLU` (`\u001B[34m`), `GIALLO` (`\u001B[33m`), `NERO` (`\u001B[30m`).
   - `formatta(String testo)` racchiude il testo tra il codice ANSI del colore e `ANSI_RESET` (`\u001B[0m`).
@@ -107,16 +113,17 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
   - Azione: `PIU_DUE("+2")`, `BLOCCA_TURNO("blocca turno")`, `CAMBIA_GIRO("cambia giro")`.
   - Nere speciali: `CAMBIA_COLORE("cambia colore")`, `PIU_QUATTRO("+4")`.
   - Utility statiche: `fromInt(int)` (0..9) e `fromString(String)` (case-insensitive).
-- **`TipoMazzo`** *(enum)*:
-  - Valore attuale: `STANDARD` (predisposto per configurazioni future).
 - **`Giocatore`** *(GRASP Information Expert)*:
-  - Campi: `nome` (`String`), `mano` (`List<Carta>`).
+  - Campi: `nome` (`String`), `mano` (`List<Carta>`), `stato` (`StatoGiocatore`, iniziale `IN_GIOCO`).
+  - Stato: `getStato()`, `isInGioco()`; `segnaComeTerminato()`, `segnaComeEliminato()` e `svuotaMano()` sono package-private, usati solo da `Partita`.
   - Metodi: `getNome()`, `getMano()` (restituisce `Collections.unmodifiableList(mano)`), `getCartaInPosizione(int)` (ritorna `null` se indice fuori range), `estraiCarta(int)` (rimuove e ritorna la carta, o `null` se fuori range), `rimuoviCarta(Carta)` (rimuove proprio quella carta, per identità; usato quando la giocata si completa dopo una risposta), `aggiungiCarta(Carta)`.
 - **`Mazzo`** *(GRASP Information Expert)*:
   - Campo: `carte` (`Deque<Carta>` implementata con `ArrayDeque`).
   - `prelevaCarta()` esegue `carte.pollFirst()` (ritorna `null` se vuoto).
   - `isVuoto()`, `getNumeroCarte()`, `mischia()` (copia in `ArrayList`, `Collections.shuffle`, reinserisce nella `Deque`).
   - `rimescolaDaScarti(PilaDegliScarti)`: estrae tutte le carte dagli scarti tranne quella in cima, le aggiunge al mazzo e chiama `mischia()`.
+  - `aggiungiCarteERimescola(Collection<Carta>)`: rimette in circolo le carte di un giocatore eliminato.
+- **`StatoGiocatore`** *(enum, Step 3)*: `IN_GIOCO`, `TERMINATO` (ha finito le carte e ha un posto in classifica), `ELIMINATO`. Si chiama `IN_GIOCO` e non `ATTIVO` perché "giocatore attivo" indica già il giocatore di turno.
 - **`PilaDegliScarti`** *(GRASP Information Expert)*:
   - Campo: `scarti` (`List<Carta>`).
   - `getCartaInCima()` restituisce l'ultimo elemento della lista (o `null` se vuota).
@@ -131,7 +138,7 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
     - `getRichiestaInput(Partita partita)` → default `null`.
     - `validaRispostaInput(String risposta, Partita partita)` → default `risposta == null` se non richiede input, altrimenti `risposta != null`.
     - `attivaEffetto(Partita partita, String risposta)` → default verifica che non serva input e chiama `attivaEffetto(partita)`.
-- **`Effetto_Nullo`** *(Null Object)*: `attivaEffetto` vuoto. Usato da tutte le `CartaNumero`.
+- **`Effetto_Nullo`** *(Null Object)*: `attivaEffetto` vuoto. Usato da tutte le carte numeriche (`new Carta(colore, valore)`).
 - **`Effetto_Blocca_Turno`**: chiama `partita.segnalaSaltoTurno()`.
 - **`Effetto_cambio_giro`**: chiama `partita.cambioGiro()`.
 - **`Effetto_pescata_carte`**:
@@ -152,7 +159,7 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 - **`TipoRichiesta`** *(enum)*: `SCELTA_COLORE`, `SCELTA_GIOCATORE` (quest'ultimo predisposto per carta 7 e abilità attive).
 - **`AzioneInAttesa`** *(record package-private, GoF Command)*: `(Ieffetto effetto, Consumer<String> completamento)`. L'effetto sa cosa chiedere e validare; il completamento è ciò che `Partita` esegue quando arriva una risposta valida.
 - **`FaseTurno`** *(enum)*: `NORMALE`, `POST_PESCA`, `ATTESA_INPUT`, `ATTESA_UNO`, `TERMINATA`. Vedi sezione 4.
-- **`EventoPartita`** *(record)* + **`TipoEvento`** *(enum)*: registro dei fatti accaduti (`PESCA_VOLONTARIA`, `PESCA_FORZATA`, `TURNO_SALTATO`, `SENSO_INVERTITO`, `COLORE_SCELTO`, `UNO_DICHIARATO`). Campi: `tipo`, `nomeGiocatore`, `quantita`, `origine`, `colore`; si creano con factory statiche package-private.
+- **`EventoPartita`** *(record)* + **`TipoEvento`** *(enum)*: registro dei fatti accaduti (`PESCA_VOLONTARIA`, `PESCA_FORZATA`, `TURNO_SALTATO`, `SENSO_INVERTITO`, `COLORE_SCELTO`, `UNO_DICHIARATO`, `GIOCATORE_TERMINATO` con la posizione in `quantita`, `GIOCATORE_ELIMINATO`). Campi: `tipo`, `nomeGiocatore`, `quantita`, `origine`, `colore`; si creano con factory statiche package-private.
 - **`OriginePesca`** *(enum)*: causa di una pesca (`VOLONTARIA`, `PIU_DUE`, `PIU_QUATTRO`, `PENALITA_UNO`). Permette alle regole (e in futuro alle passive dei Legend) di distinguere le pescate.
 - **`ContestoPesca`** *(record immutabile)*: `(Giocatore bersaglio, int numeroCarte, OriginePesca origine)`, passato a `RegoleDiGioco.calcolaCartePescaForzata(...)`.
 
@@ -163,35 +170,41 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
   - Istanza statica eager `INSTANCE` esposta via `getInstance()`.
   - `creaMazzo()` costruisce **108 carte** e chiama `mazzo.mischia()`:
     - Per ciascuno dei 4 colori (`ROSSO`, `GIALLO`, `VERDE`, `BLU`):
-      - 1 copia di `0` (`CartaNumero`)
-      - 2 copie per ogni numero da `1` a `9` (`CartaNumero`) → 19 carte numeriche per colore
-      - 2 copie di `PIU_DUE` (`CartaSpeciale` con `Effetto_pescata_carte(2, PIU_DUE)`)
-      - 2 copie di `BLOCCA_TURNO` (`CartaSpeciale` con `Effetto_Blocca_Turno`)
-      - 2 copie di `CAMBIA_GIRO` (`CartaSpeciale` con `Effetto_cambio_giro`) → 6 carte azione per colore
+      - 1 copia di `0` (`Carta` senza effetto)
+      - 2 copie per ogni numero da `1` a `9` (`Carta` senza effetto) → 19 carte numeriche per colore
+      - 2 copie di `PIU_DUE` (`Carta` con `Effetto_pescata_carte(2, PIU_DUE)`)
+      - 2 copie di `BLOCCA_TURNO` (`Carta` con `Effetto_Blocca_Turno`)
+      - 2 copie di `CAMBIA_GIRO` (`Carta` con `Effetto_cambio_giro`) → 6 carte azione per colore
     - Totale carte colorate: `4 × 25 = 100`.
     - Carte nere (`Colore.NERO`):
       - 4 copie di `CAMBIA_COLORE` (`Effetto_Cambia_colore`)
       - 4 copie di `PIU_QUATTRO` (`EffettoComposito([Effetto_Cambia_colore, Effetto_pescata_carte(4, PIU_QUATTRO)])`)
     - Totale complessivo: **108 carte**.
+- **`ModalitaDiGioco`** *(enum di soli dati, Step 3)*: per ogni modalità la `MazzoFactory` da usare e le `OpzionePartita` obbligatorie (`getOpzioniObbligatorie()`, `isConfigurabile(opzione)`). Oggi contiene `NORMALE`; `NO_MERCY` arriva allo Step 4 con il suo mazzo. Sostituisce l'enum `TipoMazzo`, che non era usato.
+- **`OpzionePartita`** *(enum di soli dati, Step 3)*: regole opzionali scelte dal menu. Oggi `ENDLESS`; `STACKING` (Step 5) e `LEGEND` (Step 6) si aggiungeranno quando funzioneranno.
+- **`ConfigurazionePartita`** *(record, Step 3)*: `(modalita, nomiGiocatori, opzioni)`. Il costruttore toglie gli spazi dai nomi, aggiunge le opzioni obbligatorie della modalità e valida (2–6 giocatori, nomi non vuoti e non duplicati, Endless con almeno 3 giocatori). La validazione è il metodo statico `verifica(modalita, nomi, opzioni) : ErroreConfigurazione` (`null` = valida; enum, nessun testo nel model); il costruttore lo richiama e, se i dati non sono validi, lancia una normale `IllegalArgumentException`.
 - **`PartitaFactory`** *(GRASP Creator / GoF Factory)*:
   - Costante `CARTE_PER_GIOCATORE = 7`.
-  - `creaRegoleStandard()` delega a `RegoleDiGioco.standard()`.
-  - `creaPartita(MazzoFactory, int numeroDiGiocatori, RegoleDiGioco)`: crea il mazzo, distribuisce 7 carte a ciascun giocatore (nominati `"Giocatore1"`, `"Giocatore2"`, ...), pesca la `primaCarta` per inizializzare `PilaDegliScarti` e istanzia `Partita` (il giocatore iniziale lo decide `Partita`).
+  - `creaPartita(ConfigurazionePartita)`: mazzo da `config.modalita().getMazzoFactory()`, regole da `creaRegole(config)` (uno `switch` esaustivo sulla modalità: `NORMALE -> RegoleDiGioco.standard(config.opzioni())`), giocatori con i nomi scelti.
+  - `creaPartita(MazzoFactory, List<String> nomiGiocatori, RegoleDiGioco)`: crea il mazzo, distribuisce 7 carte a ciascun giocatore, pesca la `primaCarta` per inizializzare `PilaDegliScarti` e istanzia `Partita` (il giocatore iniziale lo decide `Partita`).
 - **`RegoleDiGioco`** *(Protected Variations / Contenitore di Strategy)*:
-  - Contiene 5 strategie, tutte iniettate dal costruttore:
+  - Contiene 6 strategie, tutte iniettate dal costruttore:
     1. `IStrategiaCondizioneVittoria`
     2. `IStrategiaCondizioneSconfitta`
     3. `IStrategiaCompatibilitaCarte`
     4. `IStrategiaPesca` (pesca **volontaria**)
     5. `IStrategiaPenalitaUno`
+    6. `IStrategiaFinePartita` (Step 3)
   - Metodi esposti:
     - `isGiocabile(Giocatore giocatore, Carta candidata, Carta inCima, Partita partita)` → delega a `strategiaCompatibilitaCarte.puoGiocare(candidata, inCima, partita.getColoreAttuale())`. Il giocatore servirà alle passive che modificano la compatibilità.
-    - `isVincitore(Giocatore, Partita)` → delega a `strategiaVittoria`.
+    - `isVincitore(Giocatore, Partita)` → delega a `strategiaVittoria` (ha finito le carte: in Endless vuol dire "prende il prossimo posto in classifica").
+    - `isPartitaTerminata(Partita)` → delega a `strategiaFinePartita`.
     - `isEliminato(Giocatore, Partita)` → delega a `strategiaSconfitta`.
     - `pescaVolontaria(Giocatore, Partita)` → delega alla strategia di pesca volontaria.
     - `calcolaCartePescaForzata(ContestoPesca)` → numero di carte che il bersaglio deve pescare davvero; oggi restituisce `contesto.numeroCarte()`, in futuro vi si agganciano le passive.
     - `mancatoUno(Giocatore giocatore, boolean unoDichiarato, Partita partita)` → se `mano.size() == 1 && !unoDichiarato`, applica `strategiaPenalitaUno` e ritorna `true`; altrimenti `false`.
-    - `standard()` → restituisce `RegoleDiGioco` con tutte le implementazioni standard.
+    - `standard(Set<OpzionePartita> opzioni)` → regole della partita normale; ogni opzione sostituisce una strategia (`ENDLESS` → `StrategiaFinePartitaEndless`). `standard()` equivale a `standard(Set.of())`. Allo Step 4 si aggiungerà `noMercy(Set<OpzionePartita>)`.
+    - Non c'è un Builder: con poche strategie `RegoleDiGioco.standard(opzioni)` è più leggibile; va rivalutato quando le strategie cresceranno (stacking, passive).
 
 ### 3.6 Package `unolegends.domain.rules` e `unolegends.domain.rules.impl`
 
@@ -202,6 +215,8 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 | `IStrategiaCondizioneSconfitta` | `StrategiaSconfittaStandard` | Ritorna sempre `false` (nessuna eliminazione nelle regole standard). |
 | `IStrategiaPesca` (pesca volontaria) | `StrategiaPescaSingola` | Chiama `partita.pescaSingola(giocatore)` e ritorna `List.of(carta)` (o `List.of()` se mazzo e scarti sono vuoti). |
 | `IStrategiaPenalitaUno` | `StrategiaPenalitaMancatoUno` | Chiama `partita.applicaPescaForzata(giocatore, numeroCarte, OriginePesca.PENALITA_UNO)` (default `2` carte). |
+| `IStrategiaFinePartita` | `StrategiaFinePartitaStandard` | `terminati >= 1 \|\| inGioco <= 1`: finisce appena uno finisce le carte. |
+| `IStrategiaFinePartita` | `StrategiaFinePartitaEndless` | `inGioco <= 1`: si continua finché resta un solo giocatore. |
 
 ---
 
@@ -211,7 +226,7 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 
 | Campo | Tipo | Significato e ciclo di vita |
 |---|---|---|
-| `giocatori` | `List<Giocatore>` | Lista ordinata dei giocatori partecipanti (copia difensiva). |
+| `giocatori` | `List<Giocatore>` | Lista ordinata dei giocatori partecipanti (copia difensiva), da 2 a 6. Restano tutti nella lista anche quando escono: lo dice il loro `StatoGiocatore`. |
 | `mazzo` | `Mazzo` | Mazzo da cui pescare le carte. |
 | `pilaDegliScarti` | `PilaDegliScarti` | Pila delle carte giocate; l'ultima è la carta in cima. |
 | `regole` | `RegoleDiGioco` | Profilo di strategie di gioco attivo. |
@@ -220,7 +235,9 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 | `fase` | `FaseTurno` | Fase corrente del turno (vedi tabella sotto). |
 | `azioneInAttesa` | `AzioneInAttesa` | Valorizzata solo in `ATTESA_INPUT`: effetto da completare e completamento da eseguire. |
 | `cartaAppenaPescata` | `Carta` | Ultima carta pescata volontariamente; esposta solo in `POST_PESCA`. |
-| `vincitore` | `Giocatore` | Dato del vincitore, valorizzato insieme a `fase = TERMINATA`. |
+| `terminati` | `List<Giocatore>` | Chi ha finito le carte, nell'ordine in cui ha finito (Step 3). |
+| `eliminati` | `List<Giocatore>` | Chi è stato eliminato, in ordine (Step 3; nessuno con le regole attuali). |
+| `classifica` | `List<Giocatore>` | Classifica finale, valorizzata insieme a `fase = TERMINATA`: terminati, poi chi era in gioco (meno carte = meglio), poi eliminati dal più recente. Il vincitore è il primo. Sostituisce il campo `vincitore`. |
 | `giocoIniziato` | `boolean` | Rende `iniziaGioco()` idempotente (evita la doppia applicazione dell'effetto iniziale). |
 | `saltaProssimoTurno` | `boolean` | Non è una fase: è un'informazione per il prossimo avanzamento, impostata da `segnalaSaltoTurno()` e consumata da `aggiornaGiocatoreAttivo()`. |
 | `coloreAttuale` | `Colore` | Colore attivo per la compatibilità delle carte. Inizializzato al colore della prima carta; aggiornato sulle giocate colorate o tramite `applicaColoreScelto(Colore)` (package-private) sulle carte nere. |
@@ -238,7 +255,9 @@ Ogni comando pubblico dichiara le fasi in cui è **permesso** (lista di ammissio
 | `POST_PESCA` | `giocaCarta` (qualsiasi carta della mano), `passaTurno` | `pescaCarta` | giocata, `passaTurno` |
 | `ATTESA_INPUT` | `rispondiInput` | carta iniziale o carta giocata che richiede input | risposta valida → il completamento decide la fase |
 | `ATTESA_UNO` | `completaDichiarazioneUno` | giocata che lascia una sola carta | dichiarazione (con o senza penalità) |
-| `TERMINATA` | nessuno | giocata che svuota la mano | — |
+| `TERMINATA` | nessuno | `IStrategiaFinePartita` dice che la partita è finita (uno finisce le carte, o in Endless ne resta uno solo) | — |
+
+Quando un giocatore finisce le carte, `completaGiocata` chiama `registraTerminato` (stato `TERMINATO`, evento `GIOCATORE_TERMINATO`, `verificaFinePartita`). Se la partita non è finita (Endless) il turno passa al prossimo **in gioco** con `chiudiTurno()`.
 
 ---
 
@@ -248,10 +267,14 @@ Ogni comando pubblico dichiara le fasi in cui è **permesso** (lista di ammissio
 
 ```text
 UnoLegendsCli.main
-  └─> UnoLegendsGame.avviaPartitaStandard()
-        ├─> PartitaFactory.creaPartita(StandardMazzoFactory.getInstance(), 2, RegoleDiGioco.standard())
-        │     ├─> StandardMazzoFactory.creaMazzo() -> 108 carte mescolate
-        │     ├─> distribuisciCarteAiGiocatori(mazzo, 2) -> 7 carte a Giocatore1, 7 a Giocatore2
+  └─> configuraPartita(reader)              // modalità, opzioni, numero e nomi
+  └─> UnoLegendsGame.verificaImpostazioni(modalita, opzioni, nomi)   // null = valide
+  └─> UnoLegendsGame.avviaPartita(modalita, opzioni, nomi)
+        ├─> new ConfigurazionePartita(modalita, nomi, opzioni)
+        ├─> PartitaFactory.creaPartita(config)
+        │     ├─> config.modalita().getMazzoFactory().creaMazzo() -> 108 carte mescolate
+        │     ├─> creaRegole(config) -> RegoleDiGioco.standard(config.opzioni())
+        │     ├─> distribuisciCarteAiGiocatori(mazzo, nomi) -> 7 carte a ciascuno
         │     ├─> primaCarta = mazzo.prelevaCarta()
         │     ├─> pilaDegliScarti = new PilaDegliScarti([primaCarta])
         │     └─> new Partita(...) -> coloreAttuale = primaCarta.getColore();
@@ -261,7 +284,7 @@ UnoLegendsCli.main
 
 - **Caso A — La prima carta NON richiede input** (carta numerica, `+2`, `Blocca Turno`, `Cambia Giro`):
   1. `iniziaGioco()` applica `primaCarta.getEffetto().attivaEffetto(this)`.
-  2. Se la prima carta era un `+2`, `getProssimoGiocatore()` (partendo da `1` in senso orario) è `Giocatore1`: pesca 2 carte (evento `PESCA_FORZATA`) e viene impostato `saltaProssimoTurno = true`.
+  2. (Esempio con 2 giocatori.) Se la prima carta era un `+2`, `getProssimoGiocatore()` (partendo da `1` in senso orario) è `Giocatore1`: pesca 2 carte (evento `PESCA_FORZATA`) e viene impostato `saltaProssimoTurno = true`.
   3. Chiama `aggiornaGiocatoreAttivo()`:
      - per carta numerica: avanza da `1` a `0` → inizia `Giocatore1`;
      - per `+2` o `Blocca Turno`: avanza a `0`, registra `TURNO_SALTATO` e avanza a `1` → inizia `Giocatore2`;
@@ -279,7 +302,7 @@ A ogni iterazione del ciclo in `UnoLegendsCli.main`:
 1. Stampa i messaggi di `controller.prelevaMessaggi()` (eventi accaduti dall'ultimo comando).
 2. Legge `StatoPartitaDto stato = controller.richiediStato()`.
 3. Fa uno `switch` esaustivo su `stato.getFase()`:
-   - `TERMINATA` → stampa il vincitore ed esce;
+   - `TERMINATA` → `mostraClassifica`: stampa vincitore e classifica ed esce;
    - `ATTESA_INPUT` → `gestisciRichiestaInput` (stampa messaggio e opzioni, chiama `rispondiInput`);
    - `ATTESA_UNO` → `attendiDichiarazioneUno` e `completaDichiarazioneUno`;
    - `POST_PESCA` → `turnoDopoPesca`: mostra stato e carta pescata, accetta un indice oppure `'p'`;
@@ -302,7 +325,7 @@ La CLI non deduce più la fase combinando flag: la legge dal model.
 1. Calcola `avevaDueCarte`, toglie la carta (`rimuoviCarta`) e la mette negli scarti.
 2. Se la carta non è `NERO`, aggiorna `coloreAttuale`; azzera `cartaAppenaPescata`.
 3. Applica `effetto.attivaEffetto(this, risposta)`.
-4. **Vittoria**: se `regole.isVincitore(...)` → `vincitore`, fase `TERMINATA`.
+4. **Carte finite**: se `regole.isVincitore(...)` → `registraTerminato` (stato `TERMINATO`, evento, controllo `isPartitaTerminata`). Se la partita è finita la fase è `TERMINATA`; altrimenti (Endless) `chiudiTurno()`.
 5. **Finestra UNO**: se `avevaDueCarte` e ora ha una carta → fase `ATTESA_UNO` (il turno non avanza).
 6. Altrimenti `chiudiTurno()`: fase `NORMALE` e `aggiornaGiocatoreAttivo()`.
 
@@ -356,8 +379,8 @@ La CLI non deduce più la fase combinando flag: la legge dal model.
    - Chiama `pescaSingola(bersaglio)` quel numero di volte, fermandosi se mazzo e scarti sono esauriti.
    - Registra **un** evento `PESCA_FORZATA` con le carte effettivamente pescate e l'origine.
 2. **Avanzamento turno**:
-   - `getProssimoGiocatore()` calcola `(indice + 1) % n` se `sensoOrario`, oppure `(indice - 1 + n) % n`, **senza** modificare `indiceGiocatoreAttivo`.
-   - `aggiornaGiocatoreAttivo()` (ora privato) chiama `avanzaGiocatore()`; se `saltaProssimoTurno`, azzera il flag, registra `TURNO_SALTATO` e avanza una **seconda volta**.
+   - Unico helper privato `trovaProssimoIndiceInGioco(daIndice)`: avanza di ±1 (modulo `n`) nel senso di gioco **saltando i giocatori non `IN_GIOCO`**. Lo usano sia `getProssimoGiocatore()` (che non modifica `indiceGiocatoreAttivo`) sia `avanzaGiocatore()`. Prima ognuno usava `(i ± 1) % n`, che dava per scontato che nessuno uscisse.
+   - `aggiornaGiocatoreAttivo()` (privato) chiama `avanzaGiocatore()`; se `saltaProssimoTurno`, azzera il flag, registra `TURNO_SALTATO` e avanza una **seconda volta**.
    - `cambioGiro()` inverte `sensoOrario` e registra `SENSO_INVERTITO`.
 3. **Lettura degli eventi**: `Partita.prelevaEventi()` restituisce una copia del registro e lo svuota; `UnoLegendsGame.prelevaMessaggi()` traduce ogni evento in frase.
 
@@ -368,15 +391,15 @@ La CLI non deduce più la fase combinando flag: la legge dal model.
 | Pattern | Tipo | Classi nel Codice | Ruolo Effettivo |
 |---|---|---|---|
 | **Facade / Controller** | GoF / GRASP | `UnoLegendsGame` | Espone API semplificate alla UI e disaccoppia `ui` da `model`. |
-| **DTO (Data Transfer Object)** | Architetturale | `StatoPartitaDto`, `RichiestaInputDto`, `FaseTurnoDto` | Trasporta dati immutabili privi di dipendenze dal dominio verso la UI. |
+| **DTO (Data Transfer Object)** | Architetturale | `StatoPartitaDto` (con i tipi interni `Fase`, `Richiesta`, `Giocatore`) | Trasporta dati immutabili privi di dipendenze dal dominio verso la UI. |
 | **Coordinator** | GRASP | `Partita` | Coordina turni, stato partita, delega a regole, effetti ed expert. |
 | **Information Expert** | GRASP | `Giocatore`, `Mazzo`, `PilaDegliScarti`, `Effetto_Cambia_colore` | Ogni classe gestisce i dati di cui è esperta (mano, deck, scarti, validazione colore). |
-| **Creator / Factory** | GRASP / GoF | `PartitaFactory` | Centralizza la costruzione e il setup iniziale di `Partita`. |
+| **Creator / Factory** | GRASP / GoF | `PartitaFactory`, `RegoleDiGioco.standard(opzioni)` | Centralizza la costruzione e il setup iniziale di `Partita`; è l'unico punto che sceglie le classi concrete in base a modalità e opzioni. |
 | **Abstract Factory** | GoF | `MazzoFactory`, `StandardMazzoFactory` | Astrae la creazione della famiglia di carte del mazzo. |
 | **Singleton** | GoF | `StandardMazzoFactory` | Garantisce un'unica istanza della factory del mazzo standard (`getInstance()`). |
-| **Strategy / Protected Variations** | GoF / GRASP | `RegoleDiGioco`, `IStrategia*`, `Ieffetto` | Rende intercambiabili compatibilità carte, pesca, vittoria, sconfitta, penalità UNO ed effetti delle carte. |
+| **Strategy / Protected Variations** | GoF / GRASP | `RegoleDiGioco`, `IStrategia*`, `Ieffetto` | Rende intercambiabili compatibilità carte, pesca, vittoria, sconfitta, penalità UNO, fine partita (normale/Endless) ed effetti delle carte. |
 | **Composite** | GoF | `EffettoComposito` | Compone più `Ieffetto` in sequenza trattandoli come un unico `Ieffetto` (usato per `+4`). |
-| **Null Object** | Design Pattern | `Effetto_Nullo` | Evita controlli `if (effetto != null)` sulle carte numeriche. |
+| **Null Object** | Design Pattern | `Effetto_Nullo` | Evita controlli `if (effetto != null)` sulle carte numeriche e permette di avere una sola classe `Carta`. |
 | **Command** | GoF | `AzioneInAttesa` | Incapsula un'azione sospesa (effetto + completamento) da eseguire quando arriva la risposta del giocatore. |
 | **Pure Fabrication / Indirection** | GRASP | `EventoPartita`, `TipoEvento` | Registro eventi: il model registra cosa succede senza sapere chi lo leggerà; il controller lo traduce in testo. |
 
@@ -389,11 +412,10 @@ Per comprendere con precisione ciò che il codice fa *effettivamente* oggi rispe
 1. **Numero di carte iniziali**: `PartitaFactory.CARTE_PER_GIOCATORE` distribuisce **7 carte** per giocatore (mentre `docs/roles_and_patterns.md` cita ancora 5 carte da una revisione precedente).
 2. **Disallineamento `domain_class_diagram.puml` vs codice reale**:
    - Nel codice reale `Partita.giocaCarta` ha firma `(int indiceCarta) : boolean`: la risposta agli input passa da `rispondiInput(String)` e la dichiarazione UNO da `completaDichiarazioneUno(boolean)`.
-   - Nel codice reale `CartaNumero` non ha il campo `id : int`.
    - In `Mazzo`, il metodo si chiama `getNumeroCarte()` (non `getNumeroCarteRestanti()`).
    - `Partita` non espone `getMazzoDaPesca()`, `getNumeroCarteNelMazzo()` né `tuttiGliAltriGiocatoriHannoPiuDi(...)`.
-3. **Strategia di sconfitta predisposta ma non ancora agganciata**: `RegoleDiGioco` espone `isEliminato(Giocatore, Partita)` con `StrategiaSconfittaStandard` (che ritorna sempre `false`), ma `Partita` attualmente non invoca `regole.isEliminato(...)` durante il turno.
+3. **Eliminazione predisposta ma non ancora agganciata**: `Partita.eliminaGiocatore(Giocatore)` (package-private) esiste dallo Step 3 (stato `ELIMINATO`, carte nel mazzo, evento, controllo fine partita), ma nessuno lo chiama: `regole.isEliminato(...)` verrà controllato dopo ogni pesca allo Step 4, con la Mercy rule.
 4. **Dopo la pesca si gioca qualsiasi carta**: in `POST_PESCA` `Partita.giocaCarta` accetta ogni carta compatibile della mano, non solo `cartaAppenaPescata` (regola scelta per il progetto).
-5. **Cambia Giro con 2 giocatori**: `Effetto_cambio_giro` inverte `sensoOrario`, ma con `giocatori.size() == 2` avanzare di `+1` o `-1` modulo `2` seleziona comunque l'altro giocatore (non equivale a un salta turno in 2 giocatori, a differenza della variante UNO 2-player ufficiale).
+5. **Cambia Giro con 2 giocatori in gioco**: `Effetto_cambio_giro` inverte `sensoOrario`; con 3 o più giocatori cambia davvero chi viene dopo. Con 2 giocatori in gioco (anche in Endless, quando ne restano due) avanzare in un senso o nell'altro seleziona comunque l'altro giocatore: non equivale a un salta turno, a differenza della regola ufficiale per 2 giocatori. Da decidere.
 6. **Attese di input unificate (Step 2)**: carta iniziale nera e carta nera giocata nel turno passano entrambe da `AzioneInAttesa` + `rispondiInput(String)`. La dichiarazione UNO resta un comando separato (`completaDichiarazioneUno`) perché ha il timer di 5 secondi ed è un'interazione diversa da "scegli fra opzioni".
-7. **Assenza di `Personaggio` / abilità passive e stacking `+2`/`+4`**: non sono ancora presenti nel codice attuale; `Partita` e `RegoleDiGioco` implementano al momento il solo set di regole UNO standard senza personaggi né accumulo di penalità.
+7. **Assenza di Legend / abilità passive e stacking `+2`/`+4`**: non sono ancora presenti nel codice attuale; `Partita` e `RegoleDiGioco` implementano al momento il solo set di regole UNO standard senza personaggi né accumulo di penalità.
