@@ -1,5 +1,6 @@
 package unolegends.controller;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
@@ -7,6 +8,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import unolegends.model.AbilitaAttiva;
 import unolegends.model.Accumulo;
 import unolegends.model.Carta;
 import unolegends.model.Colore;
@@ -15,6 +17,7 @@ import unolegends.model.ErroreConfigurazione;
 import unolegends.model.EventoPartita;
 import unolegends.model.FaseTurno;
 import unolegends.model.Giocatore;
+import unolegends.model.Legend;
 import unolegends.model.ModalitaDiGioco;
 import unolegends.model.OpzionePartita;
 import unolegends.model.OriginePesca;
@@ -38,6 +41,12 @@ import unolegends.model.TipoRichiesta;
  * verifica restituisce la frase d'errore oppure {@code null}. La CLI non sa quali
  * opzioni sono obbligatorie in una modalità: le basta chiedere
  * {@link #getOpzioniConfigurabili(String)}.</p>
+ *
+ * <p>Dallo Step 6 il setup chiede anche i Legend, sempre come stringhe:
+ * {@link #richiedeLegend(Set)} dice se le opzioni scelte li prevedono,
+ * {@link #getLegendDisponibili()} e {@link #descriviLegend(String)} li elencano. Nomi
+ * e descrizioni di Legend, passive e abilità li scrive questa classe, come per
+ * modalità e opzioni: il model contiene solo l'enum {@link Legend}.</p>
  */
 public class UnoLegendsGame {
     private final Partita partita;
@@ -68,6 +77,28 @@ public class UnoLegendsGame {
         return descrizioneOpzione(Objects.requireNonNull(opzioneDaNome(opzione), "opzione sconosciuta"));
     }
 
+    /**
+     * true se con queste opzioni ogni giocatore deve scegliere un Legend. La CLI lo
+     * chiede qui invece di confrontare il nome dell'opzione: non sa quale opzione porta
+     * i Legend.
+     */
+    public static boolean richiedeLegend(Set<String> opzioni) {
+        return opzioni.stream().anyMatch(nome -> opzioneDaNome(nome) == OpzionePartita.LEGEND);
+    }
+
+    /** Nomi dei Legend selezionabili, nell'ordine in cui mostrarli. */
+    public static List<String> getLegendDisponibili() {
+        return Arrays.stream(Legend.values()).map(UnoLegendsGame::nomeLegend).toList();
+    }
+
+    /** Frase che spiega passiva, attiva e cooldown del Legend, da mostrare nel menu. */
+    public static String descriviLegend(String legend) {
+        Legend scelto = Objects.requireNonNull(legendDaNome(legend), "legend sconosciuto");
+        return "passiva " + nomePassiva(scelto) + " (" + descrizionePassiva(scelto) + "); attiva "
+                + nomeAbilita(scelto) + " (" + descrizioneAbilita(scelto) + ", ricarica "
+                + scelto.getCooldown() + " turni)";
+    }
+
     public static int getMinimoGiocatori() {
         return ConfigurazionePartita.MIN_GIOCATORI;
     }
@@ -84,6 +115,17 @@ public class UnoLegendsGame {
      * @return la frase da mostrare se le scelte non sono valide, oppure {@code null} se sono valide
      */
     public static String verificaImpostazioni(String modalita, Set<String> opzioni, List<String> nomiGiocatori) {
+        return verificaImpostazioni(modalita, opzioni, nomiGiocatori, List.of());
+    }
+
+    /**
+     * Come {@link #verificaImpostazioni(String, Set, List)}, con i Legend dei giocatori
+     * nello stesso ordine dei nomi (lista vuota se la partita è senza Legend).
+     *
+     * @return la frase da mostrare se le scelte non sono valide, oppure {@code null} se sono valide
+     */
+    public static String verificaImpostazioni(String modalita, Set<String> opzioni, List<String> nomiGiocatori,
+                                              List<String> legend) {
         ModalitaDiGioco modalitaScelta = modalitaDaNome(modalita);
         if (modalitaScelta == null) {
             return "Modalita sconosciuta: " + modalita + ".";
@@ -96,7 +138,16 @@ public class UnoLegendsGame {
             }
             opzioniScelte.add(opzione);
         }
-        ErroreConfigurazione errore = ConfigurazionePartita.verifica(modalitaScelta, nomiGiocatori, opzioniScelte);
+        List<Legend> legendScelti = new ArrayList<>();
+        for (String nome : legend) {
+            Legend scelto = legendDaNome(nome);
+            if (scelto == null) {
+                return "Legend sconosciuto: " + nome + ".";
+            }
+            legendScelti.add(scelto);
+        }
+        ErroreConfigurazione errore = ConfigurazionePartita.verifica(modalitaScelta, nomiGiocatori, opzioniScelte,
+                legendScelti);
         return errore == null ? null : messaggioPer(errore);
     }
 
@@ -107,13 +158,21 @@ public class UnoLegendsGame {
      * di programmazione della UI e non un caso da mostrare all'utente.
      */
     public static UnoLegendsGame avviaPartita(String modalita, Set<String> opzioni, List<String> nomiGiocatori) {
-        String errore = verificaImpostazioni(modalita, opzioni, nomiGiocatori);
+        return avviaPartita(modalita, opzioni, nomiGiocatori, List.of());
+    }
+
+    /** Come {@link #avviaPartita(String, Set, List)}, con i Legend dei giocatori. */
+    public static UnoLegendsGame avviaPartita(String modalita, Set<String> opzioni, List<String> nomiGiocatori,
+                                              List<String> legend) {
+        String errore = verificaImpostazioni(modalita, opzioni, nomiGiocatori, legend);
         if (errore != null) {
             throw new IllegalArgumentException(errore);
         }
         Set<OpzionePartita> opzioniScelte = EnumSet.noneOf(OpzionePartita.class);
         opzioni.forEach(nome -> opzioniScelte.add(opzioneDaNome(nome)));
-        ConfigurazionePartita config = new ConfigurazionePartita(modalitaDaNome(modalita), nomiGiocatori, opzioniScelte);
+        List<Legend> legendScelti = legend.stream().map(UnoLegendsGame::legendDaNome).toList();
+        ConfigurazionePartita config = new ConfigurazionePartita(modalitaDaNome(modalita), nomiGiocatori,
+                opzioniScelte, legendScelti);
 
         Partita partita = PartitaFactory.creaPartita(config);
         partita.iniziaGioco();
@@ -131,6 +190,7 @@ public class UnoLegendsGame {
         return switch (opzione) {
             case ENDLESS -> "Endless";
             case STACKING -> "Stacking";
+            case LEGEND -> "Legend";
         };
     }
 
@@ -141,7 +201,78 @@ public class UnoLegendsGame {
             case STACKING -> "a una carta di pesca si puo rispondere con una carta di pesca di valore uguale"
                     + " o superiore (+2 su +2, +4 su +2 o su +4): le carte si accumulano e chi non risponde"
                     + " le pesca tutte e perde il turno";
+            case LEGEND -> "ogni giocatore sceglie un Legend diverso, con un'abilita passiva sempre attiva"
+                    + " e un'abilita attiva da usare a inizio turno (poi va ricaricata)";
         };
+    }
+
+    // ------------------------------------------------------------------
+    // Testi dei Legend (Step 6): il model ha solo l'enum, le frasi stanno qui
+    // ------------------------------------------------------------------
+
+    private static String nomeLegend(Legend legend) {
+        return switch (legend) {
+            case ROCCIA -> "La Roccia";
+            case MERCANTE -> "Il Mercante";
+            case FANTASMA -> "Il Fantasma";
+            case DALTONICO -> "Il Daltonico";
+            case FREEZER -> "Il Freezer";
+            case ACROBATA -> "L'Acrobata";
+        };
+    }
+
+    private static String nomePassiva(Legend legend) {
+        return switch (legend) {
+            case ROCCIA -> "Roccia";
+            case MERCANTE -> "Salesman";
+            case FANTASMA -> "Ghost";
+            case DALTONICO -> "Daltonismo";
+            case FREEZER -> "Pelle di ghiaccio";
+            case ACROBATA -> "Doppia pesca";
+        };
+    }
+
+    private static String descrizionePassiva(Legend legend) {
+        return switch (legend) {
+            case ROCCIA -> "un +2 da solo non ha effetto su di lui: non pesca e non salta il turno;"
+                    + " un accumulo dello stacking lo subisce come tutti";
+            case MERCANTE -> "a ogni penalita di pesca pesca una carta in meno, tranne che con la roulette";
+            case FANTASMA -> "non puo essere scelto come bersaglio da carte e abilita";
+            case DALTONICO -> "puo giocare carte rosse sul verde e carte verdi sul rosso";
+            case FREEZER -> "la carta Blocca non ha effetto su di lui";
+            case ACROBATA -> "quando pesca pesca 2 carte, ne tiene una e rimette l'altra in fondo al mazzo;"
+                    + " solo nella partita Standard";
+        };
+    }
+
+    private static String nomeAbilita(Legend legend) {
+        return switch (legend) {
+            case ROCCIA -> "Il Castigatore";
+            case MERCANTE -> "Gifted card";
+            case FANTASMA -> "Scambia mazzo";
+            case DALTONICO -> "Arcobaleno";
+            case FREEZER -> "Congela";
+            case ACROBATA -> "Double card";
+        };
+    }
+
+    private static String descrizioneAbilita(Legend legend) {
+        return switch (legend) {
+            case ROCCIA -> "un giocatore a scelta pesca 4 carte";
+            case MERCANTE -> "dai 2 carte a caso della tua mano a un giocatore a scelta; serve avere almeno 4 carte";
+            case FANTASMA -> "scambi la tua mano con un giocatore a scelta che ha piu di una carta";
+            case DALTONICO -> "in questo turno puoi giocare qualsiasi carta, anche se non e compatibile";
+            case FREEZER -> "un giocatore a scelta salta il suo prossimo turno e intanto e come se non ci fosse";
+            case ACROBATA -> "dopo questo turno ne giochi subito un altro";
+        };
+    }
+
+    /** Il Legend con quel nome, oppure null se non esiste. */
+    private static Legend legendDaNome(String nome) {
+        return Arrays.stream(Legend.values())
+                .filter(l -> nomeLegend(l).equalsIgnoreCase(nome == null ? "" : nome.strip()))
+                .findFirst()
+                .orElse(null);
     }
 
     /** La modalità con quel nome, oppure null se non esiste. */
@@ -168,6 +299,9 @@ public class UnoLegendsGame {
             case NOMI_DUPLICATI -> "Due giocatori non possono avere lo stesso nome.";
             case GIOCATORI_INSUFFICIENTI_PER_ENDLESS -> "La modalita Endless richiede almeno "
                     + ConfigurazionePartita.MIN_GIOCATORI_ENDLESS + " giocatori.";
+            case LEGEND_MANCANTI -> "Con l'opzione Legend ogni giocatore deve scegliere un Legend.";
+            case LEGEND_SENZA_OPZIONE -> "Per scegliere i Legend bisogna attivare l'opzione Legend.";
+            case LEGEND_DUPLICATI -> "Due giocatori non possono scegliere lo stesso Legend.";
         };
     }
 
@@ -193,7 +327,16 @@ public class UnoLegendsGame {
                 convertiGiocatori(),
                 partita.isSensoOrario(),
                 partita.getClassifica().stream().map(Giocatore::getNome).toList(),
-                convertiAccumulo(partita.getAccumulo()));
+                convertiAccumulo(partita.getAccumulo()),
+                abilitaDisponibile());
+    }
+
+    /** Nome dell'abilità che il giocatore di turno può usare ora, oppure null. */
+    private String abilitaDisponibile() {
+        if (!partita.isAbilitaUsabile()) {
+            return null;
+        }
+        return nomeAbilita(partita.getGiocatori().get(partita.getIndiceGiocatoreAttivo()).getLegend());
     }
 
     private static StatoPartitaDto.Accumulo convertiAccumulo(Accumulo accumulo) {
@@ -207,13 +350,19 @@ public class UnoLegendsGame {
         boolean partitaInCorso = partita.getFase() != FaseTurno.TERMINATA;
         return partita.getGiocatori().stream()
                 .map(g -> new StatoPartitaDto.Giocatore(g.getNome(), g.getMano().size(), descriviStato(g),
-                        partitaInCorso && g.getNome().equals(nomeAttivo)))
+                        partitaInCorso && g.getNome().equals(nomeAttivo),
+                        g.getLegend() == null ? null : nomeLegend(g.getLegend()),
+                        ricarica(g.getAbilitaAttiva())))
                 .toList();
+    }
+
+    private static int ricarica(AbilitaAttiva abilita) {
+        return abilita == null ? 0 : abilita.getTurniDiRicarica();
     }
 
     private String descriviStato(Giocatore giocatore) {
         return switch (giocatore.getStato()) {
-            case IN_GIOCO -> "in gioco";
+            case IN_GIOCO -> giocatore.isCongelato() ? "congelato" : "in gioco";
             case TERMINATO -> "terminato al posto n. " + (partita.getGiocatoriTerminati().indexOf(giocatore) + 1);
             case ELIMINATO -> "eliminato";
         };
@@ -277,6 +426,17 @@ public class UnoLegendsGame {
     }
 
     /**
+     * Inoltra l'uso dell'abilità attiva del giocatore di turno (Step 6). Se l'abilità
+     * chiede un bersaglio, la partita passa in fase di attesa e la UI risponde con
+     * {@link #rispondiInput(String)}, come per una carta.
+     *
+     * @return true se il comando è stato accettato
+     */
+    public boolean usaAbilita() {
+        return partita.usaAbilita();
+    }
+
+    /**
      * Preleva gli eventi accaduti dall'ultima chiamata e li traduce in messaggi
      * da stampare. La UI la chiama a ogni giro del suo ciclo.
      */
@@ -297,8 +457,10 @@ public class UnoLegendsGame {
             case PESCA_VOLONTARIA -> evento.quantita() == 0
                     ? giocatore + " non pesca nulla: mazzo e scarti sono esauriti."
                     : giocatore + " pesca " + descriviNumeroCarte(evento.quantita()) + ".";
-            case PESCA_FORZATA -> giocatore + " pesca " + descriviNumeroCarte(evento.quantita())
-                    + descriviOrigine(evento.origine()) + ".";
+            case PESCA_FORZATA -> evento.quantita() == 0
+                    ? giocatore + " non pesca nessuna carta" + descriviOrigine(evento.origine()) + "."
+                    : giocatore + " pesca " + descriviNumeroCarte(evento.quantita())
+                            + descriviOrigine(evento.origine()) + ".";
             case TURNO_SALTATO -> giocatore + " salta il turno.";
             case SENSO_INVERTITO -> "Il senso di gioco si inverte.";
             case COLORE_SCELTO -> giocatore + " sceglie il colore "
@@ -315,7 +477,32 @@ public class UnoLegendsGame {
             case TURNO_EXTRA -> "Tutti saltano il turno: " + giocatore + " gioca ancora.";
             case ACCUMULO_AUMENTATO -> "Stacking: l'accumulo sale a " + descriviNumeroCarte(evento.quantita()) + ".";
             // Le carte pescate le racconta subito dopo l'evento PESCA_FORZATA.
-            case PENALITA_ACCETTATA -> giocatore + " non risponde allo stacking: accetta la penalita e perde il turno.";
+            case PENALITA_ACCETTATA -> giocatore + " non risponde allo stacking e accetta la penalita.";
+            case ABILITA_USATA -> giocatore + " (" + nomeLegend(evento.legend()) + ") usa l'abilita "
+                    + nomeAbilita(evento.legend()) + spiegazioneUso(evento.legend()) + ".";
+            case PESCA_RIDOTTA -> "Passiva " + nomePassiva(evento.legend()) + ": " + giocatore + " evita "
+                    + descriviNumeroCarte(evento.quantita()) + ".";
+            case BLOCCO_EVITATO -> "Passiva " + nomePassiva(evento.legend()) + ": il Blocca non ha effetto su "
+                    + giocatore + ".";
+            case GIOCATORE_CONGELATO -> giocatore + " congela " + evento.altroGiocatore()
+                    + ": saltera il suo prossimo turno.";
+            case TURNO_CONGELATO -> giocatore + " e congelato e salta il turno.";
+            case CARTE_REGALATE -> giocatore + " regala " + descriviNumeroCarte(evento.quantita())
+                    + " a " + evento.altroGiocatore() + ".";
+            case CARTA_SCELTA -> giocatore + " tiene una carta e ne rimette " + evento.quantita()
+                    + " in fondo al mazzo.";
+        };
+    }
+
+    /**
+     * Le abilità senza bersaglio non producono altri eventi subito: qui si dice cosa
+     * succede. Le altre lo raccontano i loro eventi (pesca, scambio, congelamento...).
+     */
+    private static String spiegazioneUso(Legend legend) {
+        return switch (legend) {
+            case DALTONICO -> ": in questo turno puo giocare qualsiasi carta";
+            case ACROBATA -> ": dopo questo turno ne gioca subito un altro";
+            case ROCCIA, MERCANTE, FANTASMA, FREEZER -> "";
         };
     }
 
@@ -333,6 +520,7 @@ public class UnoLegendsGame {
             case PIU_DIECI -> " per un +10";
             case ROULETTE -> " con la roulette";
             case ACCUMULO -> " accumulate con lo stacking";
+            case CASTIGATORE -> " per Il Castigatore";
         };
     }
 
@@ -384,6 +572,7 @@ public class UnoLegendsGame {
         return switch (tipo) {
             case SCELTA_COLORE -> "Scegli il colore da assegnare alla carta:";
             case SCELTA_GIOCATORE -> "Scegli il giocatore bersaglio:";
+            case SCELTA_CARTA -> "Doppia pesca: scegli la carta da tenere (l'altra torna in fondo al mazzo):";
         };
     }
 }
