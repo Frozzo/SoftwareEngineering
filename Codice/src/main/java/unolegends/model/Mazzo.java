@@ -47,6 +47,15 @@ public class Mazzo {
     }
 
     /**
+     * Mette una carta in fondo al mazzo, senza rimescolare: sarà l'ultima a essere
+     * pescata. Serve alla passiva Doppia pesca (Step 6): la carta non tenuta torna in
+     * fondo, così non si ripesca subito (decisione presa).
+     */
+    public void aggiungiInFondo(Carta carta) {
+        carte.addLast(Objects.requireNonNull(carta, "carta non puo essere null"));
+    }
+
+    /**
      * Ricostituisce e mescola il mazzo usando gli scarti, preservando la carta in cima.
      */
     public void rimescolaDaScarti(PilaDegliScarti pilaDegliScarti) {

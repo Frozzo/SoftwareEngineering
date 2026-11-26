@@ -65,6 +65,13 @@ Classi e responsabilità
   - Pattern: View / UI
   - Responsabilità: raccogliere input e presentare lo stato usando esclusivamente l'API e i DTO esposti dal controller; non importa classi del model.
 
+- Legend (Step 6) — dettagli in `step6_sesta_iter.md`
+  - Legend (enum di soli dati): collega passiva, abilità attiva e cooldown di ogni personaggio.
+  - IPassiva + Passiva* (Strategy, Polymorphism, Protected Variations): ogni passiva ridefinisce un solo hook; le interrogano RegoleDiGioco e pochi punti di Partita, senza sapere quale passiva hanno davanti.
+  - AbilitaAttiva: un Ieffetto più la ricarica del singolo giocatore (le abilità riusano il meccanismo degli input delle carte).
+  - EffettoConBersaglio (Template Method): scelta del bersaglio fra `Partita.getBersagliSelezionabili()`; sottoclassi EffettoScambiaMano, EffettoPescaBersaglio, EffettoRegalaCarte, EffettoCongela.
+  - Giocatore (Information Expert): conosce passive, abilità e congelamento; risponde a `isBersagliabile()` e `partecipaAiTurni()`.
+
 Note architetturali
 
 - Il singleton presente oggi è `StandardMazzoFactory`.

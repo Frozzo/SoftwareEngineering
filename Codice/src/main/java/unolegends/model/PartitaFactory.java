@@ -12,7 +12,7 @@ import java.util.Objects;
  * <ol>
  *   <li>crea il mazzo con la {@link MazzoFactory} della modalità (Abstract Factory);</li>
  *   <li>crea le regole della modalità con le opzioni scelte;</li>
- *   <li>distribuisce 7 carte a ogni giocatore, con i nomi scelti nel menu;</li>
+ *   <li>distribuisce 7 carte a ogni giocatore, con i nomi e (dallo Step 6) i Legend scelti nel menu;</li>
  *   <li>mette la prima carta del mazzo sugli scarti.</li>
  * </ol>
  *
@@ -30,7 +30,8 @@ public class PartitaFactory {
     /** Crea la partita descritta dalla configurazione scelta nel menu. */
     public static Partita creaPartita(ConfigurazionePartita config) {
         Objects.requireNonNull(config, "config non puo essere null");
-        return creaPartita(config.modalita().getMazzoFactory(), config.nomiGiocatori(), creaRegole(config));
+        return creaPartita(config.modalita().getMazzoFactory(), config.nomiGiocatori(), config.legend(),
+                creaRegole(config));
     }
 
     /**
@@ -39,11 +40,24 @@ public class PartitaFactory {
      * provare il dominio con regole costruite a mano.
      */
     public static Partita creaPartita(MazzoFactory mazzoFactory, List<String> nomiGiocatori, RegoleDiGioco regole) {
+        return creaPartita(mazzoFactory, nomiGiocatori, List.of(), regole);
+    }
+
+    /**
+     * Come {@link #creaPartita(MazzoFactory, List, RegoleDiGioco)}, con i Legend dei
+     * giocatori nello stesso ordine dei nomi (lista vuota = partita senza Legend).
+     */
+    public static Partita creaPartita(MazzoFactory mazzoFactory, List<String> nomiGiocatori, List<Legend> legend,
+                                      RegoleDiGioco regole) {
         Objects.requireNonNull(mazzoFactory, "mazzoFactory non puo essere null");
         Objects.requireNonNull(nomiGiocatori, "nomiGiocatori non puo essere null");
+        Objects.requireNonNull(legend, "legend non puo essere null");
         Objects.requireNonNull(regole, "regole non puo essere null");
+        if (!legend.isEmpty() && legend.size() != nomiGiocatori.size()) {
+            throw new IllegalArgumentException("serve un Legend per ogni giocatore");
+        }
         Mazzo mazzo = mazzoFactory.creaMazzo();
-        List<Giocatore> giocatori = distribuisciCarteAiGiocatori(mazzo, nomiGiocatori);
+        List<Giocatore> giocatori = distribuisciCarteAiGiocatori(mazzo, nomiGiocatori, legend);
         Carta primaCarta = scopriPrimaCarta(mazzo);
         PilaDegliScarti pilaDegliScarti = new PilaDegliScarti(List.of(primaCarta));
         return new Partita(giocatori, mazzo, pilaDegliScarti, regole);
@@ -80,14 +94,15 @@ public class PartitaFactory {
         };
     }
 
-    private static List<Giocatore> distribuisciCarteAiGiocatori(Mazzo mazzo, List<String> nomiGiocatori) {
+    private static List<Giocatore> distribuisciCarteAiGiocatori(Mazzo mazzo, List<String> nomiGiocatori,
+                                                               List<Legend> legend) {
         List<Giocatore> giocatori = new ArrayList<>();
-        for (String nome : nomiGiocatori) {
+        for (int i = 0; i < nomiGiocatori.size(); i++) {
             List<Carta> mano = new ArrayList<>();
             for (int j = 0; j < CARTE_PER_GIOCATORE; j++) {
                 mano.add(mazzo.prelevaCarta());
             }
-            giocatori.add(new Giocatore(nome, mano));
+            giocatori.add(new Giocatore(nomiGiocatori.get(i), mano, legend.isEmpty() ? null : legend.get(i)));
         }
         return giocatori;
     }

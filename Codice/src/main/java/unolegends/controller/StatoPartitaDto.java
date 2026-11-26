@@ -3,10 +3,23 @@ package unolegends.controller;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Unico DTO che la UI riceve dal controller: uno snapshot della partita già
+ * tradotto in dati di presentazione (stringhe, numeri, enum della UI).
+ *
+ * <p>Dallo Step 6 contiene anche i dati dei Legend: per ogni giocatore il nome del
+ * Legend e la ricarica dell'abilità ({@link Giocatore}), e per il giocatore di turno
+ * il nome dell'abilità che può usare adesso ({@code abilitaDisponibile}), così la CLI
+ * mostra la voce di menu solo quando il comando sarebbe accettato.</p>
+ *
+ * @param abilitaDisponibile nome dell'abilità attiva che il giocatore di turno può usare ora,
+ *                           oppure {@code null} se non può usarne nessuna
+ */
 public record StatoPartitaDto(Fase fase, String nomeGiocatoreAttivo, List<String> mano,
                               String cartaInCima, String cartaAppenaPescata,
                               Richiesta richiestaInput, List<Giocatore> giocatori,
-                              boolean sensoOrario, List<String> classifica, Accumulo accumulo) {
+                              boolean sensoOrario, List<String> classifica, Accumulo accumulo,
+                              String abilitaDisponibile) {
 
     public StatoPartitaDto {
         Objects.requireNonNull(fase, "fase non puo essere null");
@@ -51,7 +64,14 @@ public record StatoPartitaDto(Fase fase, String nomeGiocatoreAttivo, List<String
         }
     }
 
-    public record Giocatore(String nome, int numeroCarte, String stato, boolean diTurno) {
+    /**
+     * Un giocatore come lo vede la UI.
+     *
+     * @param legend          nome del Legend, oppure {@code null} se la partita è senza Legend
+     * @param ricaricaAbilita turni che mancano prima di poter riusare l'abilità (0 = pronta)
+     */
+    public record Giocatore(String nome, int numeroCarte, String stato, boolean diTurno,
+                            String legend, int ricaricaAbilita) {
         public Giocatore {
             Objects.requireNonNull(nome, "nome non puo essere null");
             Objects.requireNonNull(stato, "stato non puo essere null");

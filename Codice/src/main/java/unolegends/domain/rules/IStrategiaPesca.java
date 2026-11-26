@@ -13,4 +13,14 @@ import unolegends.model.Partita;
 @FunctionalInterface
 public interface IStrategiaPesca {
     List<Carta> pesca(Giocatore giocatore, Partita partita);
+
+    /**
+     * true se con questa pesca ha senso la passiva Doppia pesca (pesca 2 carte e
+     * tienine una, Step 6). Lo decide la strategia, non la passiva e non un {@code if}
+     * sulla modalità: la pesca singola lo ammette, la pesca No Mercy ("finché trovi una
+     * carta giocabile") no. Di default no.
+     */
+    default boolean ammettePescaConScelta() {
+        return false;
+    }
 }

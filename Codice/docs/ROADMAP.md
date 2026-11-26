@@ -35,8 +35,8 @@ Le regole di gioco e le decisioni prese sono in [`CLAUDE.md`](../../CLAUDE.md), 
 | 3 | N giocatori, giocatori eliminati, Endless, configurazione e menu di setup | ✅ fatto (branch `ci-aiuta-claudio`) |
 | 4 | Modalità No Mercy: regole speciali e carte nuove | ✅ fatto (branch `ci-aiuta-claudio`) |
 | 5 | Stacking delle carte di pesca | ✅ fatto (branch `ci-aiuta-claudio`) |
-| 6 | Legend: abilità passive, abilità attive con cooldown, scelta nel menu | ⏭️ prossimo |
-| 7 | Rifinitura: test, casi limite, bilanciamento, documentazione | da fare |
+| 6 | Legend: abilità passive, abilità attive con cooldown, scelta nel menu | ✅ fatto (branch `ci-aiuta-claudio`) |
+| 7 | Rifinitura: test, casi limite, bilanciamento, documentazione | ⏭️ prossimo |
 
 Perché quest'ordine:
 - I Legend vengono quasi per ultimi perché le loro abilità si appoggiano su tutto il resto: scelta del giocatore bersaglio, pesche forzate, stacking, eliminazioni.
@@ -315,7 +315,21 @@ Se a questo punto gli `if` sulle fasi in `Partita` sono troppi, questo è il mom
 
 ---
 
-## Step 6 — Legend
+## Step 6 — Legend ✅
+
+Fatto. Resoconto completo (cosa è stato fatto, perché, alternative scartate e tutte le scelte prese con il team): [`step6_sesta_iter.md`](step6_sesta_iter.md).
+
+Scelte approvate, in sintesi:
+- **Sei Legend con coppie fisse** passiva + attiva: La Roccia (immune al +2 singolo / Il Castigatore), Il Mercante (Salesman / Gifted card), Il Fantasma (Ghost / Scambia mazzo), Il Daltonico (rosso ↔ verde / Arcobaleno), Il Freezer (Pelle di ghiaccio / Congela), L'Acrobata (Doppia pesca / Double card).
+- **Passive: interfaccia `IPassiva` con metodi `default`** (hook), come proposto sotto. Ogni passiva ridefinisce un solo hook; le interrogano `RegoleDiGioco` e pochi punti di `Partita`.
+- **Attive: `Ieffetto` + cooldown** (`AbilitaAttiva`), comando `usaAbilita()` solo in fase `NORMALE`; **nessuna abilità consuma il turno**. Cooldown contato sui turni del possessore, nessun cooldown iniziale.
+- **Congela blocca 1 turno**; il congelato è "come se non ci fosse" (non gioca, non è bersagliabile, non risponde allo stacking, la carta 0 lo salta).
+- **Scambia mazzo:** solo verso chi ha più di una carta. **Gifted card:** solo con almeno 4 carte. **Arcobaleno:** solo nella giocata normale. **Pelle di ghiaccio:** solo contro la carta Blocca. **Doppia pesca:** la carta non tenuta va in fondo al mazzo.
+- **Legend = opzione** `OpzionePartita.LEGEND`, in entrambe le modalità; due giocatori non possono avere lo stesso Legend.
+- Rispetto al piano qui sotto: niente Null Object per l'abilità attiva (è `null` e il comando viene rifiutato; le passive sono una lista vuota); Gifted card che svuota la mano non è più un caso, perché servono almeno 4 carte; dopo Gifted e Scambia mazzo non si dichiara UNO.
+- **Niente Builder** e **niente pattern State** neanche ora: le strategie restano 7 e non ci sono fasi nuove.
+
+Sotto resta il piano originale.
 
 ### Modello
 ```
@@ -408,15 +422,15 @@ Durante la partita la CLI mostra il Legend di ogni giocatore e il cooldown, e ag
 
 | # | Decisione | Proposta |
 |---|---|---|
-| 1 | Valore del cooldown di ogni abilità attiva | da definire giocando |
+| 1 | Valore del cooldown di ogni abilità attiva | primi valori allo Step 6 (3–5 turni); da bilanciare giocando (Step 7) |
 | 2 | Salesman e roulette: si applica lo sconto? | ✅ deciso: no |
 | 3 | Composizione esatta del mazzo No Mercy (168 carte) | ✅ decisa (Step 4) |
 | 4 | Carta 7 / Scambia mazzo giocate come ultima carta | ✅ deciso: chi la gioca come ultima carta vince e lo scambio non avviene |
-| 5 | Gifted card che svuota la mano | vale come vittoria |
-| 6 | Coppie passiva/attiva fisse o libere | fisse |
+| 5 | Gifted card che svuota la mano | ✅ non succede: dallo Step 6 Gifted card richiede almeno 4 carte |
+| 6 | Coppie passiva/attiva fisse o libere | ✅ fisse (Step 6) |
 | 7 | Introdurre Maven + JUnit e quando | ✅ deciso allo Step 5: no, si continua con programmi di prova esterni (al massimo 100 partite simulate) |
 | 8 | Cambio giro con 2 giocatori in gioco | ✅ deciso: vale come blocco (regola ufficiale), in entrambe le modalità; il +4 cambio giro con lo stacking rimanda l'accumulo a chi l'ha giocato (Step 5) |
-| 9 | Builder per `RegoleDiGioco` quando le strategie cresceranno | allo Step 5 (7 strategie) deciso di no; da rivalutare allo Step 6 |
+| 9 | Builder per `RegoleDiGioco` quando le strategie cresceranno | ✅ no: allo Step 6 le strategie restano 7 (le passive sono del giocatore) |
 
 ## Pattern usati, a lavori finiti
 

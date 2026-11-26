@@ -28,6 +28,14 @@ import java.util.function.Predicate;
  * aggiunge all'{@link Accumulo}; chi deve rispondere è in
  * {@link FaseTurno#RISPOSTA_STACKING} e risponde con {@link #giocaCarta(int)} o
  * {@link #accettaPenalita()}.</p>
+ *
+ * <p>Dallo Step 6 gestisce i Legend senza conoscerli: le passive le interrogano le
+ * regole e i pochi punti di Partita che le riguardano ({@link #getBersagliSelezionabili()},
+ * {@link #bloccaProssimo()}, la pesca volontaria), sempre attraverso gli hook di
+ * {@link IPassiva}; l'abilità attiva si usa con {@link #usaAbilita()} e passa dal
+ * meccanismo unificato degli input come una carta. Il giocatore congelato è "come se
+ * non ci fosse": lo escludono i due soli punti che decidono chi viene dopo
+ * ({@link #trovaProssimoIndice}) e chi si può scegliere.</p>
  */
 public class Partita {
     private final List<Giocatore> giocatori;
@@ -185,12 +193,15 @@ public class Partita {
     }
 
     /**
-     * Avversari del giocatore attivo che sono ancora in gioco. Servirà agli
-     * effetti con scelta del bersaglio (carta 7, abilità dei Legend).
+     * Avversari che il giocatore attivo può scegliere come bersaglio (carta 7 e
+     * abilità attive dei Legend): in gioco, non congelati e non protetti da una
+     * passiva (Ghost). È l'unico punto che lo decide; gli effetti automatici (carta 0,
+     * +2 al successivo, roulette) non passano di qui, quindi colpiscono anche Ghost.
+     * Sostituisce {@code getAvversariInGioco()}.
      */
-    public List<Giocatore> getAvversariInGioco() {
+    public List<Giocatore> getBersagliSelezionabili() {
         Giocatore attivo = getGiocatoreAttivo();
-        return giocatori.stream().filter(g -> g != attivo && g.isInGioco()).toList();
+        return giocatori.stream().filter(g -> g != attivo && g.isInGioco() && g.isBersagliabile()).toList();
     }
 
     public int getNumeroGiocatoriInGioco() {
@@ -340,8 +351,15 @@ public class Partita {
         Accumulo accettato = accumulo;
         accumulo = null;
         registraEvento(EventoPartita.penalitaAccettata(giocatore, accettato.totale()));
+        boolean annullata = isPenalitaAnnullata(giocatore, accettato.totale(), accettato.getOriginePenalita());
         applicaPescaForzata(giocatore, accettato.totale(), accettato.getOriginePenalita());
         verificaEliminazioni();
+        // Una passiva ha annullato la penalità (La Roccia su un +2 singolo): la carta non
+        // ha effetto su di lui, quindi non perde il turno e lo gioca normalmente.
+        if (annullata && fase != FaseTurno.TERMINATA && giocatore.isInGioco()) {
+            fase = FaseTurno.NORMALE;
+            return true;
+        }
         chiudiTurno();
         return true;
     }
@@ -366,8 +384,14 @@ public class Partita {
     void applicaPenalitaPesca(int numeroCarte, OriginePesca origine) {
         Objects.requireNonNull(origine, "origine non puo essere null");
         if (!regole.isAccumuloAttivo()) {
-            applicaPescaForzata(getProssimoGiocatore(), numeroCarte, origine);
-            segnalaSaltoTurno();
+            Giocatore vittima = getProssimoGiocatore();
+            boolean annullata = isPenalitaAnnullata(vittima, numeroCarte, origine);
+            applicaPescaForzata(vittima, numeroCarte, origine);
+            // Se una passiva annulla la penalità (La Roccia sul +2) la carta non ha
+            // effetto: niente pesca e niente salto.
+            if (!annullata) {
+                segnalaSaltoTurno();
+            }
             return;
         }
         accumulo = accumulo == null ? Accumulo.apri(numeroCarte, origine) : accumulo.aggiungi(numeroCarte);
@@ -419,6 +443,103 @@ public class Partita {
     }
 
     /**
+     * Effetto della carta Blocca: il prossimo salta il turno, a meno che una sua
+     * passiva lo renda immune (Pelle di ghiaccio del Freezer, Step 6).
+     *
+     * <p>È un metodo a parte e non un controllo dentro {@link #segnalaSaltoTurno()}
+     * perché quello lo usano anche il cambio giro con 2 giocatori, il +2 senza
+     * stacking e la roulette, e non sa <i>perché</i> si salta: interrogando l'hook lì il
+     * Freezer sarebbe immune a tutti i salti, mentre la decisione presa è "solo al
+     * Blocca".</p>
+     */
+    void bloccaProssimo() {
+        Giocatore bersaglio = getProssimoGiocatore();
+        if (bersaglio.isImmuneAlBlocca()) {
+            registraEvento(EventoPartita.bloccoEvitato(bersaglio));
+            return;
+        }
+        segnalaSaltoTurno();
+    }
+
+    /**
+     * true se le passive del bersaglio annullano del tutto una penalità che avrebbe
+     * fatto pescare delle carte. In quel caso la penalità non fa nemmeno perdere il
+     * turno (La Roccia sul +2 singolo).
+     */
+    private boolean isPenalitaAnnullata(Giocatore bersaglio, int numeroCarte, OriginePesca origine) {
+        return numeroCarte > 0
+                && regole.calcolaCartePescaForzata(new ContestoPesca(bersaglio, numeroCarte, origine)) == 0;
+    }
+
+    // ------------------------------------------------------------------
+    // Abilità attive dei Legend (Step 6)
+    // ------------------------------------------------------------------
+
+    /**
+     * true se il giocatore di turno può usare ora la sua abilità attiva: siamo in
+     * {@link FaseTurno#NORMALE} (decisione presa: prima di pescare o giocare, mai
+     * durante lo stacking), ha un Legend, l'abilità è carica e i suoi prerequisiti
+     * sono soddisfatti ({@link Ieffetto#isAttivabile}). Lo usa anche il controller per
+     * mostrare la voce di menu solo quando serve.
+     */
+    public boolean isAbilitaUsabile() {
+        if (fase != FaseTurno.NORMALE) {
+            return false;
+        }
+        AbilitaAttiva abilita = getGiocatoreAttivo().getAbilitaAttiva();
+        return abilita != null && abilita.isPronta() && abilita.getEffetto().isAttivabile(this);
+    }
+
+    /**
+     * Usa l'abilità attiva del giocatore di turno. Permesso solo quando
+     * {@link #isAbilitaUsabile()} è vero.
+     *
+     * <p>Segue la stessa strada di {@link #giocaCarta(int)}: se l'effetto chiede un
+     * input (il bersaglio) si apre un'{@link AzioneInAttesa} e si risponde con
+     * {@link #rispondiInput(String)}; altrimenti l'abilità si completa subito. Nessun
+     * metodo {@code rispondiXxx} dedicato e nessuna fase nuova.</p>
+     *
+     * <p>Usare l'abilità <b>non consuma il turno</b> (decisione presa, vale per tutte):
+     * dopo si torna in {@link FaseTurno#NORMALE} e si può giocare o pescare.</p>
+     *
+     * @return true se il comando è stato accettato
+     */
+    public boolean usaAbilita() {
+        if (!isAbilitaUsabile()) {
+            return false;
+        }
+        Giocatore giocatore = getGiocatoreAttivo();
+        AbilitaAttiva abilita = giocatore.getAbilitaAttiva();
+        Ieffetto effetto = abilita.getEffetto();
+        if (effetto.getRichiestaInput(this) != null) {
+            mettiInAttesa(effetto, risposta -> completaAbilita(giocatore, abilita, risposta));
+            return true;
+        }
+        completaAbilita(giocatore, abilita, null);
+        return true;
+    }
+
+    /**
+     * Applica l'abilità, avvia la ricarica e controlla la Mercy rule (punto sicuro,
+     * come dopo una carta): il bersaglio del Castigatore o di Gifted card, o chi
+     * riceve una mano grande con Scambia mazzo, può superare il limite.
+     */
+    private void completaAbilita(Giocatore giocatore, AbilitaAttiva abilita, String risposta) {
+        abilita.avviaRicarica();
+        registraEvento(EventoPartita.abilitaUsata(giocatore));
+        abilita.getEffetto().attivaEffetto(this, risposta);
+        verificaEliminazioni();
+        if (fase == FaseTurno.TERMINATA) {
+            return;
+        }
+        if (!giocatore.isInGioco()) {
+            chiudiTurno();
+            return;
+        }
+        fase = FaseTurno.NORMALE;
+    }
+
+    /**
      * Gestisce la pesca volontaria del giocatore attivo. Permessa solo in
      * {@link FaseTurno#NORMALE}: dopo la pesca la fase diventa
      * {@link FaseTurno#POST_PESCA}, quindi non si può pescare due volte.
@@ -433,6 +554,11 @@ public class Partita {
             return false;
         }
         Giocatore giocatore = getGiocatoreAttivo();
+        int carteTraCuiScegliere = regole.getCarteTraCuiScegliereInPesca(giocatore);
+        if (carteTraCuiScegliere > 1) {
+            pescaConScelta(giocatore, carteTraCuiScegliere);
+            return true;
+        }
         List<Carta> cartePescate = regole.pescaVolontaria(giocatore, this);
         registraEvento(EventoPartita.pescaVolontaria(giocatore, cartePescate.size()));
         verificaEliminazioni();
@@ -444,6 +570,44 @@ public class Partita {
         cartaAppenaPescata = cartePescate.isEmpty() ? null : cartePescate.get(cartePescate.size() - 1);
         fase = FaseTurno.POST_PESCA;
         return true;
+    }
+
+    /**
+     * Passiva Doppia pesca (Step 6): il giocatore pesca {@code numero} carte e sceglie
+     * quale tenere; le altre tornano in fondo al mazzo. La scelta passa dal meccanismo
+     * unificato degli input ({@link EffettoSceltaCartaPescata}) e, quando arriva la
+     * risposta, il turno va in {@link FaseTurno#POST_PESCA} come dopo una pesca
+     * normale. Se mazzo e scarti danno meno di 2 carte non c'è niente da scegliere.
+     *
+     * <p>Vale solo nella partita normale, dove nessuno viene eliminato: per questo non
+     * serve controllare la Mercy rule.</p>
+     */
+    private void pescaConScelta(Giocatore giocatore, int numero) {
+        List<Carta> cartePescate = new ArrayList<>();
+        for (int i = 0; i < numero; i++) {
+            Carta carta = pescaSingola(giocatore);
+            if (carta == null) {
+                break;
+            }
+            cartePescate.add(carta);
+        }
+        registraEvento(EventoPartita.pescaVolontaria(giocatore, cartePescate.size()));
+        if (cartePescate.size() < 2) {
+            cartaAppenaPescata = cartePescate.isEmpty() ? null : cartePescate.get(0);
+            fase = FaseTurno.POST_PESCA;
+            return;
+        }
+        EffettoSceltaCartaPescata scelta = new EffettoSceltaCartaPescata(cartePescate);
+        mettiInAttesa(scelta, risposta -> {
+            scelta.attivaEffetto(this, risposta);
+            cartaAppenaPescata = scelta.getCartaTenuta();
+            fase = FaseTurno.POST_PESCA;
+        });
+    }
+
+    /** Rimette una carta in fondo al mazzo (Doppia pesca). */
+    void rimettiInFondoAlMazzo(Carta carta) {
+        mazzo.aggiungiInFondo(carta);
     }
 
     /**
@@ -501,6 +665,9 @@ public class Partita {
     public List<Carta> applicaPescaForzata(Giocatore bersaglio, int numeroCarte, OriginePesca origine) {
         ContestoPesca contesto = new ContestoPesca(bersaglio, numeroCarte, origine);
         int carteDaPescare = regole.calcolaCartePescaForzata(contesto);
+        if (carteDaPescare < numeroCarte) {
+            registraEvento(EventoPartita.pescaRidotta(bersaglio, numeroCarte - carteDaPescare));
+        }
 
         List<Carta> cartePescate = new ArrayList<>();
         for (int i = 0; i < carteDaPescare; i++) {
@@ -536,8 +703,9 @@ public class Partita {
         // Regola ufficiale: con due giocatori in gioco invertire il senso equivale
         // a far saltare il turno all'altro. Vale in entrambe le modalità e anche in
         // Endless quando restano in due; la decide Partita perché è lei a sapere
-        // quanti giocatori sono in gioco.
-        if (getNumeroGiocatoriInGioco() == 2) {
+        // quanti giocatori sono in gioco. Dallo Step 6 si contano quelli che partecipano
+        // ai turni: un congelato è "come se non ci fosse".
+        if (getNumeroPartecipantiAiTurni() == 2) {
             segnalaSaltoTurno();
         }
     }
@@ -552,17 +720,24 @@ public class Partita {
     }
 
     /**
-     * Giocatori in gioco a partire da quello di turno, nel senso di gioco. Serve
-     * alla carta 0 della No Mercy, che fa passare ogni mano al successivo.
+     * Giocatori che partecipano ai turni a partire da quello di turno, nel senso di
+     * gioco. Serve alla carta 0 della No Mercy, che fa passare ogni mano al
+     * successivo. I congelati sono esclusi (decisione presa, Step 6): sono "come se non
+     * ci fossero" e tengono la loro mano.
      */
-    List<Giocatore> getGiocatoriInGiocoNelSensoDiGioco() {
+    List<Giocatore> getGiocatoriPartecipantiNelSensoDiGioco() {
         List<Giocatore> ordine = new ArrayList<>();
         int indice = indiceGiocatoreAttivo;
-        for (int i = 0; i < getNumeroGiocatoriInGioco(); i++) {
+        for (int i = 0; i < getNumeroPartecipantiAiTurni(); i++) {
             ordine.add(giocatori.get(indice));
-            indice = trovaProssimoIndiceInGioco(indice);
+            indice = trovaProssimoIndice(indice, Giocatore::partecipaAiTurni);
         }
         return ordine;
+    }
+
+    /** Giocatori in gioco e non congelati. */
+    private int getNumeroPartecipantiAiTurni() {
+        return (int) giocatori.stream().filter(Giocatore::partecipaAiTurni).count();
     }
 
     /**
@@ -607,12 +782,16 @@ public class Partita {
     }
 
     /**
-     * Calcola il prossimo giocatore in gioco rispettando il senso corrente, senza
-     * modificare l'indice del giocatore attivo. È usato dagli effetti che
-     * agiscono sul giocatore successivo, come la pescata forzata.
+     * Calcola il prossimo giocatore che giocherà davvero, rispettando il senso
+     * corrente, senza modificare l'indice del giocatore attivo. È usato dagli effetti
+     * che agiscono sul giocatore successivo, come la pescata forzata.
+     *
+     * <p>Salta i congelati (Step 6): per esempio con 2 giocatori, se l'avversario è
+     * congelato, il prossimo è chi gioca, che quindi pesca il suo stesso +2
+     * (decisione presa: il congelato "è come se non ci fosse").</p>
      */
     public Giocatore getProssimoGiocatore() {
-        return giocatori.get(trovaProssimoIndiceInGioco(indiceGiocatoreAttivo));
+        return giocatori.get(trovaProssimoIndice(indiceGiocatoreAttivo, Giocatore::partecipaAiTurni));
     }
 
     /**
@@ -796,9 +975,13 @@ public class Partita {
         if (fase == FaseTurno.TERMINATA) {
             return;
         }
+        // Step 6: le passive temporanee (Arcobaleno) valgono solo nel turno in cui si
+        // ottengono; la ricarica dell'abilità scende all'inizio di ogni turno giocato.
+        getGiocatoreAttivo().terminaTurno();
         cartaAppenaPescata = null;
         fase = accumulo != null ? FaseTurno.RISPOSTA_STACKING : FaseTurno.NORMALE;
         aggiornaGiocatoreAttivo();
+        getGiocatoreAttivo().iniziaTurno();
     }
 
     /**
@@ -825,27 +1008,45 @@ public class Partita {
         }
     }
 
-    /** Passa il turno al prossimo giocatore in gioco secondo il senso di gioco. */
+    /**
+     * Passa il turno al prossimo giocatore in gioco secondo il senso di gioco. Se
+     * tocca a un giocatore congelato (Step 6), il suo turno passa: si scala un turno di
+     * congelamento, si registra l'evento e si va avanti. È l'unico punto in cui il
+     * congelamento si consuma, perché è l'unico in cui un turno passa davvero.
+     */
     private void avanzaGiocatore() {
-        indiceGiocatoreAttivo = trovaProssimoIndiceInGioco(indiceGiocatoreAttivo);
+        indiceGiocatoreAttivo = trovaProssimoIndice(indiceGiocatoreAttivo, Giocatore::isInGioco);
+        while (getGiocatoreAttivo().isCongelato()) {
+            Giocatore congelato = getGiocatoreAttivo();
+            congelato.consumaTurnoCongelato();
+            registraEvento(EventoPartita.turnoCongelato(congelato));
+            indiceGiocatoreAttivo = trovaProssimoIndice(indiceGiocatoreAttivo, Giocatore::isInGioco);
+        }
     }
 
     /**
-     * Unico punto che calcola "chi viene dopo": parte da {@code daIndice} e
-     * avanza nel senso di gioco saltando i giocatori terminati o eliminati. Prima
+     * Unico punto che calcola "chi viene dopo": parte da {@code daIndice} e avanza
+     * nel senso di gioco fino al primo giocatore che soddisfa il criterio. Prima
      * {@code avanzaGiocatore} e {@code getProssimoGiocatore} usavano ciascuno
      * {@code (i ± 1) % n}, che dava per scontato che nessuno uscisse dalla partita.
      *
-     * <p>Se nessun altro è in gioco restituisce {@code daIndice}: succede solo a
-     * partita finita.</p>
+     * <p>Il criterio è {@link Giocatore#isInGioco()} per l'avanzamento vero (che poi
+     * consuma i turni dei congelati) e {@link Giocatore#partecipaAiTurni()} per sapere
+     * chi giocherà davvero dopo (Step 6: il congelato non risponde allo stacking e non
+     * subisce il +2). Fino allo Step 5 si chiamava {@code trovaProssimoIndiceInGioco}
+     * e il criterio era fisso.</p>
+     *
+     * <p>Il giro arriva fino a {@code daIndice} compreso: se nessun altro soddisfa il
+     * criterio ma {@code daIndice} sì, il prossimo è lui stesso. Se nessuno lo soddisfa
+     * restituisce {@code daIndice}: succede solo a partita finita.</p>
      */
-    private int trovaProssimoIndiceInGioco(int daIndice) {
+    private int trovaProssimoIndice(int daIndice, Predicate<Giocatore> criterio) {
         int numeroGiocatori = giocatori.size();
         int passo = sensoOrario ? 1 : -1;
         int indice = daIndice;
         for (int tentativi = 0; tentativi < numeroGiocatori; tentativi++) {
             indice = Math.floorMod(indice + passo, numeroGiocatori);
-            if (giocatori.get(indice).isInGioco()) {
+            if (criterio.test(giocatori.get(indice))) {
                 return indice;
             }
         }

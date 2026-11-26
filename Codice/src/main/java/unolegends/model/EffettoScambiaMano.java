@@ -3,79 +3,75 @@ package unolegends.model;
 import java.util.List;
 
 /**
- * Carta 7 della No Mercy (e, allo Step 6, abilità attiva "Scambia mazzo"): chi
- * gioca la carta sceglie un avversario in gioco e i due si scambiano la mano.
+ * Carta 7 della No Mercy e abilità attiva "Scambia mazzo" del Fantasma: chi gioca
+ * sceglie un avversario e i due si scambiano la mano.
  *
  * <p><b>Perché tutto dentro l'effetto</b> (scelta 4.B): l'effetto riceve
- * {@link Partita}, che gli fornisce il giocatore di turno e gli avversari, e
- * sposta le mani con i metodi package-private di {@link Giocatore}. Partita non
- * deve conoscere questo effetto: i controlli che le spettano (eliminazione a 25
- * carte, finestra UNO, vittoria) li fa comunque dopo ogni giocata, per qualunque
- * effetto.</p>
+ * {@link Partita}, che gli fornisce il giocatore di turno e i bersagli, e sposta le
+ * mani con i metodi package-private di {@link Giocatore}. Partita non deve conoscere
+ * questo effetto.</p>
  *
- * <p>Regole decise:</p>
+ * <p>Dallo Step 6 la scelta del bersaglio la fa {@link EffettoConBersaglio}
+ * (Template Method): i bersagli sono quelli selezionabili, quindi Ghost e i giocatori
+ * congelati sono esclusi senza codice qui.</p>
+ *
+ * <p>Le due versioni differiscono in due punti, decisi con il team:</p>
  * <ul>
- *   <li>dopo lo scambio <b>nessuno</b> deve dichiarare UNO, né chi ha giocato né
- *       chi ha ricevuto la mano (lo garantisce {@code Partita.deveDichiarareUno});</li>
- *   <li>se la 7 è l'<b>ultima carta</b> di chi la gioca, ha vinto e lo scambio
- *       non avviene: per questo, in quel caso, non viene chiesto nessun bersaglio.</li>
+ *   <li><b>carta 7</b>: se è l'ultima carta di chi la gioca, ha vinto e lo scambio non
+ *       avviene (nessuna richiesta); se non c'è nessun bersaglio (per esempio l'unico
+ *       avversario è Ghost) la carta si gioca senza scambio;</li>
+ *   <li><b>Scambia mazzo</b>: il bersaglio deve avere <b>più di una carta</b>, così non
+ *       si "ruba" una mano quasi vincente. Per questo non serve far perdere il turno a
+ *       chi la usa (decisione presa: nessuna abilità consuma il turno).</li>
  * </ul>
  *
- * <p>Il bersaglio è scelto fra gli avversari in gioco; allo Step 6 diventeranno
- * gli avversari "bersagliabili", così Ghost sarà escluso senza toccare questa
- * classe.</p>
+ * <p>Dopo lo scambio nessuno deve dichiarare UNO (lo garantisce
+ * {@code Partita.deveDichiarareUno}; un'abilità non è una giocata).</p>
  */
-public class EffettoScambiaMano implements Ieffetto {
+public class EffettoScambiaMano extends EffettoConBersaglio {
+    private final boolean comeCarta;
 
-    /** Senza risposta l'effetto si attiva solo quando la 7 era l'ultima carta: non fa nulla. */
+    /** Carta 7 della No Mercy. */
+    public EffettoScambiaMano() {
+        this(true);
+    }
+
+    private EffettoScambiaMano(boolean comeCarta) {
+        this.comeCarta = comeCarta;
+    }
+
+    /** Abilità attiva "Scambia mazzo": il bersaglio deve avere più di una carta. */
+    static EffettoScambiaMano abilitaScambiaMazzo() {
+        return new EffettoScambiaMano(false);
+    }
+
     @Override
-    public void attivaEffetto(Partita partita) {
-        // La carta era l'ultima della mano: chi l'ha giocata ha vinto, niente scambio.
+    protected boolean ammetteBersaglio(Giocatore bersaglio) {
+        return comeCarta || bersaglio.getMano().size() > 1;
     }
 
     /**
-     * Chiede il bersaglio fra gli avversari in gioco. Non chiede nulla se la 7 è
-     * l'unica carta in mano (la si sta giocando come ultima carta).
+     * Come carta, non chiede nulla se la 7 è l'unica carta in mano (la si sta
+     * giocando come ultima carta) o se nessuno è bersagliabile.
      */
     @Override
     public RichiestaInput getRichiestaInput(Partita partita) {
-        if (partita.getGiocatoreAttivo().getMano().size() <= 1) {
+        if (comeCarta && (partita.getGiocatoreAttivo().getMano().size() <= 1 || getBersagli(partita).isEmpty())) {
             return null;
         }
-        List<String> nomi = partita.getAvversariInGioco().stream().map(Giocatore::getNome).toList();
-        return new RichiestaInput(TipoRichiesta.SCELTA_GIOCATORE, nomi);
+        return super.getRichiestaInput(partita);
     }
 
     @Override
-    public boolean validaRispostaInput(String risposta, Partita partita) {
-        return trovaBersaglio(risposta, partita) != null;
-    }
-
-    @Override
-    public void attivaEffetto(Partita partita, String risposta) {
-        Giocatore giocatore = partita.getGiocatoreAttivo();
+    protected void applicaAlBersaglio(Partita partita, Giocatore giocatore, Giocatore bersaglio) {
         if (giocatore.getMano().isEmpty()) {
             return; // ultima carta: ha vinto, niente scambio
-        }
-        Giocatore bersaglio = trovaBersaglio(risposta, partita);
-        if (bersaglio == null) {
-            throw new IllegalArgumentException("Giocatore non valido: " + risposta);
         }
         List<Carta> manoGiocatore = giocatore.svuotaMano();
         List<Carta> manoBersaglio = bersaglio.svuotaMano();
         giocatore.riceviCarte(manoBersaglio);
         bersaglio.riceviCarte(manoGiocatore);
         partita.registraEvento(EventoPartita.maniScambiate(giocatore, bersaglio));
-    }
-
-    private static Giocatore trovaBersaglio(String risposta, Partita partita) {
-        if (risposta == null) {
-            return null;
-        }
-        return partita.getAvversariInGioco().stream()
-                .filter(g -> g.getNome().equalsIgnoreCase(risposta.trim()))
-                .findFirst()
-                .orElse(null);
     }
 
     @Override

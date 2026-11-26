@@ -37,8 +37,14 @@ import unolegends.domain.rules.impl.StrategiaVittoriaStandard;
  * poche strategie {@code RegoleDiGioco.standard(opzioni)} è più leggibile di
  * {@code builder()...build()}, e il costruttore lungo lo chiamano solo questi
  * metodi. Con lo stacking (Step 5) le strategie sono diventate 7 e il team ha
- * confermato di restare senza Builder; va rivalutato con le passive dei Legend
- * (Step 6).</p>
+ * confermato di restare senza Builder. Allo Step 6 le passive dei Legend <b>non</b>
+ * hanno aggiunto strategie: sono del singolo giocatore, non della partita, quindi le
+ * strategie restano 7 e il Builder continua a non servire.</p>
+ *
+ * <p><b>Passive dei Legend (Step 6).</b> Qui si combinano la regola della partita e
+ * le passive del giocatore: prima si calcola il risultato "base" con la strategia,
+ * poi lo si fa passare dagli hook di {@link IPassiva} del giocatore coinvolto. Le
+ * regole non sanno quali passive esistono.</p>
  */
 public class RegoleDiGioco {
     private final IStrategiaCondizioneVittoria strategiaVittoria;
@@ -79,10 +85,17 @@ public class RegoleDiGioco {
     public boolean isGiocabile(Giocatore giocatore, Carta candidata, Carta inCima, Partita partita) {
         Accumulo accumulo = partita == null ? null : partita.getAccumulo();
         if (accumulo != null) {
+            // Con lo stacking contano solo i valori di pesca: le passive sulla
+            // compatibilità (Daltonico, Arcobaleno) non valgono (decisione presa).
             return strategiaAccumulo.puoRispondere(candidata, accumulo);
         }
-        return strategiaCompatibilitaCarte.puoGiocare(candidata, inCima,
-                partita == null ? null : partita.getColoreAttuale());
+        Colore coloreAttivo = partita == null ? null : partita.getColoreAttuale();
+        if (strategiaCompatibilitaCarte.puoGiocare(candidata, inCima, coloreAttivo)) {
+            return true;
+        }
+        // Le passive possono solo aggiungere giocate: "base OR passive".
+        return candidata != null && giocatore != null
+                && giocatore.getPassive().stream().anyMatch(p -> p.consenteGiocata(candidata, inCima, coloreAttivo));
     }
 
     /**
@@ -124,12 +137,32 @@ public class RegoleDiGioco {
     }
 
     /**
-     * Calcola quante carte deve pescare davvero il bersaglio di una pesca forzata.
-     * Oggi restituisce il numero richiesto; è il punto in cui le abilità passive
-     * (es. immunità al +2, una carta in meno) modificheranno il risultato.
+     * Calcola quante carte deve pescare davvero il bersaglio di una pesca forzata:
+     * il numero richiesto, modificato una passiva dopo l'altra dalle passive del
+     * bersaglio (La Roccia: 0 su un +2 singolo; Salesman: una in meno). Il risultato
+     * non scende mai sotto 0.
      */
     public int calcolaCartePescaForzata(ContestoPesca contesto) {
-        return contesto.numeroCarte();
+        int carte = contesto.numeroCarte();
+        for (IPassiva passiva : contesto.bersaglio().getPassive()) {
+            carte = Math.max(0, passiva.modificaPescaForzata(contesto, carte));
+        }
+        return carte;
+    }
+
+    /**
+     * Fra quante carte sceglie il giocatore quando pesca volontariamente (1 = pesca
+     * normale, senza scelta). Più di 1 solo se la strategia di pesca lo ammette
+     * (partita normale) e una passiva lo chiede (Doppia pesca dell'Acrobata).
+     */
+    public int getCarteTraCuiScegliereInPesca(Giocatore giocatore) {
+        if (!strategiaPescaVolontaria.ammettePescaConScelta()) {
+            return 1;
+        }
+        return giocatore.getPassive().stream()
+                .mapToInt(IPassiva::getCarteTraCuiScegliereInPesca)
+                .max()
+                .orElse(1);
     }
 
     /**

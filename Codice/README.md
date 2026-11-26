@@ -79,6 +79,7 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
     - `getMinimoGiocatori()` / `getMassimoGiocatori()`;
     - `verificaImpostazioni(String modalita, Set<String> opzioni, List<String> nomi) : String`: converte le stringhe in `ModalitaDiGioco` / `OpzionePartita`, chiama `ConfigurazionePartita.verifica(...)` e traduce l'eventuale `ErroreConfigurazione` in frase; restituisce `null` se le scelte sono valide.
     - `avviaPartita(String modalita, Set<String> opzioni, List<String> nomi) : UnoLegendsGame`: crea la `ConfigurazionePartita`, chiama `PartitaFactory.creaPartita(config)` e `iniziaGioco()`. Le scelte vanno verificate prima: se non sono valide lancia `IllegalArgumentException` (errore di programmazione della UI).
+    - Legend (Step 6): `richiedeLegend(Set<String> opzioni)` dice se le opzioni scelte prevedono i Legend; `getLegendDisponibili()` e `descriviLegend(String)` li elencano. `verificaImpostazioni` e `avviaPartita` hanno un overload con un quarto parametro `List<String> legend` (un Legend a testa, nell'ordine dei nomi).
     - Nessun DTO e nessuna classe di eccezione per il setup: solo stringhe, e l'errore come valore restituito.
     - Sostituisce il vecchio `avviaPartitaStandard()`.
   - API esposte alla UI:
@@ -88,14 +89,15 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
     - `completaDichiarazioneUno(boolean unoDichiarato) : boolean` — inoltra a `partita.completaDichiarazioneUno(...)`; `true` se il comando è accettato (la penalità arriva come evento).
     - `pescaCarta() : boolean` — inoltra a `partita.pescaCarta()`.
     - `passaTurno() : boolean` — inoltra a `partita.passaTurno()`.
+    - `usaAbilita() : boolean` (Step 6) — inoltra a `partita.usaAbilita()`; se l'abilità chiede un bersaglio la fase diventa `ATTESA_INPUT` e si risponde con `rispondiInput`.
     - `prelevaMessaggi() : List<String>` — preleva gli `EventoPartita` registrati da `Partita` e li traduce in frasi (`descriviEvento`, con `switch` esaustivi su `TipoEvento` e `OriginePesca`).
-  - Conversioni private: `convertiFase` (`FaseTurno` → `StatoPartitaDto.Fase`), `convertiRichiesta` + `messaggioPer` (`TipoRichiesta` → frase), `formattaCarta`, `convertiGiocatori` + `descriviStato` (`Giocatore` → `StatoPartitaDto.Giocatore`), `nomeModalita` / `nomeOpzione` / `descrizioneOpzione`, `messaggioPer(ErroreConfigurazione)`.
+  - Conversioni private: `convertiFase` (`FaseTurno` → `StatoPartitaDto.Fase`), `convertiRichiesta` + `messaggioPer` (`TipoRichiesta` → frase), `formattaCarta`, `convertiGiocatori` + `descriviStato` (`Giocatore` → `StatoPartitaDto.Giocatore`), `nomeModalita` / `nomeOpzione` / `descrizioneOpzione`, `messaggioPer(ErroreConfigurazione)`, e dallo Step 6 `nomeLegend` / `nomePassiva` / `descrizionePassiva` / `nomeAbilita` / `descrizioneAbilita` (tutti i testi dei Legend stanno qui).
 - **`StatoPartitaDto`** *(DTO immutabile)*:
-  - È un `record` ed è l'**unico DTO** del progetto. Componenti: `fase` (`Fase`), `nomeGiocatoreAttivo` (`String`), `mano` (`List<String>`, copia immutabile), `cartaInCima` (`String`), `cartaAppenaPescata` (`String`, solo in `POST_PESCA`), `richiestaInput` (`Richiesta`, solo in `ATTESA_INPUT`), `giocatori` (`List<Giocatore>`), `sensoOrario` (`boolean`), `classifica` (`List<String>`, solo in `TERMINATA`). Il metodo `nomeVincitore()` restituisce il primo della classifica.
+  - È un `record` ed è l'**unico DTO** del progetto. Componenti: `fase` (`Fase`), `nomeGiocatoreAttivo` (`String`), `mano` (`List<String>`, copia immutabile), `cartaInCima` (`String`), `cartaAppenaPescata` (`String`, solo in `POST_PESCA`), `richiestaInput` (`Richiesta`, solo in `ATTESA_INPUT`), `giocatori` (`List<Giocatore>`), `sensoOrario` (`boolean`), `classifica` (`List<String>`, solo in `TERMINATA`), `accumulo` (Step 5), `abilitaDisponibile` (Step 6: nome dell'abilità che il giocatore di turno può usare ora, oppure `null`). Il metodo `nomeVincitore()` restituisce il primo della classifica.
   - Tipi interni (prima erano i file `FaseTurnoDto`, `RichiestaInputDto`, `GiocatoreDto`):
     - `StatoPartitaDto.Fase` *(enum)*: copia di `FaseTurno` per la UI, che non può importare il model;
     - `StatoPartitaDto.Richiesta` *(record)*: `messaggio` (scritto dal controller), `opzioni`;
-    - `StatoPartitaDto.Giocatore` *(record)*: `nome`, `numeroCarte`, `stato` (già tradotto: "in gioco", "terminato al posto n. X", "eliminato"), `diTurno`.
+    - `StatoPartitaDto.Giocatore` *(record)*: `nome`, `numeroCarte`, `stato` (già tradotto: "in gioco", "congelato", "terminato al posto n. X", "eliminato"), `diTurno`, e dallo Step 6 `legend` (nome, `null` senza Legend) e `ricaricaAbilita` (0 = pronta).
 
 ### 3.3 Package `unolegends.model` — Entità Core
 
@@ -115,7 +117,8 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
   - No Mercy (Step 4): azioni colorate `SCARTA_TUTTO`, `SALTA_TUTTI`; jolly `CAMBIO_GIRO_PIU_QUATTRO("+4 cambio giro")`, `PIU_SEI("+6")`, `PIU_DIECI("+10")`, `ROULETTE("roulette colore")`.
   - Utility statiche: `fromInt(int)` (0..9) e `fromString(String)` (case-insensitive).
 - **`Giocatore`** *(GRASP Information Expert)*:
-  - Campi: `nome` (`String`), `mano` (`List<Carta>`), `stato` (`StatoGiocatore`, iniziale `IN_GIOCO`).
+  - Campi: `nome` (`String`), `mano` (`List<Carta>`), `stato` (`StatoGiocatore`, iniziale `IN_GIOCO`); dallo Step 6 `legend` (`null` senza Legend), `passive` (lista vuota senza Legend: fa da Null Object), `passiveTemporanee` (Arcobaleno), `abilitaAttiva` (`AbilitaAttiva`, `null` senza Legend), `turniCongelati`.
+  - Legend (Step 6): `getPassive()`, `isBersagliabile()` (no se congelato o Ghost), `isImmuneAlBlocca()`, `isCongelato()`, `partecipaAiTurni()` (in gioco e non congelato); `congela`, `consumaTurnoCongelato`, `iniziaTurno` (scala la ricarica), `terminaTurno` (toglie le passive temporanee) sono package-private e li usa `Partita`.
   - Stato: `getStato()`, `isInGioco()`; `segnaComeTerminato()`, `segnaComeEliminato()` e `svuotaMano()` sono package-private, usati solo da `Partita`.
   - Metodi: `getNome()`, `getMano()` (restituisce `Collections.unmodifiableList(mano)`), `getCartaInPosizione(int)` (ritorna `null` se indice fuori range), `estraiCarta(int)` (rimuove e ritorna la carta, o `null` se fuori range), `rimuoviCarta(Carta)` (rimuove proprio quella carta, per identità; usato quando la giocata si completa dopo una risposta), `aggiungiCarta(Carta)`.
 - **`Mazzo`** *(GRASP Information Expert)*:
@@ -124,6 +127,7 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
   - `isVuoto()`, `getNumeroCarte()`, `mischia()` (copia in `ArrayList`, `Collections.shuffle`, reinserisce nella `Deque`).
   - `rimescolaDaScarti(PilaDegliScarti)`: estrae tutte le carte dagli scarti tranne quella in cima, le aggiunge al mazzo e chiama `mischia()`.
   - `aggiungiCarteERimescola(Collection<Carta>)`: rimette in circolo le carte di un giocatore eliminato.
+  - `aggiungiInFondo(Carta)` (Step 6): rimette una carta in fondo, senza rimescolare (Doppia pesca).
 - **`StatoGiocatore`** *(enum, Step 3)*: `IN_GIOCO`, `TERMINATO` (ha finito le carte e ha un posto in classifica), `ELIMINATO`. Si chiama `IN_GIOCO` e non `ATTIVO` perché "giocatore attivo" indica già il giocatore di turno.
 - **`PilaDegliScarti`** *(GRASP Information Expert)*:
   - Campo: `scarti` (`List<Carta>`).
@@ -168,12 +172,12 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
   - `validaRispostaInput(String, Partita)` delega la validazione al primo sotto-effetto con richiesta di input.
   - `attivaEffetto(Partita, String)` esegue tutti i sotto-effetti in ordine: passa `risposta` al primo sotto-effetto che richiede input, e chiama `attivaEffetto(partita)` senza argomenti su tutti gli altri.
 - **`RichiestaInput`**: oggetto valore immutabile del dominio con `tipo` (`TipoRichiesta`) e `opzioni` (`List<String>`). Non contiene testo per l'utente.
-- **`TipoRichiesta`** *(enum)*: `SCELTA_COLORE`, `SCELTA_GIOCATORE` (usato dalla carta 7 dallo Step 4, e allo Step 6 dalle abilità attive).
+- **`TipoRichiesta`** *(enum)*: `SCELTA_COLORE`, `SCELTA_GIOCATORE` (carta 7 dallo Step 4, abilità attive dallo Step 6), `SCELTA_CARTA` (Step 6, Doppia pesca).
 - **`AzioneInAttesa`** *(record package-private, GoF Command)*: `(Ieffetto effetto, Consumer<String> completamento)`. L'effetto sa cosa chiedere e validare; il completamento è ciò che `Partita` esegue quando arriva una risposta valida.
 - **`FaseTurno`** *(enum)*: `NORMALE`, `POST_PESCA`, `ATTESA_INPUT`, `ATTESA_UNO`, `RISPOSTA_STACKING` (Step 5), `TERMINATA`. Vedi sezione 4.
 - **`Accumulo`** *(record immutabile, Step 5)*: `(int totale, int valoreUltimaCarta, int numeroCarte, OriginePesca originePrimaCarta)`. Accumulo dello stacking; `Partita` lo sostituisce con `aggiungi(valore)` a ogni risposta. `getOriginePenalita()` restituisce l'origine della carta se l'accumulo è una carta sola, altrimenti `ACCUMULO` (servirà a La Roccia, immune solo al +2 singolo).
-- **`EventoPartita`** *(record)* + **`TipoEvento`** *(enum)*: registro dei fatti accaduti (`PESCA_VOLONTARIA`, `PESCA_FORZATA`, `TURNO_SALTATO`, `SENSO_INVERTITO`, `COLORE_SCELTO`, `UNO_DICHIARATO`, `GIOCATORE_TERMINATO` con la posizione in `quantita`, `GIOCATORE_ELIMINATO`, dallo Step 4 `MANI_SCAMBIATE`, `MANI_PASSATE`, `CARTE_SCARTATE`, `TURNO_EXTRA`, e dallo Step 5 `ACCUMULO_AUMENTATO` con il totale in `quantita` e `PENALITA_ACCETTATA`). Campi: `tipo`, `nomeGiocatore`, `quantita`, `origine`, `colore`, `altroGiocatore` (solo per lo scambio di mani); si creano con factory statiche package-private.
-- **`OriginePesca`** *(enum)*: causa di una pesca (`VOLONTARIA`, `PIU_DUE`, `PIU_QUATTRO`, `PENALITA_UNO`, dallo Step 4 `PIU_SEI`, `PIU_DIECI`, `ROULETTE`, e dallo Step 5 `ACCUMULO` per un accumulo di due o più carte). Permette alle regole (e in futuro alle passive dei Legend) di distinguere le pescate.
+- **`EventoPartita`** *(record)* + **`TipoEvento`** *(enum)*: registro dei fatti accaduti (`PESCA_VOLONTARIA`, `PESCA_FORZATA`, `TURNO_SALTATO`, `SENSO_INVERTITO`, `COLORE_SCELTO`, `UNO_DICHIARATO`, `GIOCATORE_TERMINATO` con la posizione in `quantita`, `GIOCATORE_ELIMINATO`, dallo Step 4 `MANI_SCAMBIATE`, `MANI_PASSATE`, `CARTE_SCARTATE`, `TURNO_EXTRA`, dallo Step 5 `ACCUMULO_AUMENTATO` con il totale in `quantita` e `PENALITA_ACCETTATA`, e dallo Step 6 `ABILITA_USATA`, `PESCA_RIDOTTA`, `BLOCCO_EVITATO`, `GIOCATORE_CONGELATO`, `TURNO_CONGELATO`, `CARTE_REGALATE`, `CARTA_SCELTA`). Campi: `tipo`, `nomeGiocatore`, `quantita`, `origine`, `colore`, `altroGiocatore` (scambio di mani, congelamento, carte regalate), `legend` (Step 6, solo per gli eventi delle abilità); si creano con factory statiche package-private.
+- **`OriginePesca`** *(enum)*: causa di una pesca (`VOLONTARIA`, `PIU_DUE`, `PIU_QUATTRO`, `PENALITA_UNO`, dallo Step 4 `PIU_SEI`, `PIU_DIECI`, `ROULETTE`, dallo Step 5 `ACCUMULO` per un accumulo di due o più carte, dallo Step 6 `CASTIGATORE`). Permette alle regole e alle passive dei Legend di distinguere le pescate (La Roccia guarda `PIU_DUE`).
 - **`ContestoPesca`** *(record immutabile)*: `(Giocatore bersaglio, int numeroCarte, OriginePesca origine)`, passato a `RegoleDiGioco.calcolaCartePescaForzata(...)`.
 
 ### 3.5 Package `unolegends.model` — Factory e Contenitore Regole
@@ -198,7 +202,7 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
       3 blocca turno, 3 cambia giro, 3 `+2`, 2 `+4` colorati, 3 scarta tutto, 2 salta tutti → 64 azioni colorate.
     - Jolly: 8 `+4 cambio giro`, 8 roulette colore, 4 `+6`, 4 `+10` → 24.
 - **`ModalitaDiGioco`** *(enum di soli dati, Step 3)*: per ogni modalità la `MazzoFactory` da usare e le `OpzionePartita` obbligatorie (`getOpzioniObbligatorie()`, `isConfigurabile(opzione)`). Contiene `NORMALE` (`StandardMazzoFactory`) e `NO_MERCY` (`NoMercyMazzoFactory`, Step 4), che ha `STACKING` come opzione obbligatoria (Step 5). Sostituisce l'enum `TipoMazzo`, che non era usato.
-- **`OpzionePartita`** *(enum di soli dati, Step 3)*: regole opzionali scelte dal menu. Oggi `ENDLESS` e `STACKING` (Step 5: configurabile nella partita normale, obbligatoria in No Mercy); `LEGEND` (Step 6) si aggiungerà quando funzionerà.
+- **`OpzionePartita`** *(enum di soli dati, Step 3)*: regole opzionali scelte dal menu. `ENDLESS`, `STACKING` (Step 5: configurabile nella partita normale, obbligatoria in No Mercy) e `LEGEND` (Step 6, configurabile in entrambe le modalità: la legge `ConfigurazionePartita`, che chiede un Legend a testa).
 - **`ConfigurazionePartita`** *(record, Step 3)*: `(modalita, nomiGiocatori, opzioni)`. Il costruttore toglie gli spazi dai nomi, aggiunge le opzioni obbligatorie della modalità e valida (2–6 giocatori, nomi non vuoti e non duplicati, Endless con almeno 3 giocatori). La validazione è il metodo statico `verifica(modalita, nomi, opzioni) : ErroreConfigurazione` (`null` = valida; enum, nessun testo nel model); il costruttore lo richiama e, se i dati non sono validi, lancia una normale `IllegalArgumentException`.
 - **`PartitaFactory`** *(GRASP Creator / GoF Factory)*:
   - Costante `CARTE_PER_GIOCATORE = 7`.
@@ -225,7 +229,8 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
     - `mancatoUno(Giocatore giocatore, boolean unoDichiarato, Partita partita)` → se `mano.size() == 1 && !unoDichiarato`, applica `strategiaPenalitaUno` e ritorna `true`; altrimenti `false`.
     - `standard(Set<OpzionePartita> opzioni)` → regole della partita normale; ogni opzione sostituisce una strategia (`ENDLESS` → `StrategiaFinePartitaEndless`). `standard()` equivale a `standard(Set.of())`.
     - `noMercy(Set<OpzionePartita> opzioni)` (Step 4) → come `standard` ma con `StrategiaPescaFinoAGiocabile` e `StrategiaSconfittaNoMercy(SOGLIA_ELIMINAZIONE_NO_MERCY = 25)`. Le opzioni Endless e Stacking valgono per entrambe (`finePartita(opzioni)`, `accumulo(opzioni)`).
-    - Non c'è un Builder: `RegoleDiGioco.standard(opzioni)` è più leggibile; allo Step 5 (7 strategie) il team ha confermato di restarne senza, da rivalutare allo Step 6 con le passive.
+    - Non c'è un Builder: `RegoleDiGioco.standard(opzioni)` è più leggibile; allo Step 5 (7 strategie) il team ha confermato di restarne senza, e allo Step 6 le strategie sono rimaste 7 (le passive sono del giocatore, non della partita).
+    - Passive (Step 6): `isGiocabile` fa "regola base OR `IPassiva.consenteGiocata`" (non durante lo stacking); `calcolaCartePescaForzata` fa passare il numero di carte da `IPassiva.modificaPescaForzata` di ogni passiva del bersaglio; `getCarteTraCuiScegliereInPesca(giocatore)` vale più di 1 solo se `IStrategiaPesca.ammettePescaConScelta()` (pesca singola) e una passiva lo chiede.
 
 ### 3.6 Package `unolegends.domain.rules` e `unolegends.domain.rules.impl`
 
@@ -242,6 +247,27 @@ Il sistema è organizzato in **4 macro-strati / 5 package** con separazione nett
 | `IStrategiaCondizioneSconfitta` (No Mercy) | `StrategiaSconfittaNoMercy(25)` | `mano.size() >= 25`: Mercy rule. |
 | `IStrategiaAccumuloPenalita` | `StrategiaNessunAccumulo` | `isAccumuloAttivo()` = `false`: ogni carta di pesca si applica subito. |
 | `IStrategiaAccumuloPenalita` (opzione Stacking) | `StrategiaAccumuloValoreCrescente` | `isAccumuloAttivo()` = `true`; `puoRispondere` = `valorePenalita > 0 && valorePenalita >= accumulo.valoreUltimaCarta()`. Il colore non conta. Una sola strategia per entrambe le modalità: con il mazzo normale dà "+2 ← +2/+4, +4 ← +4". |
+
+
+### 3.7 Legend (Step 6)
+
+Resoconto completo e scelte: [`docs/step6_sesta_iter.md`](docs/step6_sesta_iter.md).
+
+- **`Legend`** *(enum di soli dati)*: `ROCCIA`, `MERCANTE`, `FANTASMA`, `DALTONICO`, `FREEZER`, `ACROBATA`. Ogni valore collega una passiva (`IPassiva`), l'effetto dell'abilità attiva (`Ieffetto`) e il cooldown. Nomi e descrizioni li scrive il controller.
+- **`IPassiva`** *(interfaccia con metodi `default`)*: gli hook `modificaPescaForzata`, `consenteGiocata`, `isBersagliabile`, `isImmuneAlBlocca`, `getCarteTraCuiScegliereInPesca`. Il default non cambia nulla; ogni passiva ridefinisce solo il suo: `PassivaRoccia`, `PassivaSalesman`, `PassivaGhost`, `PassivaDaltonico`, `PassivaPelleDiGhiaccio`, `PassivaDoppiaPesca`, più la temporanea `PassivaColoreLibero` (Arcobaleno).
+- **`AbilitaAttiva`**: `Ieffetto` + cooldown + `turniDiRicarica` del singolo giocatore. Pronta a inizio partita; dopo l'uso riparte dal cooldown e scende all'inizio di ogni turno giocato dal possessore.
+- **`EffettoConBersaglio`** *(Template Method)*: base degli effetti che scelgono un avversario fra `Partita.getBersagliSelezionabili()` (in gioco, non congelati, non Ghost). Sottoclassi: `EffettoScambiaMano` (carta 7 e Scambia mazzo, con bersaglio che ha più di una carta), `EffettoPescaBersaglio` (Castigatore), `EffettoRegalaCarte` (Gifted card, serve avere almeno 4 carte), `EffettoCongela` (Congela).
+- Altri effetti: `EffettoArcobaleno` (dà `PassivaColoreLibero` per il turno), `EffettoTurnoExtra` riusato per Double card, `EffettoSceltaCartaPescata` (richiesta della Doppia pesca).
+- `Ieffetto.isAttivabile(Partita)` (default `true`): prerequisiti di un'abilità (un bersaglio, almeno 4 carte).
+
+| Legend | Passiva | Attiva | Cooldown |
+|---|---|---|---|
+| La Roccia | immune al +2 singolo (non pesca e non salta) | Il Castigatore: un giocatore a scelta pesca 4 | 4 |
+| Il Mercante | Salesman: una carta in meno a ogni penalità (non roulette) | Gifted card: 2 carte a caso a un giocatore a scelta | 3 |
+| Il Fantasma | Ghost: non bersagliabile | Scambia mazzo (bersaglio con più di una carta) | 5 |
+| Il Daltonico | rosso sul verde e verde sul rosso | Arcobaleno: qualsiasi carta per il resto del turno | 4 |
+| Il Freezer | Pelle di ghiaccio: immune alla carta Blocca | Congela: il bersaglio salta 1 turno | 5 |
+| L'Acrobata | Doppia pesca: pesca 2, ne tiene 1 (solo Standard) | Double card: un turno in più | 4 |
 
 ---
 
@@ -288,6 +314,8 @@ Ogni comando pubblico dichiara le fasi in cui è **permesso** (lista di ammissio
 **Mercy rule (Step 4).** `verificaEliminazioni()` elimina chi ha raggiunto la soglia; è chiamata in punti sicuri, cioè dopo che effetto o pesca sono stati applicati per intero (`completaGiocata`, `pescaCarta`, `completaDichiarazioneUno`, `iniziaGioco`). Se l'eliminato è il giocatore che doveva saltare il turno, il salto si annulla; se è il giocatore di turno, il turno passa. `chiudiTurno()` non fa nulla a partita terminata. `accettaPenalita()` è un altro punto sicuro (Step 5).
 
 **Stacking (Step 5).** `chiudiTurno()` è l'unico punto che decide la fase del nuovo turno: `RISPOSTA_STACKING` se c'è un accumulo, altrimenti `NORMALE`. Così l'accumulo passa al successivo qualunque sia il motivo per cui il turno si chiude. Anche `iniziaGioco()` chiude con `chiudiTurno()`, quindi una carta iniziale di pesca apre l'accumulo e il primo giocatore risponde. Con 2 giocatori il +4 cambio giro fa tornare l'accumulo a chi l'ha giocato, perché il salto lo chiede il cambio giro (decisione del team, diversa dalla regola ufficiale).
+
+**Legend (Step 6).** `usaAbilita()` è permesso solo in `NORMALE` (`isAbilitaUsabile()`), passa da `mettiInAttesa` come una carta e alla fine torna in `NORMALE`: nessuna abilità consuma il turno. Dopo l'abilità c'è un punto sicuro per la Mercy rule. `chiudiTurno()` toglie le passive temporanee del giocatore che chiude e scala la ricarica di chi inizia. Il congelato è "come se non ci fosse": `trovaProssimoIndice(da, criterio)` (prima `trovaProssimoIndiceInGioco`) usa `isInGioco` per l'avanzamento vero, che in `avanzaGiocatore()` consuma il turno del congelato, e `partecipaAiTurni` per `getProssimoGiocatore()`, la carta 0 e il cambio giro a 2. La carta Blocca passa da `bloccaProssimo()`, che controlla Pelle di ghiaccio. Se le passive annullano del tutto una penalità (La Roccia sul +2 singolo) non si salta il turno, e dopo `accettaPenalita()` il turno continua in `NORMALE`.
 
 Quando un giocatore finisce le carte, `completaGiocata` chiama `registraTerminato` (stato `TERMINATO`, evento `GIOCATORE_TERMINATO`, `verificaFinePartita`). Se la partita non è finita (Endless) il turno passa al prossimo **in gioco** con `chiudiTurno()`.
 
@@ -436,6 +464,8 @@ La CLI non deduce più la fase combinando flag: la legge dal model.
 | **Null Object** | Design Pattern | `Effetto_Nullo` | Evita controlli `if (effetto != null)` sulle carte numeriche e permette di avere una sola classe `Carta`. |
 | **Command** | GoF | `AzioneInAttesa` | Incapsula un'azione sospesa (effetto + completamento) da eseguire quando arriva la risposta del giocatore. |
 | **Pure Fabrication / Indirection** | GRASP | `EventoPartita`, `TipoEvento` | Registro eventi: il model registra cosa succede senza sapere chi lo leggerà; il controller lo traduce in testo. |
+| **Strategy + Polymorphism (passive)** | GoF / GRASP | `IPassiva` e le sue implementazioni (Step 6) | Le passive dei Legend sono hook polimorfici: regole e `Partita` li interrogano senza sapere quale passiva hanno davanti. |
+| **Template Method** | GoF | `EffettoConBersaglio` (Step 6) | Scelta del bersaglio scritta una volta; le sottoclassi ridefiniscono solo cosa fare al bersaglio. |
 
 ---
 
@@ -452,4 +482,4 @@ Per comprendere con precisione ciò che il codice fa *effettivamente* oggi rispe
 4. **Dopo la pesca si gioca qualsiasi carta**: in `POST_PESCA` `Partita.giocaCarta` accetta ogni carta compatibile della mano, non solo `cartaAppenaPescata` (regola scelta per il progetto).
 5. **Cambia Giro con 2 giocatori in gioco**: dallo Step 4 vale come un blocco (regola ufficiale, decisione del team), in entrambe le modalità e anche in Endless quando restano in due. Con 3 o più giocatori inverte il senso.
 6. **Attese di input unificate (Step 2)**: carta iniziale nera e carta nera giocata nel turno passano entrambe da `AzioneInAttesa` + `rispondiInput(String)`. La dichiarazione UNO resta un comando separato (`completaDichiarazioneUno`) perché ha il timer di 5 secondi ed è un'interazione diversa da "scegli fra opzioni".
-7. **Assenza di Legend / abilità passive**: non sono ancora presenti nel codice attuale (Step 6). Lo stacking c'è dallo Step 5: sempre attivo in No Mercy, opzione nella partita normale.
+7. **Legend (Step 6)**: opzione `Legend` del menu, in entrambe le modalità. Sei Legend con passiva e attiva fisse; cooldown iniziali da bilanciare. Lo stacking c'è dallo Step 5: sempre attivo in No Mercy, opzione nella partita normale.

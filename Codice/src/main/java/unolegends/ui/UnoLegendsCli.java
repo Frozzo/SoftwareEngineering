@@ -14,10 +14,10 @@ import unolegends.controller.UnoLegendsGame;
 /**
  * Punto di avvio CLI (hotseat, da 2 a 6 giocatori).
  *
- * <p>Prima il menu di setup (modalità, opzioni, giocatori), poi il ciclo del
- * caso d'uso GiocaTurno. La CLI non conosce le regole: le modalità e le opzioni
- * da proporre le elenca il controller, e la validità delle scelte la verifica il
- * model.</p>
+ * <p>Prima il menu di setup (modalità, opzioni, giocatori e, se si gioca con i
+ * Legend, il Legend di ciascuno), poi il ciclo del caso d'uso GiocaTurno. La CLI non
+ * conosce le regole: le modalità, le opzioni e i Legend da proporre le elenca il
+ * controller, e la validità delle scelte la verifica il model.</p>
  */
 public final class UnoLegendsCli {
     private UnoLegendsCli() {
@@ -86,7 +86,8 @@ public final class UnoLegendsCli {
 
     /**
      * Raccoglie le scelte del setup e avvia la partita. Ordine: modalità, opzioni
-     * (una domanda sì/no ciascuna), numero e nomi dei giocatori. Se le scelte non
+     * (una domanda sì/no ciascuna), numero e nomi dei giocatori e, se le opzioni lo
+     * richiedono, il Legend di ogni giocatore. Se le scelte non
      * sono valide (per esempio Endless con 2 giocatori) mostra il motivo, scritto
      * dal controller, e ripete il setup. Le scelte si verificano prima di avviare
      * la partita: il controller restituisce la frase d'errore oppure null.
@@ -98,9 +99,12 @@ public final class UnoLegendsCli {
             String modalita = scegliModalita(reader);
             Set<String> opzioniAttive = scegliOpzioni(reader, modalita);
             List<String> nomi = scegliGiocatori(reader);
-            String errore = UnoLegendsGame.verificaImpostazioni(modalita, opzioniAttive, nomi);
+            List<String> legend = UnoLegendsGame.richiedeLegend(opzioniAttive)
+                    ? scegliLegend(reader, nomi)
+                    : List.of();
+            String errore = UnoLegendsGame.verificaImpostazioni(modalita, opzioniAttive, nomi, legend);
             if (errore == null) {
-                return UnoLegendsGame.avviaPartita(modalita, opzioniAttive, nomi);
+                return UnoLegendsGame.avviaPartita(modalita, opzioniAttive, nomi, legend);
             }
             System.out.println("Impostazioni non valide: " + errore);
             System.out.println("Ripetiamo la configurazione.");
@@ -161,6 +165,36 @@ public final class UnoLegendsCli {
         return nomi;
     }
 
+    /**
+     * Ogni giocatore sceglie un Legend fra quelli non ancora presi. Togliere dalla
+     * lista quelli già scelti è solo una comodità: che non ci siano doppioni lo
+     * verifica comunque il model.
+     */
+    private static List<String> scegliLegend(BufferedReader reader, List<String> nomi) throws IOException {
+        List<String> liberi = new ArrayList<>(UnoLegendsGame.getLegendDisponibili());
+        List<String> scelti = new ArrayList<>();
+        System.out.println("Legend disponibili:");
+        for (String legend : liberi) {
+            System.out.println(" - " + legend + ": " + UnoLegendsGame.descriviLegend(legend) + ".");
+        }
+        for (String nome : nomi) {
+            while (true) {
+                System.out.println(nome + ", scegli il tuo Legend:");
+                for (int i = 0; i < liberi.size(); i++) {
+                    System.out.println(i + ") " + liberi.get(i));
+                }
+                System.out.print("> ");
+                Integer indice = parseIndice(leggiRiga(reader));
+                if (indice != null && indice < liberi.size()) {
+                    scelti.add(liberi.remove((int) indice));
+                    break;
+                }
+                System.out.println("Scelta non valida.");
+            }
+        }
+        return scelti;
+    }
+
     private static boolean chiediSiNo(BufferedReader reader, String domanda) throws IOException {
         while (true) {
             System.out.print(domanda + " (s/n): ");
@@ -189,16 +223,26 @@ public final class UnoLegendsCli {
     // ------------------------------------------------------------------
 
     /**
-     * Inizio del turno: il giocatore può giocare una carta, pescare oppure uscire.
+     * Inizio del turno: il giocatore può giocare una carta, pescare, usare l'abilità
+     * del suo Legend (se in questo momento può farlo) oppure uscire. Se l'abilità
+     * chiede un bersaglio, la richiesta arriva al prossimo giro con la fase
+     * ATTESA_INPUT, come per una carta.
      *
      * @return false se il giocatore ha scelto di uscire
      */
     private static boolean turnoNormale(StatoPartitaDto stato, UnoLegendsGame controller,
                                         BufferedReader reader) throws IOException {
         mostraStato(stato);
-        System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci");
+        String abilita = stato.abilitaDisponibile();
+        System.out.println("Scegli:\n 0) gioca carta\n 1) pesca carta\n 2) esci"
+                + (abilita == null ? "" : "\n 3) usa l'abilita " + abilita));
         System.out.print("> ");
         String scelta = leggiRiga(reader);
+
+        if ("3".equals(scelta) && abilita != null) {
+            System.out.println(controller.usaAbilita() ? "Abilita usata." : "Abilita non utilizzabile ora.");
+            return true;
+        }
 
         if ("2".equals(scelta)) {
             return false;
@@ -316,7 +360,7 @@ public final class UnoLegendsCli {
         for (StatoPartitaDto.Giocatore giocatore : stato.giocatori()) {
             System.out.println((giocatore.diTurno() ? " > " : "   ") + giocatore.nome()
                     + " - " + giocatore.numeroCarte() + (giocatore.numeroCarte() == 1 ? " carta" : " carte")
-                    + " (" + giocatore.stato() + ")");
+                    + " (" + giocatore.stato() + ")" + descriviLegend(giocatore));
         }
         System.out.println("Giocatore attivo: " + stato.nomeGiocatoreAttivo());
         System.out.println("Carta in cima: " + (stato.cartaInCima() == null ? "nessuna" : stato.cartaInCima()));
@@ -326,6 +370,17 @@ public final class UnoLegendsCli {
             System.out.println(i + ") " + mano.get(i));
         }
         System.out.println();
+    }
+
+    /** " [Legend, abilita pronta]" oppure " [Legend, ricarica N]"; vuoto senza Legend. */
+    private static String descriviLegend(StatoPartitaDto.Giocatore giocatore) {
+        if (giocatore.legend() == null) {
+            return "";
+        }
+        String abilita = giocatore.ricaricaAbilita() == 0
+                ? "abilita pronta"
+                : "abilita tra " + giocatore.ricaricaAbilita() + (giocatore.ricaricaAbilita() == 1 ? " turno" : " turni");
+        return " [" + giocatore.legend() + ", " + abilita + "]";
     }
 
     private static void mostraClassifica(StatoPartitaDto stato) {

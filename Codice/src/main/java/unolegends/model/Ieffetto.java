@@ -1,7 +1,7 @@
 package unolegends.model;
 
 /**
- * Strategy dell'effetto di una carta (o, in futuro, di un'abilità attiva).
+ * Strategy dell'effetto di una carta o, dallo Step 6, di un'abilità attiva dei Legend.
  *
  * <p>I metodi legati all'input ricevono {@link Partita} perché alcune richieste
  * dipendono dallo stato del gioco: per esempio la scelta di un giocatore
@@ -52,6 +52,18 @@ public interface Ieffetto {
      */
     default int getValorePenalita() {
         return 0;
+    }
+
+    /**
+     * true se l'effetto si può attivare ora. Lo chiede {@link Partita} solo per le
+     * <b>abilità attive</b> dei Legend (Step 6), prima di accettare
+     * {@code usaAbilita()}: una carta si gioca se è compatibile, mentre un'abilità ha
+     * prerequisiti propri (un bersaglio disponibile, almeno 4 carte per Gifted card).
+     * L'effetto li conosce (Information Expert), quindi Partita non deve sapere quale
+     * abilità sta controllando. Di default è sempre attivabile.
+     */
+    default boolean isAttivabile(Partita partita) {
+        return true;
     }
 
     default void attivaEffetto(Partita partita, String risposta) {

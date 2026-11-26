@@ -19,4 +19,10 @@ public final class StrategiaPescaSingola implements IStrategiaPesca {
         }
         return List.of(carta);
     }
+
+    /** Con la pesca di una sola carta vale la passiva Doppia pesca (Step 6). */
+    @Override
+    public boolean ammettePescaConScelta() {
+        return true;
+    }
 }

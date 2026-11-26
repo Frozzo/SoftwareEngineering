@@ -7,7 +7,7 @@ package unolegends.model;
  *
  * <p>Nuove cause (abilità attive) vanno aggiunte qui quando vengono introdotte le
  * relative funzionalità. +6, +10 e roulette sono arrivati con lo Step 4,
- * l'accumulo dello stacking con lo Step 5.</p>
+ * l'accumulo dello stacking con lo Step 5, il Castigatore con lo Step 6.</p>
  */
 public enum OriginePesca {
     VOLONTARIA,
@@ -27,5 +27,10 @@ public enum OriginePesca {
      * ({@link Accumulo#getOriginePenalita()}): La Roccia è immune al +2 singolo,
      * non a un accumulo.
      */
-    ACCUMULO
+    ACCUMULO,
+    /**
+     * Abilità attiva "Il Castigatore" de La Roccia (Step 6): un giocatore a scelta pesca
+     * 4 carte. Passa da calcolaCartePescaForzata, quindi Salesman ha lo sconto.
+     */
+    CASTIGATORE
 }

@@ -30,10 +30,28 @@ package "unolegends.model" {
     -nome : String
     -mano : List<Carta>
     -stato : StatoGiocatore
+    -legend : Legend
+    -passive : List<IPassiva>
+    -passiveTemporanee : List<IPassiva>
+    -abilitaAttiva : AbilitaAttiva
+    -turniCongelati : int
     +Giocatore(nome : String, manoIniziale : List<Carta>)
+    +Giocatore(nome : String, manoIniziale : List<Carta>, legend : Legend)
     +getNome() : String
     +getStato() : StatoGiocatore
     +isInGioco() : boolean
+    +getLegend() : Legend
+    +getAbilitaAttiva() : AbilitaAttiva
+    ~getPassive() : List<IPassiva>
+    ~aggiungiPassivaTemporanea(passiva : IPassiva) : void
+    +isBersagliabile() : boolean
+    ~isImmuneAlBlocca() : boolean
+    +isCongelato() : boolean
+    ~partecipaAiTurni() : boolean
+    ~congela(turni : int) : void
+    ~consumaTurnoCongelato() : void
+    ~iniziaTurno() : void
+    ~terminaTurno() : void
     ~segnaComeTerminato() : void
     ~segnaComeEliminato() : void
     ~svuotaMano() : List<Carta>
@@ -56,8 +74,9 @@ package "unolegends.model" {
     +Mazzo(carteIniziali : Collection<Carta>)
     +prelevaCarta() : Carta
     +isVuoto() : boolean
-    +getNumeroCarteRestanti() : int
+    +getNumeroCarte() : int
     +mischia() : void
+    +aggiungiInFondo(carta : Carta) : void
     +rimescolaDaScarti(pilaDegliScarti : PilaDegliScarti) : void
     +aggiungiCarteERimescola(nuoveCarte : Collection<Carta>) : void
   }
@@ -100,7 +119,7 @@ package "unolegends.model" {
     +getRichiestaInputInAttesa() : RichiestaInput
     +getNomeVincitore() : String
     +getGiocatori() : List<Giocatore>
-    +getAvversariInGioco() : List<Giocatore>
+    +getBersagliSelezionabili() : List<Giocatore>
     +getNumeroGiocatoriInGioco() : int
     +getNumeroGiocatoriTerminati() : int
     +getGiocatoriTerminati() : List<Giocatore>
@@ -118,7 +137,14 @@ package "unolegends.model" {
     ~applicaColoreScelto(coloreScelto : Colore) : void
     +getColoreAttuale() : Colore
     ~segnalaSaltoTurno() : void
+    ~bloccaProssimo() : void
+    +isAbilitaUsabile() : boolean
+    +usaAbilita() : boolean
+    -completaAbilita(giocatore : Giocatore, abilita : AbilitaAttiva, risposta : String) : void
+    -isPenalitaAnnullata(bersaglio : Giocatore, numeroCarte : int, origine : OriginePesca) : boolean
     +pescaCarta() : boolean
+    -pescaConScelta(giocatore : Giocatore, numero : int) : void
+    ~rimettiInFondoAlMazzo(carta : Carta) : void
     +pescaSingola(giocatore : Giocatore) : Carta
     +applicaPescaForzata(bersaglio : Giocatore, numeroCarte : int, origine : OriginePesca) : List<Carta>
     +passaTurno() : boolean
@@ -126,7 +152,8 @@ package "unolegends.model" {
     +getProssimoGiocatore() : Giocatore
     ~eliminaGiocatore(giocatore : Giocatore) : void
     ~getGiocatoreAttivo() : Giocatore
-    ~getGiocatoriInGiocoNelSensoDiGioco() : List<Giocatore>
+    ~getGiocatoriPartecipantiNelSensoDiGioco() : List<Giocatore>
+    -getNumeroPartecipantiAiTurni() : int
     ~concediTurnoExtra() : void
     ~scartaSottoLaCima(carte : List<Carta>) : void
     +isCartaGiocabile(giocatore : Giocatore, carta : Carta) : boolean
@@ -140,7 +167,7 @@ package "unolegends.model" {
     -chiudiTurno() : void
     -aggiornaGiocatoreAttivo() : void
     -avanzaGiocatore() : void
-    -trovaProssimoIndiceInGioco(daIndice : int) : int
+    -trovaProssimoIndice(daIndice : int, criterio : Predicate<Giocatore>) : int
     -verificaEliminazioni() : void
     -{static} deveDichiarareUno(giocatore : Giocatore, manoPrima : List<Carta>) : boolean
   }
@@ -184,6 +211,13 @@ package "unolegends.model" {
     TURNO_EXTRA
     ACCUMULO_AUMENTATO
     PENALITA_ACCETTATA
+    ABILITA_USATA
+    PESCA_RIDOTTA
+    BLOCCO_EVITATO
+    GIOCATORE_CONGELATO
+    TURNO_CONGELATO
+    CARTE_REGALATE
+    CARTA_SCELTA
   }
 
   class EventoPartita <<record>> {
@@ -193,6 +227,7 @@ package "unolegends.model" {
     +origine : OriginePesca
     +colore : Colore
     +altroGiocatore : String
+    +legend : Legend
   }
 
   class RegoleDiGioco {
@@ -211,6 +246,7 @@ package "unolegends.model" {
     +isPartitaTerminata(partita : Partita) : boolean
     +pescaVolontaria(giocatore : Giocatore, partita : Partita) : List<Carta>
     +calcolaCartePescaForzata(contesto : ContestoPesca) : int
+    +getCarteTraCuiScegliereInPesca(giocatore : Giocatore) : int
     +mancatoUno(giocatore : Giocatore, unoDichiarato : boolean, partita : Partita) : boolean
     +{static} standard() : RegoleDiGioco
     +{static} standard(opzioni : Set<OpzionePartita>) : RegoleDiGioco
@@ -227,6 +263,7 @@ package "unolegends.model" {
     +{default} attivaEffetto(partita : Partita, risposta : String) : void
     +{default} isAmmessoComeCartaIniziale() : boolean
     +{default} getValorePenalita() : int
+    +{default} isAttivabile(partita : Partita) : boolean
   }
 
   class Effetto_Nullo {
@@ -257,11 +294,114 @@ package "unolegends.model" {
     +attivaEffetto(partita : Partita) : void
   }
 
+  abstract class EffettoConBersaglio {
+    #{abstract} applicaAlBersaglio(partita : Partita, chiGioca : Giocatore, bersaglio : Giocatore) : void
+    #ammetteBersaglio(bersaglio : Giocatore) : boolean
+    #getBersagli(partita : Partita) : List<Giocatore>
+    +getRichiestaInput(partita : Partita) : RichiestaInput
+    +validaRispostaInput(risposta : String, partita : Partita) : boolean
+    +isAttivabile(partita : Partita) : boolean
+    +attivaEffetto(partita : Partita) : void
+    +attivaEffetto(partita : Partita, risposta : String) : void
+  }
+
+  note right of EffettoConBersaglio
+    Template Method (Step 6): la scelta del
+    bersaglio fra getBersagliSelezionabili()
+    sta qui; le sottoclassi dicono solo cosa
+    fare al bersaglio.
+  end note
+
   class EffettoScambiaMano {
+    -comeCarta : boolean
+    +EffettoScambiaMano()
+    ~{static} abilitaScambiaMazzo() : EffettoScambiaMano
+    #ammetteBersaglio(bersaglio : Giocatore) : boolean
+    +getRichiestaInput(partita : Partita) : RichiestaInput
+    #applicaAlBersaglio(partita : Partita, chiGioca : Giocatore, bersaglio : Giocatore) : void
+    +isAmmessoComeCartaIniziale() : boolean
+  }
+
+  class EffettoPescaBersaglio {
+    -numeroCarte : int
+    -origine : OriginePesca
+    #applicaAlBersaglio(partita : Partita, chiGioca : Giocatore, bersaglio : Giocatore) : void
+  }
+
+  class EffettoRegalaCarte {
+    ~{static} CARTE_MINIME_IN_MANO : int
+    -numeroCarte : int
+    +isAttivabile(partita : Partita) : boolean
+    #applicaAlBersaglio(partita : Partita, chiGioca : Giocatore, bersaglio : Giocatore) : void
+  }
+
+  class EffettoCongela {
+    -turni : int
+    #applicaAlBersaglio(partita : Partita, chiGioca : Giocatore, bersaglio : Giocatore) : void
+  }
+
+  class EffettoArcobaleno {
+    +attivaEffetto(partita : Partita) : void
+  }
+
+  class EffettoSceltaCartaPescata {
+    -cartePescate : List<Carta>
+    -cartaTenuta : Carta
     +getRichiestaInput(partita : Partita) : RichiestaInput
     +validaRispostaInput(risposta : String, partita : Partita) : boolean
     +attivaEffetto(partita : Partita, risposta : String) : void
-    +isAmmessoComeCartaIniziale() : boolean
+    ~getCartaTenuta() : Carta
+  }
+
+  interface IPassiva {
+    +{default} modificaPescaForzata(contesto : ContestoPesca, carte : int) : int
+    +{default} consenteGiocata(candidata : Carta, inCima : Carta, coloreAttivo : Colore) : boolean
+    +{default} isBersagliabile() : boolean
+    +{default} isImmuneAlBlocca() : boolean
+    +{default} getCarteTraCuiScegliereInPesca() : int
+  }
+
+  note right of IPassiva
+    Step 6: ogni metodo è un hook con un default
+    che non cambia nulla; ogni passiva ridefinisce
+    solo il suo. Strategy + Polymorphism +
+    Protected Variations: nessun instanceof sul Legend.
+  end note
+
+  class PassivaRoccia
+  class PassivaSalesman
+  class PassivaGhost
+  class PassivaDaltonico
+  class PassivaPelleDiGhiaccio
+  class PassivaDoppiaPesca
+  class PassivaColoreLibero
+
+  enum Legend {
+    ROCCIA
+    MERCANTE
+    FANTASMA
+    DALTONICO
+    FREEZER
+    ACROBATA
+    --
+    -passiva : IPassiva
+    -effettoAttivo : Ieffetto
+    -cooldown : int
+    ~getPassiva() : IPassiva
+    +getCooldown() : int
+    ~creaAbilitaAttiva() : AbilitaAttiva
+  }
+
+  class AbilitaAttiva <<final>> {
+    -effetto : Ieffetto
+    -cooldown : int
+    -turniDiRicarica : int
+    ~getEffetto() : Ieffetto
+    +getCooldown() : int
+    +getTurniDiRicarica() : int
+    +isPronta() : boolean
+    ~avviaRicarica() : void
+    ~scalaRicarica() : void
   }
 
   class EffettoPassaMani {
@@ -306,6 +446,7 @@ package "unolegends.model" {
     PIU_DIECI
     ROULETTE
     ACCUMULO
+    CASTIGATORE
   }
 
   class ContestoPesca <<record>> {
@@ -317,6 +458,7 @@ package "unolegends.model" {
   enum TipoRichiesta {
     SCELTA_COLORE
     SCELTA_GIOCATORE
+    SCELTA_CARTA
   }
 
   class RichiestaInput {
@@ -350,8 +492,9 @@ package "unolegends.model" {
     -{static} CARTE_PER_GIOCATORE : int
     +{static} creaPartita(config : ConfigurazionePartita) : Partita
     +{static} creaPartita(mazzoFactory : MazzoFactory, nomiGiocatori : List<String>, regole : RegoleDiGioco) : Partita
+    +{static} creaPartita(mazzoFactory : MazzoFactory, nomiGiocatori : List<String>, legend : List<Legend>, regole : RegoleDiGioco) : Partita
     -{static} creaRegole(config : ConfigurazionePartita) : RegoleDiGioco
-    -{static} distribuisciCarteAiGiocatori(mazzo : Mazzo, nomiGiocatori : List<String>) : List<Giocatore>
+    -{static} distribuisciCarteAiGiocatori(mazzo : Mazzo, nomiGiocatori : List<String>, legend : List<Legend>) : List<Giocatore>
   }
 
   enum ModalitaDiGioco {
@@ -368,16 +511,19 @@ package "unolegends.model" {
   enum OpzionePartita {
     ENDLESS
     STACKING
+    LEGEND
   }
 
   class ConfigurazionePartita <<record>> {
     +modalita : ModalitaDiGioco
     +nomiGiocatori : List<String>
     +opzioni : Set<OpzionePartita>
+    +legend : List<Legend>
     +{static} MIN_GIOCATORI : int
     +{static} MAX_GIOCATORI : int
     +{static} MIN_GIOCATORI_ENDLESS : int
     +{static} verifica(modalita : ModalitaDiGioco, nomiGiocatori : List<String>, opzioni : Set<OpzionePartita>) : ErroreConfigurazione
+    +{static} verifica(modalita : ModalitaDiGioco, nomiGiocatori : List<String>, opzioni : Set<OpzionePartita>, legend : List<Legend>) : ErroreConfigurazione
     +haOpzione(opzione : OpzionePartita) : boolean
     +numeroGiocatori() : int
   }
@@ -387,6 +533,9 @@ package "unolegends.model" {
     NOME_VUOTO
     NOMI_DUPLICATI
     GIOCATORI_INSUFFICIENTI_PER_ENDLESS
+    LEGEND_MANCANTI
+    LEGEND_SENZA_OPZIONE
+    LEGEND_DUPLICATI
   }
 
 
@@ -444,7 +593,31 @@ Ieffetto <|.. Effetto_cambio_giro
 Ieffetto <|.. EffettoComposito
 MazzoFactory <|.. StandardMazzoFactory
 MazzoFactory <|.. NoMercyMazzoFactory
-Ieffetto <|.. EffettoScambiaMano
+Ieffetto <|.. EffettoConBersaglio
+EffettoConBersaglio <|-- EffettoScambiaMano
+EffettoConBersaglio <|-- EffettoPescaBersaglio
+EffettoConBersaglio <|-- EffettoRegalaCarte
+EffettoConBersaglio <|-- EffettoCongela
+Ieffetto <|.. EffettoArcobaleno
+Ieffetto <|.. EffettoSceltaCartaPescata
+IPassiva <|.. PassivaRoccia
+IPassiva <|.. PassivaSalesman
+IPassiva <|.. PassivaGhost
+IPassiva <|.. PassivaDaltonico
+IPassiva <|.. PassivaPelleDiGhiaccio
+IPassiva <|.. PassivaDoppiaPesca
+IPassiva <|.. PassivaColoreLibero
+Legend --> "1" IPassiva : passiva
+Legend --> "1" Ieffetto : effettoAttivo
+Legend ..> AbilitaAttiva : crea
+AbilitaAttiva --> "1" Ieffetto : effetto
+Giocatore --> "0..1" Legend : legend
+Giocatore --> "0..*" IPassiva : passive
+Giocatore --> "0..1" AbilitaAttiva : abilitaAttiva
+EffettoArcobaleno ..> PassivaColoreLibero : crea
+RegoleDiGioco ..> IPassiva : interroga gli hook
+ConfigurazionePartita --> "0..*" Legend : legend
+Partita ..> EffettoSceltaCartaPescata : Doppia pesca
 Ieffetto <|.. EffettoPassaMani
 Ieffetto <|.. EffettoScartaColore
 Ieffetto <|.. EffettoTurnoExtra
@@ -502,7 +675,7 @@ ContestoPesca --> "1" Giocatore : bersaglio
 ContestoPesca --> "1" OriginePesca : origine
 Partita ..> ContestoPesca : crea
 RegoleDiGioco ..> ContestoPesca : usa
-Effetto_Blocca_Turno ..> Partita : segnala salto turno
+Effetto_Blocca_Turno ..> Partita : bloccaProssimo
 Effetto_cambio_giro ..> Partita : cambia giro
 Effetto_Cambia_colore ..> Partita : applica colore
 
