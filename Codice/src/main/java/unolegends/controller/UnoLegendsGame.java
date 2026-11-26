@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import unolegends.model.Accumulo;
 import unolegends.model.Carta;
 import unolegends.model.Colore;
 import unolegends.model.ConfigurazionePartita;
@@ -129,6 +130,7 @@ public class UnoLegendsGame {
     private static String nomeOpzione(OpzionePartita opzione) {
         return switch (opzione) {
             case ENDLESS -> "Endless";
+            case STACKING -> "Stacking";
         };
     }
 
@@ -136,6 +138,9 @@ public class UnoLegendsGame {
         return switch (opzione) {
             case ENDLESS -> "chi finisce le carte esce e si continua fino all'ultimo, poi si stila la classifica"
                     + " (almeno " + ConfigurazionePartita.MIN_GIOCATORI_ENDLESS + " giocatori)";
+            case STACKING -> "a una carta di pesca si puo rispondere con una carta di pesca di valore uguale"
+                    + " o superiore (+2 su +2, +4 su +2 o su +4): le carte si accumulano e chi non risponde"
+                    + " le pesca tutte e perde il turno";
         };
     }
 
@@ -187,7 +192,14 @@ public class UnoLegendsGame {
                 convertiRichiesta(partita.getRichiestaInputInAttesa()),
                 convertiGiocatori(),
                 partita.isSensoOrario(),
-                partita.getClassifica().stream().map(Giocatore::getNome).toList());
+                partita.getClassifica().stream().map(Giocatore::getNome).toList(),
+                convertiAccumulo(partita.getAccumulo()));
+    }
+
+    private static StatoPartitaDto.Accumulo convertiAccumulo(Accumulo accumulo) {
+        return accumulo == null
+                ? null
+                : new StatoPartitaDto.Accumulo(accumulo.totale(), accumulo.valoreUltimaCarta());
     }
 
     private List<StatoPartitaDto.Giocatore> convertiGiocatori() {
@@ -255,6 +267,16 @@ public class UnoLegendsGame {
     }
 
     /**
+     * Inoltra la scelta di non rispondere allo stacking: il giocatore pesca tutte
+     * le carte accumulate e perde il turno. La pesca viene comunicata dagli eventi.
+     *
+     * @return true se il comando è stato accettato (c'era un accumulo a cui rispondere)
+     */
+    public boolean accettaPenalita() {
+        return partita.accettaPenalita();
+    }
+
+    /**
      * Preleva gli eventi accaduti dall'ultima chiamata e li traduce in messaggi
      * da stampare. La UI la chiama a ogni giro del suo ciclo.
      */
@@ -291,6 +313,9 @@ public class UnoLegendsGame {
                     : giocatore + " scarta " + descriviNumeroCarte(evento.quantita()) + " di colore "
                             + evento.colore().formatta(evento.colore().getNome().toLowerCase()) + ".";
             case TURNO_EXTRA -> "Tutti saltano il turno: " + giocatore + " gioca ancora.";
+            case ACCUMULO_AUMENTATO -> "Stacking: l'accumulo sale a " + descriviNumeroCarte(evento.quantita()) + ".";
+            // Le carte pescate le racconta subito dopo l'evento PESCA_FORZATA.
+            case PENALITA_ACCETTATA -> giocatore + " non risponde allo stacking: accetta la penalita e perde il turno.";
         };
     }
 
@@ -307,6 +332,7 @@ public class UnoLegendsGame {
             case PIU_SEI -> " per un +6";
             case PIU_DIECI -> " per un +10";
             case ROULETTE -> " con la roulette";
+            case ACCUMULO -> " accumulate con lo stacking";
         };
     }
 
@@ -316,6 +342,7 @@ public class UnoLegendsGame {
             case POST_PESCA -> StatoPartitaDto.Fase.POST_PESCA;
             case ATTESA_INPUT -> StatoPartitaDto.Fase.ATTESA_INPUT;
             case ATTESA_UNO -> StatoPartitaDto.Fase.ATTESA_UNO;
+            case RISPOSTA_STACKING -> StatoPartitaDto.Fase.RISPOSTA_STACKING;
             case TERMINATA -> StatoPartitaDto.Fase.TERMINATA;
         };
     }

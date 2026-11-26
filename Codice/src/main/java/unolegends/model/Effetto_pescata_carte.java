@@ -3,22 +3,36 @@ package unolegends.model;
 import java.util.Objects;
 
 /**
- * Fa pescare al giocatore successivo un numero fisso di carte e gli fa saltare
- * il turno. La pesca passa interamente da {@link Partita#applicaPescaForzata},
- * così le regole possono modificarne il numero in base all'origine.
+ * Effetto delle carte di pesca (+2, +4, +6, +10): fa pescare un numero fisso di
+ * carte a chi viene dopo.
+ *
+ * <p>Dallo Step 5 l'effetto <b>non sa se lo stacking è attivo</b> (Protected
+ * Variations): chiede a {@link Partita#applicaPenalitaPesca(int, OriginePesca)} di
+ * applicare la penalità e decide Partita, tramite le regole. Senza stacking il
+ * successivo pesca subito e salta il turno, come prima; con lo stacking la
+ * penalità si aggiunge all'accumulo e il successivo può rispondere. Prima
+ * l'effetto chiamava direttamente {@code applicaPescaForzata} e
+ * {@code segnalaSaltoTurno}: così lo stesso effetto funziona in entrambi i casi.</p>
  */
 public class Effetto_pescata_carte implements Ieffetto {
     private final int numeroCarteDaPescare;
     private final OriginePesca origine;
 
     public Effetto_pescata_carte(int numeroCarteDaPescare, OriginePesca origine) {
+        if (numeroCarteDaPescare <= 0) {
+            throw new IllegalArgumentException("numeroCarteDaPescare deve essere positivo");
+        }
         this.numeroCarteDaPescare = numeroCarteDaPescare;
         this.origine = Objects.requireNonNull(origine, "origine non puo essere null");
     }
 
     public void attivaEffetto(Partita partita) {
-        Giocatore prossimoGiocatore = partita.getProssimoGiocatore();
-        partita.applicaPescaForzata(prossimoGiocatore, numeroCarteDaPescare, origine);
-        partita.segnalaSaltoTurno();
+        partita.applicaPenalitaPesca(numeroCarteDaPescare, origine);
+    }
+
+    /** Il valore di pesca è il numero di carte che fa pescare (Information Expert). */
+    @Override
+    public int getValorePenalita() {
+        return numeroCarteDaPescare;
     }
 }

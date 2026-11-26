@@ -34,8 +34,8 @@ Le regole di gioco e le decisioni prese sono in [`CLAUDE.md`](../../CLAUDE.md), 
 | 2 | Fasi del turno, input unificato, comunicazione degli eventi alla UI | ✅ fatto (branch `ci-aiuta-claudio`) |
 | 3 | N giocatori, giocatori eliminati, Endless, configurazione e menu di setup | ✅ fatto (branch `ci-aiuta-claudio`) |
 | 4 | Modalità No Mercy: regole speciali e carte nuove | ✅ fatto (branch `ci-aiuta-claudio`) |
-| 5 | Stacking delle carte di pesca | ⏭️ prossimo |
-| 6 | Legend: abilità passive, abilità attive con cooldown, scelta nel menu | da fare |
+| 5 | Stacking delle carte di pesca | ✅ fatto (branch `ci-aiuta-claudio`) |
+| 6 | Legend: abilità passive, abilità attive con cooldown, scelta nel menu | ⏭️ prossimo |
 | 7 | Rifinitura: test, casi limite, bilanciamento, documentazione | da fare |
 
 Perché quest'ordine:
@@ -187,7 +187,7 @@ Scelte approvate, in sintesi:
   - dopo uno scambio o una rotazione di mani **nessuno** dichiara UNO;
   - dopo Scarta tutto **sì**, se resta una carta.
 - **Ultima carta:** la 7 o lo 0 giocati come ultima carta fanno vincere, e lo scambio non avviene.
-- **Cambio giro con 2 giocatori in gioco:** vale come blocco (regola ufficiale), in entrambe le modalità.
+- **Cambio giro con 2 giocatori in gioco:** vale come blocco (regola ufficiale), in entrambe le modalità. Con lo stacking (Step 5) il +4 cambio giro con 2 giocatori fa tornare l'accumulo a chi l'ha giocato.
 - **Roulette:**
   - il colore lo sceglie chi gioca;
   - un jolly nero non conta come carta del colore scelto;
@@ -196,7 +196,7 @@ Scelte approvate, in sintesi:
   - l'eliminazione avviene dopo l'effetto o la pesca;
   - se l'eliminato doveva saltare il turno, il salto si annulla;
   - se è il giocatore di turno, il turno passa.
-- **Stacking:** non c'è ancora, arriva allo Step 5.
+- **Stacking:** non c'era ancora, è arrivato allo Step 5.
 
 Il piano originale, per confronto:
 
@@ -252,7 +252,20 @@ Il mazzo ufficiale ha 168 carte, ma le quantità per tipo non le abbiamo trovate
 
 ---
 
-## Step 5 — Stacking (+2 / +4 / +6 / +10)
+## Step 5 — Stacking (+2 / +4 / +6 / +10) ✅
+
+Fatto. Resoconto completo (cosa è stato fatto, perché, e tutte le scelte prese con il team): [`step5_quinta_iter.md`](step5_quinta_iter.md).
+
+Scelte approvate, in sintesi:
+- **5.A — valore di pesca:** metodo `default int getValorePenalita()` in `Ieffetto` (0 di default; `EffettoComposito` somma), **non** un attributo di `ValoreCarta` come proposto sotto: il numero di carte è già scritto nell'effetto, così non sta in due punti.
+- **5.B — accumulo:** record `Accumulo` (totale, valore dell'ultima carta, numero di carte, origine della prima), come proposto.
+- **Una sola strategia** `StrategiaAccumuloValoreCrescente` per entrambe le modalità (più `StrategiaNessunAccumulo`): con il mazzo normale la regola "valore uguale o superiore" dà già "+2 ← +2/+4, +4 ← +4".
+- **Risposta:** conta solo il valore, non il colore; chi ha una risposta valida può comunque accettare; si accetta con il comando dedicato `accettaPenalita()` (non con "pesca").
+- **+4 cambio giro con 2 giocatori:** "arma a doppio taglio". Il cambio giro fa saltare l'avversario, quindi l'accumulo torna a chi ha giocato la carta, che può rispondere o accettare. **Ci si discosta dalla regola ufficiale.**
+- **Carta iniziale di pesca:** con lo stacking apre l'accumulo e il primo giocatore risponde.
+- **Niente pattern State** e **niente Builder** per ora; **niente Maven/JUnit** (le prove restano un programma esterno).
+
+Sotto resta il piano originale.
 
 ### Regola (No Mercy, e opzione Stacking della partita normale)
 - In No Mercy lo stacking è **sempre attivo**: è un'opzione obbligatoria di `ModalitaDiGioco.NO_MERCY`. Nella partita normale è l'**opzione** `OpzionePartita.STACKING`, che si aggiunge all'enum in questo step.
@@ -382,7 +395,7 @@ Durante la partita la CLI mostra il Legend di ogni giocatore e il cooldown, e ag
   | **Maven/Gradle + JUnit 5** | Standard; test ripetibili sulle regole (stacking, eliminazione, passive) | Va aggiunta la struttura `pom.xml`/`build.gradle` |
   | JUnit da riga di comando con `javac` | Nessun build tool | Scomodo da far girare |
 
-  **Opinione:** **Maven + JUnit 5**, anche introdotto prima se il team è d'accordo. Le regole No Mercy e le interazioni con i Legend hanno molti casi limite, e provarli a mano in CLI è lento.
+  **Decisione del team (Step 5): niente Maven né JUnit.** Le prove restano un programma esterno compilato con `javac` (al massimo 100 partite simulate). Il parere iniziale era **Maven + JUnit 5**, anche introdotto prima. Le regole No Mercy e le interazioni con i Legend hanno molti casi limite, e provarli a mano in CLI è lento.
 - **Bilanciamento** dei cooldown.
 - **Documentazione:**
   - diagrammi aggiornati (classi e sequenza);
@@ -401,9 +414,9 @@ Durante la partita la CLI mostra il Legend di ogni giocatore e il cooldown, e ag
 | 4 | Carta 7 / Scambia mazzo giocate come ultima carta | ✅ deciso: chi la gioca come ultima carta vince e lo scambio non avviene |
 | 5 | Gifted card che svuota la mano | vale come vittoria |
 | 6 | Coppie passiva/attiva fisse o libere | fisse |
-| 7 | Introdurre Maven + JUnit e quando | sì, entro lo Step 4 |
-| 8 | Cambio giro con 2 giocatori in gioco | ✅ deciso: vale come blocco (regola ufficiale), in entrambe le modalità |
-| 9 | Builder per `RegoleDiGioco` quando le strategie cresceranno | da rivalutare agli Step 5–6 |
+| 7 | Introdurre Maven + JUnit e quando | ✅ deciso allo Step 5: no, si continua con programmi di prova esterni (al massimo 100 partite simulate) |
+| 8 | Cambio giro con 2 giocatori in gioco | ✅ deciso: vale come blocco (regola ufficiale), in entrambe le modalità; il +4 cambio giro con lo stacking rimanda l'accumulo a chi l'ha giocato (Step 5) |
+| 9 | Builder per `RegoleDiGioco` quando le strategie cresceranno | allo Step 5 (7 strategie) deciso di no; da rivalutare allo Step 6 |
 
 ## Pattern usati, a lavori finiti
 
@@ -417,6 +430,6 @@ Durante la partita la CLI mostra il Legend di ogni giocatore e il cooldown, e ag
 | Composite | `EffettoComposito` (+4, Jolly +6/+10, cambio giro +4) |
 | Null Object | `Effetto_Nullo`, `PassivaNulla` |
 | Abstract Factory + Singleton | `MazzoFactory`, `StandardMazzoFactory`, `NoMercyMazzoFactory` |
-| Builder | non usato per ora (vedi scelta 3.B); candidato `RegoleDiGioco` agli Step 5–6 |
-| State (opzionale) | fasi del turno di `Partita` |
+| Builder | non usato per ora (vedi scelta 3.B, confermata allo Step 5); candidato `RegoleDiGioco` allo Step 6 |
+| State (opzionale) | fasi del turno di `Partita`: allo Step 5 si è restati all'enum `FaseTurno`; da rivalutare allo Step 6 |
 | Protected Variations / Information Expert / Coordinator (GRASP) | `RegoleDiGioco`, effetti, `Partita` |

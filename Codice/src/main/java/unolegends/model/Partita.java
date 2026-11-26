@@ -22,6 +22,12 @@ import java.util.function.Predicate;
  * ({@link StatoGiocatore#ELIMINATO}). Quando la partita finisce lo decidono le
  * regole ({@code IStrategiaFinePartita}): così la stessa Partita gestisce sia la
  * partita normale sia Endless senza sapere quale delle due è attiva.</p>
+ *
+ * <p>Dallo Step 5 gestisce lo stacking: le carte di pesca passano da
+ * {@link #applicaPenalitaPesca}, che a seconda delle regole fa pescare subito o
+ * aggiunge all'{@link Accumulo}; chi deve rispondere è in
+ * {@link FaseTurno#RISPOSTA_STACKING} e risponde con {@link #giocaCarta(int)} o
+ * {@link #accettaPenalita()}.</p>
  */
 public class Partita {
     private final List<Giocatore> giocatori;
@@ -56,6 +62,15 @@ public class Partita {
      * turni extra.
      */
     private int turniExtra;
+    /**
+     * Accumulo dello stacking in corso (Step 5), oppure {@code null} se non ce n'è
+     * uno. Quando non è null il giocatore di turno è in
+     * {@link FaseTurno#RISPOSTA_STACKING} (o sta completando la sua risposta: scelta
+     * del colore, finestra UNO). Non è un flag sulla fase: contiene i dati che
+     * servono alle regole ({@link Accumulo}), mentre la fase la decide
+     * {@link #chiudiTurno()} guardando se l'accumulo esiste.
+     */
+    private Accumulo accumulo;
     private Colore coloreAttuale;
     private boolean sensoOrario = true; // Variabile per tenere traccia del senso di gioco
 
@@ -86,6 +101,11 @@ public class Partita {
      * arriva la risposta, l'effetto viene applicato e il turno avanza. Prima esisteva
      * un meccanismo dedicato ({@code effettoInizialeInAttesa} +
      * {@code rispondiRichiestaInputIniziale}); ora è lo stesso delle carte giocate.</p>
+     *
+     * <p>Dallo Step 5, dopo l'effetto, il turno passa con {@link #chiudiTurno()} come
+     * per qualunque carta giocata. Così una carta iniziale di pesca con lo stacking
+     * attivo apre un accumulo e il primo giocatore può rispondere, senza un caso
+     * speciale per l'inizio della partita.</p>
      */
     public void iniziaGioco() {
         if (giocoIniziato) {
@@ -108,7 +128,7 @@ public class Partita {
         }
         effetto.attivaEffetto(this);
         verificaEliminazioni();
-        aggiornaGiocatoreAttivo();
+        chiudiTurno();
     }
 
     /**
@@ -128,6 +148,14 @@ public class Partita {
     }
 
     /** Fase corrente del turno: è l'unica informazione che la UI deve leggere per sapere cosa chiedere. */
+    /**
+     * Accumulo dello stacking in corso, oppure {@code null}. Lo leggono le regole
+     * (per sapere se una carta può rispondere) e il controller (per mostrarlo).
+     */
+    public Accumulo getAccumulo() {
+        return accumulo;
+    }
+
     public FaseTurno getFase() {
         return fase;
     }
@@ -235,7 +263,10 @@ public class Partita {
      * @return true se la giocata è stata accettata (completata o in attesa di input)
      */
     public boolean giocaCarta(int indiceCarta) {
-        if (fase != FaseTurno.NORMALE && fase != FaseTurno.POST_PESCA) {
+        // In RISPOSTA_STACKING si gioca come sempre: è isGiocabile delle regole ad
+        // accettare solo le carte di pesca di valore sufficiente.
+        if (fase != FaseTurno.NORMALE && fase != FaseTurno.POST_PESCA
+                && fase != FaseTurno.RISPOSTA_STACKING) {
             return false;
         }
         Giocatore giocatoreAttivo = getGiocatoreAttivo();
@@ -281,6 +312,66 @@ public class Partita {
         fase = FaseTurno.NORMALE;
         azione.completamento().accept(risposta);
         return true;
+    }
+
+    /**
+     * Il giocatore di turno non risponde allo stacking: pesca tutte le carte
+     * accumulate e il suo turno finisce, cioè "perde il turno" (Step 5). Permesso
+     * solo in {@link FaseTurno#RISPOSTA_STACKING}, anche se il giocatore avrebbe
+     * una risposta valida (decisione presa).
+     *
+     * <p>È un comando dedicato e non {@link #pescaCarta()} (decisione presa): il
+     * nome dice cosa succede, e la pesca volontaria non cambia significato a
+     * seconda della fase.</p>
+     *
+     * <p>La pesca passa da {@link #applicaPescaForzata}, quindi le regole (e allo
+     * Step 6 le passive) possono modificarla e l'evento di pesca si registra da
+     * solo. L'origine è quella della carta se l'accumulo è una carta sola,
+     * altrimenti {@link OriginePesca#ACCUMULO}. Dopo la pesca si controlla la Mercy
+     * rule, come per tutte le pesche.</p>
+     *
+     * @return true se il comando è stato accettato
+     */
+    public boolean accettaPenalita() {
+        if (fase != FaseTurno.RISPOSTA_STACKING) {
+            return false;
+        }
+        Giocatore giocatore = getGiocatoreAttivo();
+        Accumulo accettato = accumulo;
+        accumulo = null;
+        registraEvento(EventoPartita.penalitaAccettata(giocatore, accettato.totale()));
+        applicaPescaForzata(giocatore, accettato.totale(), accettato.getOriginePenalita());
+        verificaEliminazioni();
+        chiudiTurno();
+        return true;
+    }
+
+    /**
+     * Unico punto d'ingresso delle penalità delle carte di pesca (+2, +4, +6, +10).
+     * L'effetto non sa se lo stacking è attivo: lo chiede Partita alle regole
+     * (Protected Variations).
+     * <ul>
+     *   <li><b>Senza stacking</b>: il giocatore successivo pesca subito e salta il
+     *       turno, come fino allo Step 4.</li>
+     *   <li><b>Con lo stacking</b>: nessuno pesca e nessun turno viene saltato. La
+     *       penalità apre l'accumulo o lo fa crescere; quando il turno passa,
+     *       {@link #chiudiTurno()} porta il giocatore successivo in
+     *       {@link FaseTurno#RISPOSTA_STACKING}.</li>
+     * </ul>
+     *
+     * <p>Chi deve rispondere è semplicemente il prossimo di turno. Per questo il +4
+     * cambio giro con 2 giocatori torna a chi l'ha giocato: il salto lo chiede
+     * {@link #cambioGiro()}, non il +4 (decisione presa: "arma a doppio taglio").</p>
+     */
+    void applicaPenalitaPesca(int numeroCarte, OriginePesca origine) {
+        Objects.requireNonNull(origine, "origine non puo essere null");
+        if (!regole.isAccumuloAttivo()) {
+            applicaPescaForzata(getProssimoGiocatore(), numeroCarte, origine);
+            segnalaSaltoTurno();
+            return;
+        }
+        accumulo = accumulo == null ? Accumulo.apri(numeroCarte, origine) : accumulo.aggiungi(numeroCarte);
+        registraEvento(EventoPartita.accumuloAumentato(accumulo.totale()));
     }
 
     /**
@@ -685,20 +776,28 @@ public class Partita {
 
         classifica = List.copyOf(risultato);
         azioneInAttesa = null;
+        accumulo = null;
         cartaAppenaPescata = null;
         fase = FaseTurno.TERMINATA;
     }
 
     /**
-     * Chiude il turno del giocatore attivo: azzera i dati del turno, riporta la
-     * fase a {@link FaseTurno#NORMALE} e passa al giocatore successivo.
+     * Chiude il turno del giocatore attivo: azzera i dati del turno e passa al
+     * giocatore successivo.
+     *
+     * <p>È l'unico punto che decide la fase del nuovo turno: se c'è un accumulo
+     * dello stacking il nuovo giocatore deve rispondere
+     * ({@link FaseTurno#RISPOSTA_STACKING}), altrimenti il turno è
+     * {@link FaseTurno#NORMALE}. Così l'accumulo "passa al successivo" senza codice
+     * dedicato, qualunque sia il motivo per cui il turno si chiude (giocata, UNO,
+     * vittoria in Endless, eliminazione, carta iniziale).</p>
      */
     private void chiudiTurno() {
         if (fase == FaseTurno.TERMINATA) {
             return;
         }
         cartaAppenaPescata = null;
-        fase = FaseTurno.NORMALE;
+        fase = accumulo != null ? FaseTurno.RISPOSTA_STACKING : FaseTurno.NORMALE;
         aggiornaGiocatoreAttivo();
     }
 

@@ -72,6 +72,7 @@ public final class UnoLegendsCli {
                         System.out.println();
                         yield true;
                     }
+                    case RISPOSTA_STACKING -> turnoRispostaStacking(stato, controller, reader);
                     case POST_PESCA -> turnoDopoPesca(stato, controller, reader);
                     case NORMALE -> turnoNormale(stato, controller, reader);
                 };
@@ -211,6 +212,44 @@ public final class UnoLegendsCli {
         if ("1".equals(scelta)) {
             if (!controller.pescaCarta()) {
                 System.out.println("Pesca non consentita.");
+            }
+            return true;
+        }
+        System.out.println("Comando non riconosciuto.");
+        return true;
+    }
+
+    /**
+     * Stacking (Step 5): c'è un accumulo di pesca e il giocatore deve decidere se
+     * rispondere con una carta di pesca di valore sufficiente oppure accettare la
+     * penalità. Quali carte sono valide lo decide il model: la CLI mostra solo la
+     * soglia ricevuta nel DTO.
+     *
+     * @return false se il giocatore ha scelto di uscire
+     */
+    private static boolean turnoRispostaStacking(StatoPartitaDto stato, UnoLegendsGame controller,
+                                                 BufferedReader reader) throws IOException {
+        mostraStato(stato);
+        StatoPartitaDto.Accumulo accumulo = stato.accumulo();
+        System.out.println("Stacking in corso: " + accumulo.carteDaPescare() + " carte accumulate.");
+        System.out.println("Puoi rispondere con una carta +" + accumulo.valoreMinimoRisposta()
+                + " o superiore (di qualsiasi colore), oppure accettare e pescarle tutte.");
+        System.out.println("Scegli:\n 0) rispondi con una carta\n 1) accetta la penalita\n 2) esci");
+        System.out.print("> ");
+        String scelta = leggiRiga(reader);
+
+        if ("2".equals(scelta)) {
+            return false;
+        }
+        if ("0".equals(scelta)) {
+            System.out.println("Digita l'indice della carta da giocare.");
+            System.out.print("> ");
+            giocaCarta(leggiRiga(reader), controller);
+            return true;
+        }
+        if ("1".equals(scelta)) {
+            if (!controller.accettaPenalita()) {
+                System.out.println("Comando non consentito.");
             }
             return true;
         }

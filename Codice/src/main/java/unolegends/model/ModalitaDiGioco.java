@@ -18,11 +18,10 @@ import java.util.Set;
 public enum ModalitaDiGioco {
     NORMALE(StandardMazzoFactory.getInstance(), Set.of()),
     /**
-     * No Mercy (Step 4): mazzo da 168 carte e regole proprie. Lo stacking sarà la
-     * sua opzione obbligatoria dallo Step 5, quando {@code OpzionePartita.STACKING}
-     * esisterà.
+     * No Mercy (Step 4): mazzo da 168 carte e regole proprie. Lo stacking è la sua
+     * opzione obbligatoria (Step 5): è sempre attivo e il menu non lo chiede.
      */
-    NO_MERCY(NoMercyMazzoFactory.getInstance(), Set.of());
+    NO_MERCY(NoMercyMazzoFactory.getInstance(), Set.of(OpzionePartita.STACKING));
 
     private final MazzoFactory mazzoFactory;
     private final Set<OpzionePartita> opzioniObbligatorie;

@@ -36,6 +36,24 @@ public interface Ieffetto {
         return true;
     }
 
+    /**
+     * Valore di pesca dell'effetto: quante carte fa pescare una carta di pesca
+     * (+2 vale 2, +4 vale 4...), 0 per tutti gli altri effetti. Lo usa lo stacking
+     * (Step 5) per decidere se una carta può rispondere a un accumulo: si risponde
+     * solo con un valore uguale o superiore a quello dell'ultima carta.
+     *
+     * <p>È un metodo polimorfico e non un attributo di {@link ValoreCarta}: il
+     * numero di carte è già scritto nell'effetto che le fa pescare, e ripeterlo
+     * nell'enum vorrebbe dire averlo in due punti (decisione 5.A). Evita anche
+     * {@code instanceof Effetto_pescata_carte} nelle regole.</p>
+     *
+     * <p>La roulette vale 0: pesca un numero di carte non noto in anticipo e non si
+     * accumula.</p>
+     */
+    default int getValorePenalita() {
+        return 0;
+    }
+
     default void attivaEffetto(Partita partita, String risposta) {
         if (getRichiestaInput(partita) != null) {
             throw new IllegalArgumentException("L'effetto richiede un input");

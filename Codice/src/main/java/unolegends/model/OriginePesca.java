@@ -5,9 +5,9 @@ package unolegends.model;
  * Legend) di distinguere le pescate senza conoscere l'effetto o la carta che le
  * ha generate: per esempio un'immunità al solo +2 controlla {@code PIU_DUE}.
  *
- * <p>Nuove cause (accumulo dello stacking, abilità attive) vanno aggiunte qui
- * quando vengono introdotte le relative funzionalità. +6, +10 e roulette sono
- * arrivati con lo Step 4.</p>
+ * <p>Nuove cause (abilità attive) vanno aggiunte qui quando vengono introdotte le
+ * relative funzionalità. +6, +10 e roulette sono arrivati con lo Step 4,
+ * l'accumulo dello stacking con lo Step 5.</p>
  */
 public enum OriginePesca {
     VOLONTARIA,
@@ -20,5 +20,12 @@ public enum OriginePesca {
     /** Jolly +10 (No Mercy). */
     PIU_DIECI,
     /** Jolly roulette colore (No Mercy): non passa da calcolaCartePescaForzata, quindi niente sconti (Salesman). */
-    ROULETTE
+    ROULETTE,
+    /**
+     * Accumulo dello stacking (Step 5) formato da <b>due o più</b> carte. Se chi
+     * accetta subisce una sola carta, l'origine resta quella della carta
+     * ({@link Accumulo#getOriginePenalita()}): La Roccia è immune al +2 singolo,
+     * non a un accumulo.
+     */
+    ACCUMULO
 }

@@ -19,15 +19,20 @@ setup chiede:
 
 1. la modalità: **Standard** oppure **No Mercy** (mazzo da 168 carte con 0 e 7 che spostano le mani,
    Scarta tutto, Salta tutti, +4 colorati, jolly +4 cambio giro, +6, +10, roulette; pesca finché trovi una
-   carta giocabile; eliminazione a 25 carte);
-2. le opzioni, con una domanda sì/no ciascuna (oggi **Endless**: chi finisce le
-   carte esce e si continua fino all'ultimo, poi si stila la classifica; serve
-   almeno 3 giocatori);
+   carta giocabile; eliminazione a 25 carte; stacking sempre attivo);
+2. le opzioni, con una domanda sì/no ciascuna:
+   - **Endless**: chi finisce le carte esce e si continua fino all'ultimo, poi si
+     stila la classifica; serve almeno 3 giocatori;
+   - **Stacking** (solo nella partita Standard, in No Mercy è sempre attivo): a una
+     carta di pesca si risponde con una carta di pesca di valore uguale o superiore,
+     di qualsiasi colore; le carte si accumulano e chi non risponde le pesca tutte e
+     perde il turno;
 3. il numero di giocatori (2–6) e i loro nomi (invio = nome predefinito).
 
 Se le scelte non sono valide, la CLI mostra il motivo e ripete il setup.
 Durante la partita puoi giocare una carta, pescare, passare dopo aver pescato
-oppure uscire; la CLI mostra la tabella dei giocatori (carte in mano e stato) e
+oppure uscire; quando c'è uno stacking in corso puoi rispondere con una carta di
+pesca oppure accettare la penalità; la CLI mostra la tabella dei giocatori (carte in mano e stato) e
 lo stato del turno dopo ogni azione.
 
 Nella partita normale vince chi gioca l'ultima carta; con Endless la partita

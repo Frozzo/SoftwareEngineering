@@ -87,6 +87,7 @@ package "unolegends.model" {
     -giocoIniziato : boolean
     -saltaProssimoTurno : boolean
     -turniExtra : int
+    -accumulo : Accumulo
     -coloreAttuale : Colore
     -sensoOrario : boolean
     +Partita(giocatori : List<Giocatore>, mazzo : Mazzo, pilaDegliScarti : PilaDegliScarti, regole : RegoleDiGioco)
@@ -94,6 +95,7 @@ package "unolegends.model" {
     +getNomeGiocatoreAttivo() : String
     +getManoGiocatoreAttivo() : List<Carta>
     +getFase() : FaseTurno
+    +getAccumulo() : Accumulo
     +getCartaAppenaPescata() : Carta
     +getRichiestaInputInAttesa() : RichiestaInput
     +getNomeVincitore() : String
@@ -111,6 +113,8 @@ package "unolegends.model" {
     +giocaCarta(indiceCarta : int) : boolean
     +rispondiInput(risposta : String) : boolean
     +completaDichiarazioneUno(unoDichiarato : boolean) : boolean
+    +accettaPenalita() : boolean
+    ~applicaPenalitaPesca(numeroCarte : int, origine : OriginePesca) : void
     ~applicaColoreScelto(coloreScelto : Colore) : void
     +getColoreAttuale() : Colore
     ~segnalaSaltoTurno() : void
@@ -146,7 +150,18 @@ package "unolegends.model" {
     POST_PESCA
     ATTESA_INPUT
     ATTESA_UNO
+    RISPOSTA_STACKING
     TERMINATA
+  }
+
+  class Accumulo <<record>> {
+    +totale : int
+    +valoreUltimaCarta : int
+    +numeroCarte : int
+    +originePrimaCarta : OriginePesca
+    ~{static} apri(valore : int, origine : OriginePesca) : Accumulo
+    ~aggiungi(valore : int) : Accumulo
+    +getOriginePenalita() : OriginePesca
   }
 
   class AzioneInAttesa <<record>> {
@@ -167,6 +182,8 @@ package "unolegends.model" {
     MANI_PASSATE
     CARTE_SCARTATE
     TURNO_EXTRA
+    ACCUMULO_AUMENTATO
+    PENALITA_ACCETTATA
   }
 
   class EventoPartita <<record>> {
@@ -185,8 +202,10 @@ package "unolegends.model" {
     -strategiaPescaVolontaria : IStrategiaPesca
     -strategiaPenalitaUno : IStrategiaPenalitaUno
     -strategiaFinePartita : IStrategiaFinePartita
-    +RegoleDiGioco(strategiaVittoria : IStrategiaCondizioneVittoria, strategiaSconfitta : IStrategiaCondizioneSconfitta, strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte, strategiaPescaVolontaria : IStrategiaPesca, strategiaPenalitaUno : IStrategiaPenalitaUno, strategiaFinePartita : IStrategiaFinePartita)
+    -strategiaAccumulo : IStrategiaAccumuloPenalita
+    +RegoleDiGioco(strategiaVittoria : IStrategiaCondizioneVittoria, strategiaSconfitta : IStrategiaCondizioneSconfitta, strategiaCompatibilitaCarte : IStrategiaCompatibilitaCarte, strategiaPescaVolontaria : IStrategiaPesca, strategiaPenalitaUno : IStrategiaPenalitaUno, strategiaFinePartita : IStrategiaFinePartita, strategiaAccumulo : IStrategiaAccumuloPenalita)
     +isGiocabile(giocatore : Giocatore, candidata : Carta, inCima : Carta, partita : Partita) : boolean
+    +isAccumuloAttivo() : boolean
     +isVincitore(giocatore : Giocatore, partita : Partita) : boolean
     +isEliminato(giocatore : Giocatore, partita : Partita) : boolean
     +isPartitaTerminata(partita : Partita) : boolean
@@ -197,6 +216,8 @@ package "unolegends.model" {
     +{static} standard(opzioni : Set<OpzionePartita>) : RegoleDiGioco
     +{static} noMercy(opzioni : Set<OpzionePartita>) : RegoleDiGioco
     +{static} SOGLIA_ELIMINAZIONE_NO_MERCY : int
+    -{static} finePartita(opzioni : Set<OpzionePartita>) : IStrategiaFinePartita
+    -{static} accumulo(opzioni : Set<OpzionePartita>) : IStrategiaAccumuloPenalita
   }
 
   interface Ieffetto {
@@ -205,6 +226,7 @@ package "unolegends.model" {
     +{default} validaRispostaInput(risposta : String, partita : Partita) : boolean
     +{default} attivaEffetto(partita : Partita, risposta : String) : void
     +{default} isAmmessoComeCartaIniziale() : boolean
+    +{default} getValorePenalita() : int
   }
 
   class Effetto_Nullo {
@@ -224,6 +246,7 @@ package "unolegends.model" {
     -origine : OriginePesca
     +Effetto_pescata_carte(numeroCarteDaPescare : int, origine : OriginePesca)
     +attivaEffetto(partita : Partita) : void
+    +getValorePenalita() : int
   }
 
   class Effetto_Blocca_Turno {
@@ -266,12 +289,12 @@ package "unolegends.model" {
   class EffettoComposito {
     -effetti : List<Ieffetto>
     +EffettoComposito(effetti : List<Ieffetto>)
-    -{static} contaEffettiConInput(effetti : List<Ieffetto>) : int
     +attivaEffetto(partita : Partita) : void
     +getRichiestaInput(partita : Partita) : RichiestaInput
     +validaRispostaInput(risposta : String, partita : Partita) : boolean
     +attivaEffetto(partita : Partita, risposta : String) : void
-    +{static} contieneEffetto(effetto : Ieffetto, tipoEffetto : Class<? extends Ieffetto>) : boolean
+    +isAmmessoComeCartaIniziale() : boolean
+    +getValorePenalita() : int
   }
 
   enum OriginePesca {
@@ -282,6 +305,7 @@ package "unolegends.model" {
     PIU_SEI
     PIU_DIECI
     ROULETTE
+    ACCUMULO
   }
 
   class ContestoPesca <<record>> {
@@ -343,6 +367,7 @@ package "unolegends.model" {
 
   enum OpzionePartita {
     ENDLESS
+    STACKING
   }
 
   class ConfigurazionePartita <<record>> {
@@ -444,6 +469,9 @@ Partita "1" --> "1" RegoleDiGioco : regole
 Partita "1" --> "0..1" Carta : cartaAppenaPescata
 Partita "1" --> "1" FaseTurno : fase
 Partita "1" --> "0..1" AzioneInAttesa : azioneInAttesa
+Partita "1" --> "0..1" Accumulo : accumulo
+Accumulo --> "1" OriginePesca : originePrimaCarta
+RegoleDiGioco ..> Accumulo : puoRispondere
 Partita "1" --> "0..*" EventoPartita : eventi
 AzioneInAttesa --> "1" Ieffetto : effetto
 EventoPartita --> "1" TipoEvento : tipo
@@ -468,7 +496,7 @@ PartitaFactory ..> Giocatore : crea
 StandardMazzoFactory ..> Mazzo : crea
 StandardMazzoFactory ..> Carta : crea
 Mazzo ..> PilaDegliScarti : rimescola da scarti
-Effetto_pescata_carte ..> Partita : pesca e salta turno
+Effetto_pescata_carte ..> Partita : applicaPenalitaPesca
 Effetto_pescata_carte --> "1" OriginePesca : origine
 ContestoPesca --> "1" Giocatore : bersaglio
 ContestoPesca --> "1" OriginePesca : origine
@@ -480,7 +508,9 @@ Effetto_Cambia_colore ..> Partita : applica colore
 
 note right of RegoleDiGioco
   Le interfacce IStrategia* (compresa IStrategiaFinePartita:
-  StrategiaFinePartitaStandard / StrategiaFinePartitaEndless)
+  StrategiaFinePartitaStandard / StrategiaFinePartitaEndless,
+  e IStrategiaAccumuloPenalita dello Step 5:
+  StrategiaNessunAccumulo / StrategiaAccumuloValoreCrescente)
   sono dichiarate nel package
   unolegends.domain.rules, esterno al model, e qui sono
   riportate come tipi degli attributi senza espanderne

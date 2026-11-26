@@ -11,9 +11,10 @@ package unolegends.model;
  * rappresentabili.</p>
  *
  * <p>Ogni comando di {@link Partita} dichiara in quali fasi è <b>permesso</b>
- * (lista di ammissione, non di esclusione): una fase aggiunta in futuro, come
- * {@code RISPOSTA_STACKING} dello Step 5, viene rifiutata da tutti i comandi
- * finché non la si abilita esplicitamente dove serve.</p>
+ * (lista di ammissione, non di esclusione): una fase aggiunta in futuro viene
+ * rifiutata da tutti i comandi finché non la si abilita esplicitamente dove serve.
+ * È successo con {@link #RISPOSTA_STACKING} (Step 5): l'hanno abilitata solo
+ * {@code giocaCarta} e il nuovo {@code accettaPenalita}.</p>
  */
 public enum FaseTurno {
     /** Inizio del turno: si può giocare una carta o pescare. */
@@ -24,6 +25,13 @@ public enum FaseTurno {
     ATTESA_INPUT,
     /** Il giocatore è rimasto con una carta: si accetta solo la dichiarazione UNO. */
     ATTESA_UNO,
+    /**
+     * C'è un accumulo di pesca (stacking, Step 5) e il giocatore di turno deve
+     * rispondere: può giocare solo una carta di pesca di valore sufficiente
+     * ({@link Partita#giocaCarta(int)}) oppure accettare la penalità
+     * ({@link Partita#accettaPenalita()}). Non si può pescare volontariamente.
+     */
+    RISPOSTA_STACKING,
     /** La partita è finita: nessun comando è accettato. */
     TERMINATA
 }

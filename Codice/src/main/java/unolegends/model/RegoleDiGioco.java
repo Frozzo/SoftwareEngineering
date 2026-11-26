@@ -4,15 +4,18 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import unolegends.domain.rules.IStrategiaAccumuloPenalita;
 import unolegends.domain.rules.IStrategiaCondizioneSconfitta;
 import unolegends.domain.rules.IStrategiaCondizioneVittoria;
 import unolegends.domain.rules.IStrategiaCompatibilitaCarte;
 import unolegends.domain.rules.IStrategiaFinePartita;
 import unolegends.domain.rules.IStrategiaPenalitaUno;
 import unolegends.domain.rules.IStrategiaPesca;
+import unolegends.domain.rules.impl.StrategiaAccumuloValoreCrescente;
 import unolegends.domain.rules.impl.StrategiaCompatibilitaCarte;
 import unolegends.domain.rules.impl.StrategiaFinePartitaEndless;
 import unolegends.domain.rules.impl.StrategiaFinePartitaStandard;
+import unolegends.domain.rules.impl.StrategiaNessunAccumulo;
 import unolegends.domain.rules.impl.StrategiaPenalitaMancatoUno;
 import unolegends.domain.rules.impl.StrategiaPescaFinoAGiocabile;
 import unolegends.domain.rules.impl.StrategiaPescaSingola;
@@ -33,8 +36,9 @@ import unolegends.domain.rules.impl.StrategiaVittoriaStandard;
  * sceglie le strategie concrete. Si è scelto di non introdurre un Builder: con
  * poche strategie {@code RegoleDiGioco.standard(opzioni)} è più leggibile di
  * {@code builder()...build()}, e il costruttore lungo lo chiamano solo questi
- * metodi. Il Builder va rivalutato quando le strategie aumenteranno (stacking,
- * passive dei Legend).</p>
+ * metodi. Con lo stacking (Step 5) le strategie sono diventate 7 e il team ha
+ * confermato di restare senza Builder; va rivalutato con le passive dei Legend
+ * (Step 6).</p>
  */
 public class RegoleDiGioco {
     private final IStrategiaCondizioneVittoria strategiaVittoria;
@@ -43,29 +47,51 @@ public class RegoleDiGioco {
     private final IStrategiaPesca strategiaPescaVolontaria;
     private final IStrategiaPenalitaUno strategiaPenalitaUno;
     private final IStrategiaFinePartita strategiaFinePartita;
+    private final IStrategiaAccumuloPenalita strategiaAccumulo;
 
     public RegoleDiGioco(IStrategiaCondizioneVittoria strategiaVittoria,
                          IStrategiaCondizioneSconfitta strategiaSconfitta,
                          IStrategiaCompatibilitaCarte strategiaCompatibilitaCarte,
                          IStrategiaPesca strategiaPescaVolontaria,
                          IStrategiaPenalitaUno strategiaPenalitaUno,
-                         IStrategiaFinePartita strategiaFinePartita) {
+                         IStrategiaFinePartita strategiaFinePartita,
+                         IStrategiaAccumuloPenalita strategiaAccumulo) {
         this.strategiaVittoria = Objects.requireNonNull(strategiaVittoria);
         this.strategiaSconfitta = Objects.requireNonNull(strategiaSconfitta);
         this.strategiaCompatibilitaCarte = Objects.requireNonNull(strategiaCompatibilitaCarte);
         this.strategiaPescaVolontaria = Objects.requireNonNull(strategiaPescaVolontaria);
         this.strategiaPenalitaUno = Objects.requireNonNull(strategiaPenalitaUno);
         this.strategiaFinePartita = Objects.requireNonNull(strategiaFinePartita);
+        this.strategiaAccumulo = Objects.requireNonNull(strategiaAccumulo);
     }
 
     /**
      * Stabilisce se il giocatore può giocare la carta candidata. Il giocatore è
      * passato anche se la regola standard non lo usa: servirà alle abilità
      * passive che modificano la compatibilità (es. Daltonico).
+     *
+     * <p>Se c'è un accumulo dello stacking in corso (Step 5) la domanda cambia: non
+     * conta più la compatibilità con la carta in cima, ma solo se la carta può
+     * rispondere all'accumulo ({@link IStrategiaAccumuloPenalita}). Resta un unico
+     * metodo "si può giocare?", così {@link Partita} non deve sapere quale delle due
+     * regole vale in quel momento.</p>
      */
     public boolean isGiocabile(Giocatore giocatore, Carta candidata, Carta inCima, Partita partita) {
+        Accumulo accumulo = partita == null ? null : partita.getAccumulo();
+        if (accumulo != null) {
+            return strategiaAccumulo.puoRispondere(candidata, accumulo);
+        }
         return strategiaCompatibilitaCarte.puoGiocare(candidata, inCima,
                 partita == null ? null : partita.getColoreAttuale());
+    }
+
+    /**
+     * true se le carte di pesca si accumulano (stacking) invece di far pescare
+     * subito il giocatore successivo. Lo chiede {@link Partita} quando un effetto di
+     * pesca applica la sua penalità.
+     */
+    public boolean isAccumuloAttivo() {
+        return strategiaAccumulo.isAccumuloAttivo();
     }
 
     /**
@@ -136,7 +162,8 @@ public class RegoleDiGioco {
                 new StrategiaCompatibilitaCarte(),
                 new StrategiaPescaSingola(),
                 new StrategiaPenalitaMancatoUno(),
-                finePartita(opzioni));
+                finePartita(opzioni),
+                accumulo(opzioni));
     }
 
     /** Numero di carte che fa scattare l'eliminazione in No Mercy (Mercy rule). */
@@ -145,8 +172,9 @@ public class RegoleDiGioco {
     /**
      * Regole della No Mercy, con le opzioni scelte nel menu. Rispetto alla partita
      * normale cambiano la pesca volontaria (finché trovi una carta giocabile) e la
-     * sconfitta (eliminazione a 25 carte). Lo stacking, obbligatorio in No Mercy,
-     * arriverà con lo Step 5.
+     * sconfitta (eliminazione a 25 carte). Lo stacking è un'opzione obbligatoria
+     * della modalità ({@link ModalitaDiGioco#NO_MERCY}): {@link ConfigurazionePartita}
+     * la aggiunge da sola alle opzioni, quindi arriva qui come le altre.
      */
     public static RegoleDiGioco noMercy(Set<OpzionePartita> opzioni) {
         return new RegoleDiGioco(
@@ -155,7 +183,8 @@ public class RegoleDiGioco {
                 new StrategiaCompatibilitaCarte(),
                 new StrategiaPescaFinoAGiocabile(),
                 new StrategiaPenalitaMancatoUno(),
-                finePartita(opzioni));
+                finePartita(opzioni),
+                accumulo(opzioni));
     }
 
     /** Opzione Endless: comune alle due modalità. */
@@ -164,5 +193,17 @@ public class RegoleDiGioco {
         return opzioni.contains(OpzionePartita.ENDLESS)
                 ? new StrategiaFinePartitaEndless()
                 : new StrategiaFinePartitaStandard();
+    }
+
+    /**
+     * Opzione Stacking: comune alle due modalità, come Endless. Con il mazzo
+     * normale la stessa strategia dà "+2 ← +2/+4, +4 ← +4", con quello No Mercy la
+     * tabella ufficiale.
+     */
+    private static IStrategiaAccumuloPenalita accumulo(Set<OpzionePartita> opzioni) {
+        Objects.requireNonNull(opzioni, "opzioni non puo essere null");
+        return opzioni.contains(OpzionePartita.STACKING)
+                ? new StrategiaAccumuloValoreCrescente()
+                : new StrategiaNessunAccumulo();
     }
 }

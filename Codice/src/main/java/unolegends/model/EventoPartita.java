@@ -19,9 +19,10 @@ import java.util.Objects;
  * diversi, si potrà passare a un record per evento (interfaccia sealed).</p>
  *
  * @param tipo          cosa è successo
- * @param nomeGiocatore il giocatore coinvolto ({@code null} per {@link TipoEvento#SENSO_INVERTITO})
- * @param quantita      numero di carte, per le pesche; posizione in classifica, per
- *                      {@link TipoEvento#GIOCATORE_TERMINATO}; 0 altrimenti
+ * @param nomeGiocatore il giocatore coinvolto ({@code null} per {@link TipoEvento#SENSO_INVERTITO}
+ *                      e {@link TipoEvento#ACCUMULO_AUMENTATO})
+ * @param quantita      numero di carte, per le pesche e per l'accumulo dello stacking;
+ *                      posizione in classifica, per {@link TipoEvento#GIOCATORE_TERMINATO}; 0 altrimenti
  * @param origine       causa della pesca forzata, solo per {@link TipoEvento#PESCA_FORZATA}
  * @param colore        colore scelto ({@link TipoEvento#COLORE_SCELTO}) o scartato
  *                      ({@link TipoEvento#CARTE_SCARTATE})
@@ -83,5 +84,18 @@ public record EventoPartita(TipoEvento tipo, String nomeGiocatore, int quantita,
 
     static EventoPartita turnoExtra(Giocatore giocatore) {
         return new EventoPartita(TipoEvento.TURNO_EXTRA, giocatore.getNome(), 0, null, null, null);
+    }
+
+    /**
+     * L'accumulo dello stacking è cresciuto fino a {@code totale} carte. Non indica
+     * un giocatore: chi ha giocato la carta lo racconta già "Carta giocata", e per
+     * la carta iniziale non c'è nessuno che l'abbia giocata.
+     */
+    static EventoPartita accumuloAumentato(int totale) {
+        return new EventoPartita(TipoEvento.ACCUMULO_AUMENTATO, null, totale, null, null, null);
+    }
+
+    static EventoPartita penalitaAccettata(Giocatore giocatore, int totale) {
+        return new EventoPartita(TipoEvento.PENALITA_ACCETTATA, giocatore.getNome(), totale, null, null, null);
     }
 }

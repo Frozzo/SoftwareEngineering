@@ -6,7 +6,7 @@ import java.util.Objects;
 public record StatoPartitaDto(Fase fase, String nomeGiocatoreAttivo, List<String> mano,
                               String cartaInCima, String cartaAppenaPescata,
                               Richiesta richiestaInput, List<Giocatore> giocatori,
-                              boolean sensoOrario, List<String> classifica) {
+                              boolean sensoOrario, List<String> classifica, Accumulo accumulo) {
 
     public StatoPartitaDto {
         Objects.requireNonNull(fase, "fase non puo essere null");
@@ -26,7 +26,18 @@ public record StatoPartitaDto(Fase fase, String nomeGiocatoreAttivo, List<String
         POST_PESCA,
         ATTESA_INPUT,
         ATTESA_UNO,
+        /** C'è un accumulo di pesca: si risponde con una carta di pesca o si accetta la penalità. */
+        RISPOSTA_STACKING,
         TERMINATA
+    }
+
+    /**
+     * Accumulo dello stacking in corso, {@code null} se non ce n'è uno (Step 5).
+     *
+     * @param carteDaPescare        quante carte pesca chi accetta
+     * @param valoreMinimoRisposta  valore di pesca minimo di una risposta (2 vuol dire "+2 o superiore")
+     */
+    public record Accumulo(int carteDaPescare, int valoreMinimoRisposta) {
     }
 
     /**

@@ -30,5 +30,9 @@ public enum TipoEvento {
     /** Il giocatore ha scartato {@code quantita} carte di colore {@code colore} (Scarta tutto). */
     CARTE_SCARTATE,
     /** Tutti gli altri saltano e il giocatore gioca un altro turno (Salta tutti). */
-    TURNO_EXTRA
+    TURNO_EXTRA,
+    /** Una carta di pesca è finita nell'accumulo dello stacking, che ora vale {@code quantita} carte. */
+    ACCUMULO_AUMENTATO,
+    /** Il giocatore non risponde allo stacking e accetta di pescare le {@code quantita} carte accumulate. */
+    PENALITA_ACCETTATA
 }

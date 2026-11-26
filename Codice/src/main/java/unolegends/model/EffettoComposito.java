@@ -27,6 +27,17 @@ public final class EffettoComposito implements Ieffetto {
         return effetti.stream().allMatch(Ieffetto::isAmmessoComeCartaIniziale);
     }
 
+    /**
+     * Il valore di pesca di un composito è la somma di quelli dei suoi effetti:
+     * nel +4 cambio giro, nel +6 e nel +10 l'unico effetto di pesca è
+     * {@link Effetto_pescata_carte}, gli altri valgono 0. Così il composito lo
+     * calcola da solo e nessuno deve guardare dentro la lista.
+     */
+    @Override
+    public int getValorePenalita() {
+        return effetti.stream().mapToInt(Ieffetto::getValorePenalita).sum();
+    }
+
     @Override
     public RichiestaInput getRichiestaInput(Partita partita) {
         for (Ieffetto effetto : effetti) {
