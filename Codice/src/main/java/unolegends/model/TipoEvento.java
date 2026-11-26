@@ -22,5 +22,13 @@ public enum TipoEvento {
     /** Il giocatore ha finito le carte e si classifica in posizione {@code quantita}. */
     GIOCATORE_TERMINATO,
     /** Il giocatore è stato eliminato e le sue carte sono tornate nel mazzo. */
-    GIOCATORE_ELIMINATO
+    GIOCATORE_ELIMINATO,
+    /** Il giocatore ha scambiato la mano con {@code altroGiocatore} (carta 7). */
+    MANI_SCAMBIATE,
+    /** Tutti i giocatori in gioco hanno passato la mano al successivo (carta 0). */
+    MANI_PASSATE,
+    /** Il giocatore ha scartato {@code quantita} carte di colore {@code colore} (Scarta tutto). */
+    CARTE_SCARTATE,
+    /** Tutti gli altri saltano e il giocatore gioca un altro turno (Salta tutti). */
+    TURNO_EXTRA
 }

@@ -17,7 +17,9 @@ java -cp out unolegends.ui.UnoLegendsCli
 Nel menu iniziale scegli `0` per una nuova partita o `1` per uscire. Il menu di
 setup chiede:
 
-1. la modalità (oggi solo Standard; No Mercy arriverà con lo Step 4);
+1. la modalità: **Standard** oppure **No Mercy** (mazzo da 168 carte con 0 e 7 che spostano le mani,
+   Scarta tutto, Salta tutti, +4 colorati, jolly +4 cambio giro, +6, +10, roulette; pesca finché trovi una
+   carta giocabile; eliminazione a 25 carte);
 2. le opzioni, con una domanda sì/no ciascuna (oggi **Endless**: chi finisce le
    carte esce e si continua fino all'ultimo, poi si stila la classifica; serve
    almeno 3 giocatori);

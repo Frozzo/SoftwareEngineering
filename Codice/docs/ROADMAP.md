@@ -33,8 +33,8 @@ Le regole di gioco e le decisioni prese sono in [`CLAUDE.md`](../../CLAUDE.md), 
 | 1 | Fondamenta del dominio: pesca forzata unica, `OriginePesca`, `Ieffetto` con `Partita` | ✅ fatto (branch `ci-aiuta-claudio`) |
 | 2 | Fasi del turno, input unificato, comunicazione degli eventi alla UI | ✅ fatto (branch `ci-aiuta-claudio`) |
 | 3 | N giocatori, giocatori eliminati, Endless, configurazione e menu di setup | ✅ fatto (branch `ci-aiuta-claudio`) |
-| 4 | Modalità No Mercy: regole speciali e carte nuove | ⏭️ prossimo |
-| 5 | Stacking delle carte di pesca | da fare |
+| 4 | Modalità No Mercy: regole speciali e carte nuove | ✅ fatto (branch `ci-aiuta-claudio`) |
+| 5 | Stacking delle carte di pesca | ⏭️ prossimo |
 | 6 | Legend: abilità passive, abilità attive con cooldown, scelta nel menu | da fare |
 | 7 | Rifinitura: test, casi limite, bilanciamento, documentazione | da fare |
 
@@ -173,7 +173,33 @@ Il piano originale, per confronto:
 
 ---
 
-## Step 4 — Modalità No Mercy: regole e carte
+## Step 4 — Modalità No Mercy: regole e carte ✅
+
+Fatto. Resoconto completo (cosa è stato fatto, perché, e tutte le scelte prese con il team): [`step4_quarta_iter.md`](step4_quarta_iter.md).
+
+Scelte approvate, in sintesi:
+- **4.A — mazzo:** composizione ufficiale scritta in `NoMercyMazzoFactory`, in un unico punto (non cambierà). Sono 168 carte:
+  - 80 numeriche;
+  - 64 azioni colorate; per colore: 3 blocca, 3 cambia giro, 3 +2, 2 +4, 3 scarta tutto, 2 salta tutti;
+  - 24 jolly: 8 +4 cambio giro, 8 roulette, 4 +6, 4 +10.
+- **4.B — scambio e rotazione delle mani: dentro gli effetti** (`EffettoScambiaMano`, `EffettoPassaMani`), non in `Partita`. Il parere iniziale era diverso: vedi sotto.
+- **UNO:**
+  - dopo uno scambio o una rotazione di mani **nessuno** dichiara UNO;
+  - dopo Scarta tutto **sì**, se resta una carta.
+- **Ultima carta:** la 7 o lo 0 giocati come ultima carta fanno vincere, e lo scambio non avviene.
+- **Cambio giro con 2 giocatori in gioco:** vale come blocco (regola ufficiale), in entrambe le modalità.
+- **Roulette:**
+  - il colore lo sceglie chi gioca;
+  - un jolly nero non conta come carta del colore scelto;
+  - Salesman non ha lo sconto.
+- **Mercy rule:**
+  - l'eliminazione avviene dopo l'effetto o la pesca;
+  - se l'eliminato doveva saltare il turno, il salto si annulla;
+  - se è il giocatore di turno, il turno passa.
+- **Stacking:** non c'è ancora, arriva allo Step 5.
+
+Il piano originale, per confronto:
+
 
 ### Regole speciali (in `RegoleDiGioco.noMercy()`)
 - **Pesca volontaria "finché trovi una carta giocabile":** `StrategiaPescaFinoAGiocabile implements IStrategiaPesca`. L'aggancio esiste già dallo Step 1. La carta giocabile è l'ultima pescata.
@@ -208,6 +234,8 @@ Il mazzo ufficiale ha 168 carte, ma le quantità per tipo non le abbiamo trovate
 
 **Opinione:** definirle noi in una tabella dentro `NoMercyMazzoFactory`, e verificarle sulla scatola o sul PDF Mattel se disponibile. L'importante è che i numeri stiano in un solo punto.
 
+**Scelta approvata:** le quantità le ha fornite il team; per le azioni colorate la ripartizione per colore è 3/3/3/2/3/2. Sono costanti con nome in `NoMercyMazzoFactory`, che controlla anche il totale di 168.
+
 ### Scelta 4.B — Dove mettere "scambia mani" e "ruota mani"
 
 | Opzione | Pro | Contro |
@@ -215,7 +243,12 @@ Il mazzo ufficiale ha 168 carte, ma le quantità per tipo non le abbiamo trovate
 | **Metodi package-private in `Partita`** (`scambiaMani`, `ruotaMani`) che delegano a `Giocatore.sostituisciMano(...)` | Coerente con `segnalaSaltoTurno` e `applicaColoreScelto`; `Partita` controlla UNO e vittoria dopo lo scambio | `Partita` cresce un po' |
 | Effetto che manipola direttamente i `Giocatore` | `Partita` resta più piccola | L'effetto deve ricordarsi i controlli UNO e vittoria: responsabilità sparse |
 
-**Opinione:** **metodi in `Partita`**, che è il Coordinator e deve garantire che il gioco resti coerente.
+**Opinione iniziale:** **metodi in `Partita`**, che è il Coordinator e deve garantire che il gioco resti coerente.
+
+**Scelta approvata:** **dentro gli effetti.** L'effetto riceve `Partita` e sposta le mani con i metodi package-private di `Giocatore`. Il difetto previsto ("l'effetto deve ricordarsi i controlli UNO e vittoria") non si presenta, perché `Partita` fa comunque quei controlli dopo **ogni** giocata, per qualunque effetto:
+- `verificaEliminazioni`;
+- `deveDichiarareUno`;
+- il controllo di vittoria.
 
 ---
 
@@ -287,7 +320,7 @@ Interfaccia `IAbilitaPassiva` con metodi `default` che non modificano nulla:
 | `modificaCartePescaForzata(int base, ContestoPesca)` | **La Roccia** (`PIU_DUE` → 0), **Salesman** (`max(0, base - 1)` su ogni penalità, compresa UNO) | `RegoleDiGioco.calcolaCartePescaForzata` |
 | `isBersagliabileDaScelta()` | **Ghost** (`false`) | `Partita.getAvversariBersagliabili()`, usato **solo** dagli effetti in cui l'utente sceglie il bersaglio (7, Scambia mazzo, Gifted, Castigatore). La carta 0 e il +2 al successivo lo colpiscono comunque |
 
-Da decidere: se Salesman riceva lo sconto anche sulla roulette. La proposta è **no**, perché "una carta in meno" non ha un significato chiaro quando si pesca finché esce un colore.
+Salesman e roulette: **deciso, nessuno sconto.** "Una carta in meno" non ha un significato chiaro quando si pesca finché esce un colore. Nel codice la roulette passa da `applicaPescaFinoA`, che non chiama `calcolaCartePescaForzata`.
 
 ### Abilità attive — sono `Ieffetto`
 
@@ -363,13 +396,13 @@ Durante la partita la CLI mostra il Legend di ogni giocatore e il cooldown, e ag
 | # | Decisione | Proposta |
 |---|---|---|
 | 1 | Valore del cooldown di ogni abilità attiva | da definire giocando |
-| 2 | Salesman e roulette: si applica lo sconto? | no |
-| 3 | Composizione esatta del mazzo No Mercy (168 carte) | tabella nostra, da verificare sulle regole ufficiali |
-| 4 | Carta 7 / Scambia mazzo giocate come ultima carta | vietata come ultima carta, oppure vince chi resta senza carte |
+| 2 | Salesman e roulette: si applica lo sconto? | ✅ deciso: no |
+| 3 | Composizione esatta del mazzo No Mercy (168 carte) | ✅ decisa (Step 4) |
+| 4 | Carta 7 / Scambia mazzo giocate come ultima carta | ✅ deciso: chi la gioca come ultima carta vince e lo scambio non avviene |
 | 5 | Gifted card che svuota la mano | vale come vittoria |
 | 6 | Coppie passiva/attiva fisse o libere | fisse |
 | 7 | Introdurre Maven + JUnit e quando | sì, entro lo Step 4 |
-| 8 | Cambio giro con 2 giocatori in gioco: vale come blocco (regola ufficiale)? Oggi non fa saltare il turno | da decidere |
+| 8 | Cambio giro con 2 giocatori in gioco | ✅ deciso: vale come blocco (regola ufficiale), in entrambe le modalità |
 | 9 | Builder per `RegoleDiGioco` quando le strategie cresceranno | da rivalutare agli Step 5–6 |
 
 ## Pattern usati, a lavori finiti

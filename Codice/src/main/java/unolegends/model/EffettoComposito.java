@@ -21,6 +21,12 @@ public final class EffettoComposito implements Ieffetto {
         }
     }
 
+    /** Un composito è ammesso come carta iniziale solo se lo sono tutti i suoi effetti. */
+    @Override
+    public boolean isAmmessoComeCartaIniziale() {
+        return effetti.stream().allMatch(Ieffetto::isAmmessoComeCartaIniziale);
+    }
+
     @Override
     public RichiestaInput getRichiestaInput(Partita partita) {
         for (Ieffetto effetto : effetti) {

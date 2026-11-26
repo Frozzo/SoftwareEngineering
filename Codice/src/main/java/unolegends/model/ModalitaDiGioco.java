@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Modalità di gioco scelta nel menu (partita normale, e allo Step 4 No Mercy).
+ * Modalità di gioco scelta nel menu: partita normale o No Mercy.
  *
  * <p>È un enum di soli dati, una "tabella" con una riga per modalità: con quale
  * mazzo si gioca ({@link MazzoFactory}, l'Abstract Factory già esistente) e quali
@@ -16,7 +16,13 @@ import java.util.Set;
  * <p>Sostituisce l'enum {@code TipoMazzo}, che non era usato da nessuno.</p>
  */
 public enum ModalitaDiGioco {
-    NORMALE(StandardMazzoFactory.getInstance(), Set.of());
+    NORMALE(StandardMazzoFactory.getInstance(), Set.of()),
+    /**
+     * No Mercy (Step 4): mazzo da 168 carte e regole proprie. Lo stacking sarà la
+     * sua opzione obbligatoria dallo Step 5, quando {@code OpzionePartita.STACKING}
+     * esisterà.
+     */
+    NO_MERCY(NoMercyMazzoFactory.getInstance(), Set.of());
 
     private final MazzoFactory mazzoFactory;
     private final Set<OpzionePartita> opzioniObbligatorie;

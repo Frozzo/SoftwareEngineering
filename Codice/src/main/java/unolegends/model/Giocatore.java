@@ -45,13 +45,21 @@ public class Giocatore {
     }
 
     /**
-     * Toglie tutte le carte dalla mano e le restituisce. Serve all'eliminazione:
-     * le carte dell'eliminato tornano subito nel mazzo (decisione del progetto).
+     * Toglie tutte le carte dalla mano e le restituisce. Serve all'eliminazione
+     * (le carte dell'eliminato tornano subito nel mazzo) e agli scambi di mano.
      */
     List<Carta> svuotaMano() {
         List<Carta> carte = new ArrayList<>(mano);
         mano.clear();
         return carte;
+    }
+
+    /**
+     * Aggiunge alla mano un gruppo di carte. Serve agli effetti che spostano mani
+     * intere (carta 7 e carta 0 della No Mercy), insieme a {@link #svuotaMano()}.
+     */
+    void riceviCarte(List<Carta> carte) {
+        mano.addAll(Objects.requireNonNull(carte, "carte non puo essere null"));
     }
 
     public List<Carta> getMano() {

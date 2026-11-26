@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * GRASP Coordinator / oggetto radice del dominio: coordina il turno delegando agli expert.
@@ -46,6 +47,15 @@ public class Partita {
      * {@link FaseTurno}.
      */
     private boolean saltaProssimoTurno;
+    /**
+     * Turni extra concessi al giocatore di turno (Salta tutti, e allo Step 6 l'abilità
+     * Double card). Come {@link #saltaProssimoTurno} non è una fase ma
+     * un'informazione per il prossimo avanzamento: invece di passare al successivo,
+     * il turno resta al giocatore. È un contatore e non un booleano perché funziona
+     * con qualunque numero di giocatori e di eliminati, e permette di sommare più
+     * turni extra.
+     */
+    private int turniExtra;
     private Colore coloreAttuale;
     private boolean sensoOrario = true; // Variabile per tenere traccia del senso di gioco
 
@@ -91,15 +101,21 @@ public class Partita {
             indiceGiocatoreAttivo = 0;
             mettiInAttesa(effetto, risposta -> {
                 effetto.attivaEffetto(this, risposta);
+                verificaEliminazioni();
                 chiudiTurno();
             });
             return;
         }
         effetto.attivaEffetto(this);
+        verificaEliminazioni();
         aggiornaGiocatoreAttivo();
     }
 
-    private Giocatore getGiocatoreAttivo() {
+    /**
+     * Giocatore di turno. Package-private: lo usano gli effetti che agiscono su
+     * "chi ha giocato la carta" (scambio di mano, Scarta tutto).
+     */
+    Giocatore getGiocatoreAttivo() {
         return giocatori.get(indiceGiocatoreAttivo);
     }
 
@@ -285,6 +301,7 @@ public class Partita {
             registraEvento(EventoPartita.unoDichiarato(giocatore));
         }
         regole.mancatoUno(giocatore, unoDichiarato, this);
+        verificaEliminazioni();
         chiudiTurno();
         return true;
     }
@@ -327,9 +344,34 @@ public class Partita {
         Giocatore giocatore = getGiocatoreAttivo();
         List<Carta> cartePescate = regole.pescaVolontaria(giocatore, this);
         registraEvento(EventoPartita.pescaVolontaria(giocatore, cartePescate.size()));
+        verificaEliminazioni();
+        // Mercy rule: se la pesca lo ha eliminato, il turno passa al successivo.
+        if (!giocatore.isInGioco()) {
+            chiudiTurno();
+            return true;
+        }
         cartaAppenaPescata = cartePescate.isEmpty() ? null : cartePescate.get(cartePescate.size() - 1);
         fase = FaseTurno.POST_PESCA;
         return true;
+    }
+
+    /**
+     * true se il giocatore può giocare la carta sulla carta in cima. Serve alla
+     * pesca No Mercy ("pesca finché trovi una carta giocabile"), che è una
+     * strategia esterna e non vede le regole direttamente.
+     */
+    public boolean isCartaGiocabile(Giocatore giocatore, Carta carta) {
+        return regole.isGiocabile(giocatore, carta, pilaDegliScarti.getCartaInCima(), this);
+    }
+
+    /**
+     * true se il giocatore ha raggiunto la condizione di eliminazione (Mercy rule:
+     * 25 carte). Le pesche "a ripetizione" (pesca No Mercy, roulette) lo usano per
+     * fermarsi; l'eliminazione vera la esegue Partita in un punto sicuro del turno
+     * ({@link #verificaEliminazioni()}).
+     */
+    public boolean isDaEliminare(Giocatore giocatore) {
+        return regole.isEliminato(giocatore, this);
     }
 
     /**
@@ -400,6 +442,77 @@ public class Partita {
     public void cambioGiro() {
         this.sensoOrario = !sensoOrario; // Inverte il senso di gioco
         registraEvento(EventoPartita.sensoInvertito());
+        // Regola ufficiale: con due giocatori in gioco invertire il senso equivale
+        // a far saltare il turno all'altro. Vale in entrambe le modalità e anche in
+        // Endless quando restano in due; la decide Partita perché è lei a sapere
+        // quanti giocatori sono in gioco.
+        if (getNumeroGiocatoriInGioco() == 2) {
+            segnalaSaltoTurno();
+        }
+    }
+
+    /**
+     * Concede al giocatore di turno un turno in più: tutti gli altri saltano e lui
+     * rigioca (Salta tutti). Il turno extra viene consumato da
+     * {@link #aggiornaGiocatoreAttivo()}.
+     */
+    void concediTurnoExtra() {
+        turniExtra++;
+    }
+
+    /**
+     * Giocatori in gioco a partire da quello di turno, nel senso di gioco. Serve
+     * alla carta 0 della No Mercy, che fa passare ogni mano al successivo.
+     */
+    List<Giocatore> getGiocatoriInGiocoNelSensoDiGioco() {
+        List<Giocatore> ordine = new ArrayList<>();
+        int indice = indiceGiocatoreAttivo;
+        for (int i = 0; i < getNumeroGiocatoriInGioco(); i++) {
+            ordine.add(giocatori.get(indice));
+            indice = trovaProssimoIndiceInGioco(indice);
+        }
+        return ordine;
+    }
+
+    /**
+     * Mette delle carte negli scarti sotto la carta in cima, senza attivarne gli
+     * effetti (Scarta tutto).
+     */
+    void scartaSottoLaCima(List<Carta> carte) {
+        pilaDegliScarti.inserisciSottoLaCima(carte);
+    }
+
+    /**
+     * Pesca forzata "a ripetizione": il bersaglio pesca una carta alla volta
+     * finché una carta soddisfa la condizione (roulette: finché esce il colore
+     * scelto). Si ferma anche se mazzo e scarti sono esauriti o se il bersaglio
+     * raggiunge la condizione di eliminazione (25 carte in No Mercy).
+     *
+     * <p>Come {@link #applicaPescaForzata} è un unico punto in Partita, così gli
+     * effetti non scrivono cicli di {@link #pescaSingola}. Non passa da
+     * {@code calcolaCartePescaForzata}, perché il numero di carte non è noto in
+     * anticipo: per questo Salesman non ha lo sconto sulla roulette (decisione
+     * presa).</p>
+     *
+     * @return le carte pescate, l'ultima delle quali è quella che ha fermato la pesca
+     */
+    public List<Carta> applicaPescaFinoA(Giocatore bersaglio, Predicate<Carta> condizioneDiArresto,
+                                         OriginePesca origine) {
+        Objects.requireNonNull(bersaglio, "bersaglio non puo essere null");
+        Objects.requireNonNull(condizioneDiArresto, "condizioneDiArresto non puo essere null");
+        List<Carta> cartePescate = new ArrayList<>();
+        while (true) {
+            Carta carta = pescaSingola(bersaglio);
+            if (carta == null) {
+                break;
+            }
+            cartePescate.add(carta);
+            if (condizioneDiArresto.test(carta) || isDaEliminare(bersaglio)) {
+                break;
+            }
+        }
+        registraEvento(EventoPartita.pescaForzata(bersaglio, cartePescate.size(), origine));
+        return cartePescate;
     }
 
     /**
@@ -416,10 +529,9 @@ public class Partita {
      * rimescolato (decisione del progetto), e il giocatore finisce in fondo alla
      * classifica. Se resta un solo giocatore in gioco la partita termina.
      *
-     * <p>Package-private e preparato per lo Step 4: con le regole attuali
-     * ({@code StrategiaSconfittaStandard}) nessuno viene eliminato. Lo Step 4
-     * aggiungerà il controllo dopo ogni pesca e gestirà i casi in cui
-     * l'eliminato è il giocatore di turno o quello che doveva saltare il turno.</p>
+     * <p>Lo chiama {@link #verificaEliminazioni()}, che gestisce anche i casi
+     * limite del turno (eliminato di turno, eliminato che doveva saltare). Con le
+     * regole standard nessuno viene eliminato.</p>
      */
     void eliminaGiocatore(Giocatore giocatore) {
         Objects.requireNonNull(giocatore, "giocatore non puo essere null");
@@ -450,7 +562,7 @@ public class Partita {
      */
     private void completaGiocata(Carta carta, String risposta) {
         Giocatore giocatoreAttivo = getGiocatoreAttivo();
-        boolean avevaDueCarte = giocatoreAttivo.getMano().size() == 2;
+        List<Carta> manoPrima = new ArrayList<>(giocatoreAttivo.getMano());
         giocatoreAttivo.rimuoviCarta(carta);
         pilaDegliScarti.aggiungiCarta(carta);
 
@@ -462,6 +574,17 @@ public class Partita {
         cartaAppenaPescata = null;
         carta.getEffetto().attivaEffetto(this, risposta);
 
+        // Mercy rule: dopo l'effetto qualcuno può aver superato il limite di carte
+        // (vittima di un +10, o chi ha ricevuto una mano grande con la 7 o lo 0).
+        verificaEliminazioni();
+        if (fase == FaseTurno.TERMINATA) {
+            return;
+        }
+        if (!giocatoreAttivo.isInGioco()) {
+            chiudiTurno();
+            return;
+        }
+
         if (regole.isVincitore(giocatoreAttivo, this)) {
             registraTerminato(giocatoreAttivo);
             // In Endless la partita può continuare: il turno passa al prossimo in gioco.
@@ -471,11 +594,61 @@ public class Partita {
             return;
         }
         // Con una sola carta in mano, il turno resta al giocatore finché non dichiara UNO.
-        if (avevaDueCarte && giocatoreAttivo.getMano().size() == 1) {
+        if (deveDichiarareUno(giocatoreAttivo, manoPrima)) {
             fase = FaseTurno.ATTESA_UNO;
             return;
         }
         chiudiTurno();
+    }
+
+    /**
+     * Si deve dichiarare UNO quando, dopo la giocata, resta in mano una sola carta
+     * che il giocatore <b>aveva già</b>. Così:
+     * <ul>
+     *   <li>giocare una carta avendone due apre la finestra UNO (come prima);</li>
+     *   <li>"Scarta tutto" che lascia una sola carta apre la finestra UNO (decisione presa);</li>
+     *   <li>dopo uno scambio di mano (7) o una rotazione (0) la carta rimasta viene
+     *       da un altro giocatore, quindi UNO non va dichiarato (decisione presa).</li>
+     * </ul>
+     * Il confronto è per identità, come in {@link Giocatore#rimuoviCarta(Carta)}.
+     */
+    private static boolean deveDichiarareUno(Giocatore giocatore, List<Carta> manoPrima) {
+        List<Carta> mano = giocatore.getMano();
+        if (mano.size() != 1 || manoPrima.size() < 2) {
+            return false;
+        }
+        Carta rimasta = mano.get(0);
+        return manoPrima.stream().anyMatch(carta -> carta == rimasta);
+    }
+
+    /**
+     * Mercy rule: elimina chi ha raggiunto la condizione di eliminazione. Si chiama
+     * in un punto sicuro, cioè dopo che l'effetto o la pesca sono stati applicati
+     * per intero, e non durante: altrimenti un effetto come il +10, che prima fa
+     * pescare e poi chiede il salto del turno, farebbe saltare il turno a un
+     * innocente.
+     *
+     * <p>Casi limite (decisioni prese):</p>
+     * <ul>
+     *   <li>se l'eliminato è il giocatore che doveva saltare il turno, il salto si
+     *       annulla e non passa al giocatore dopo di lui;</li>
+     *   <li>se l'eliminato è il giocatore di turno, lo gestisce il chiamante
+     *       facendo avanzare il turno.</li>
+     * </ul>
+     */
+    private void verificaEliminazioni() {
+        Giocatore prossimo = getProssimoGiocatore();
+        for (Giocatore giocatore : List.copyOf(giocatori)) {
+            if (fase == FaseTurno.TERMINATA) {
+                return;
+            }
+            if (giocatore.isInGioco() && regole.isEliminato(giocatore, this)) {
+                if (giocatore == prossimo) {
+                    saltaProssimoTurno = false;
+                }
+                eliminaGiocatore(giocatore);
+            }
+        }
     }
 
     /**
@@ -521,6 +694,9 @@ public class Partita {
      * fase a {@link FaseTurno#NORMALE} e passa al giocatore successivo.
      */
     private void chiudiTurno() {
+        if (fase == FaseTurno.TERMINATA) {
+            return;
+        }
         cartaAppenaPescata = null;
         fase = FaseTurno.NORMALE;
         aggiornaGiocatoreAttivo();
@@ -533,6 +709,15 @@ public class Partita {
      * la fase.
      */
     private void aggiornaGiocatoreAttivo() {
+        if (turniExtra > 0) {
+            if (getGiocatoreAttivo().isInGioco()) {
+                turniExtra--;
+                registraEvento(EventoPartita.turnoExtra(getGiocatoreAttivo()));
+                return;
+            }
+            // Chi aveva il turno extra è uscito (ha finito le carte o è eliminato).
+            turniExtra = 0;
+        }
         avanzaGiocatore();
         if (saltaProssimoTurno) {
             saltaProssimoTurno = false;

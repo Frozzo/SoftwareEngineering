@@ -44,19 +44,39 @@ public class PartitaFactory {
         Objects.requireNonNull(regole, "regole non puo essere null");
         Mazzo mazzo = mazzoFactory.creaMazzo();
         List<Giocatore> giocatori = distribuisciCarteAiGiocatori(mazzo, nomiGiocatori);
-        Carta primaCarta = mazzo.prelevaCarta();
+        Carta primaCarta = scopriPrimaCarta(mazzo);
         PilaDegliScarti pilaDegliScarti = new PilaDegliScarti(List.of(primaCarta));
         return new Partita(giocatori, mazzo, pilaDegliScarti, regole);
     }
 
     /**
+     * Scopre la prima carta degli scarti. Le carte il cui effetto non ha senso a
+     * inizio partita (scambio o rotazione delle mani, Scarta tutto, Salta tutti:
+     * agiscono su "chi ha giocato", che qui non c'è) vengono rimesse nel mazzo,
+     * che viene rimescolato, e se ne scopre un'altra.
+     *
+     * <p>Lo decide l'effetto ({@link Ieffetto#isAmmessoComeCartaIniziale()}), non
+     * un controllo sul tipo della carta. Nella partita normale tutte le carte sono
+     * ammesse, quindi il comportamento non cambia.</p>
+     */
+    private static Carta scopriPrimaCarta(Mazzo mazzo) {
+        Carta carta = mazzo.prelevaCarta();
+        while (carta != null && !carta.getEffetto().isAmmessoComeCartaIniziale()) {
+            mazzo.aggiungiCarteERimescola(List.of(carta));
+            carta = mazzo.prelevaCarta();
+        }
+        return carta;
+    }
+
+    /**
      * Sceglie le regole della modalità passando le opzioni attive. Lo
-     * {@code switch} è esaustivo: aggiungendo {@code NO_MERCY} allo Step 4 il
-     * compilatore obbliga a scrivere qui {@code RegoleDiGioco.noMercy(...)}.
+     * {@code switch} è esaustivo: una modalità nuova senza il suo caso qui non
+     * compila.
      */
     private static RegoleDiGioco creaRegole(ConfigurazionePartita config) {
         return switch (config.modalita()) {
             case NORMALE -> RegoleDiGioco.standard(config.opzioni());
+            case NO_MERCY -> RegoleDiGioco.noMercy(config.opzioni());
         };
     }
 

@@ -122,6 +122,7 @@ public class UnoLegendsGame {
     private static String nomeModalita(ModalitaDiGioco modalita) {
         return switch (modalita) {
             case NORMALE -> "Standard";
+            case NO_MERCY -> "No Mercy";
         };
     }
 
@@ -283,6 +284,13 @@ public class UnoLegendsGame {
             case UNO_DICHIARATO -> giocatore + " dichiara UNO!";
             case GIOCATORE_TERMINATO -> giocatore + " ha finito le carte: si classifica al posto n. " + evento.quantita() + "!";
             case GIOCATORE_ELIMINATO -> giocatore + " e eliminato: le sue carte tornano nel mazzo.";
+            case MANI_SCAMBIATE -> giocatore + " scambia la mano con " + evento.altroGiocatore() + ".";
+            case MANI_PASSATE -> giocatore + " gioca lo 0: tutti passano la mano al giocatore successivo.";
+            case CARTE_SCARTATE -> evento.quantita() == 0
+                    ? giocatore + " non ha altre carte di colore " + evento.colore().getNome().toLowerCase() + " da scartare."
+                    : giocatore + " scarta " + descriviNumeroCarte(evento.quantita()) + " di colore "
+                            + evento.colore().formatta(evento.colore().getNome().toLowerCase()) + ".";
+            case TURNO_EXTRA -> "Tutti saltano il turno: " + giocatore + " gioca ancora.";
         };
     }
 
@@ -296,6 +304,9 @@ public class UnoLegendsGame {
             case PIU_DUE -> " per un +2";
             case PIU_QUATTRO -> " per un +4";
             case PENALITA_UNO -> " di penalita: UNO non dichiarato";
+            case PIU_SEI -> " per un +6";
+            case PIU_DIECI -> " per un +10";
+            case ROULETTE -> " con la roulette";
         };
     }
 

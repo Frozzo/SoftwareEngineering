@@ -1,0 +1,11 @@
+# File compilati Java
+*.class
+
+# Cartelle di output della compilazione
+out/
+bin/
+build/
+target/
+
+# Istruzioni per Claude Code
+CLAUDE.md

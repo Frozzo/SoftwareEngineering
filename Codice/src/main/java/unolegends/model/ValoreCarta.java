@@ -18,9 +18,19 @@ public enum ValoreCarta {
     BLOCCA_TURNO("blocca turno"),
     CAMBIA_GIRO("cambia giro"), // Aggiunta per completezza delle regole di Uno
     
-    // Carte speciali (nere)
+    // Carte speciali (nere). PIU_QUATTRO in No Mercy esiste anche colorato.
     CAMBIA_COLORE("cambia colore"),
-    PIU_QUATTRO("+4");
+    PIU_QUATTRO("+4"),
+
+    // Carte azione colorate della No Mercy (Step 4)
+    SCARTA_TUTTO("scarta tutto"),
+    SALTA_TUTTI("salta tutti"),
+
+    // Jolly della No Mercy (Step 4)
+    CAMBIO_GIRO_PIU_QUATTRO("+4 cambio giro"),
+    PIU_SEI("+6"),
+    PIU_DIECI("+10"),
+    ROULETTE("roulette colore");
 
     private final String valore;
 

@@ -14,7 +14,9 @@ import unolegends.domain.rules.impl.StrategiaCompatibilitaCarte;
 import unolegends.domain.rules.impl.StrategiaFinePartitaEndless;
 import unolegends.domain.rules.impl.StrategiaFinePartitaStandard;
 import unolegends.domain.rules.impl.StrategiaPenalitaMancatoUno;
+import unolegends.domain.rules.impl.StrategiaPescaFinoAGiocabile;
 import unolegends.domain.rules.impl.StrategiaPescaSingola;
+import unolegends.domain.rules.impl.StrategiaSconfittaNoMercy;
 import unolegends.domain.rules.impl.StrategiaSconfittaStandard;
 import unolegends.domain.rules.impl.StrategiaVittoriaStandard;
 
@@ -26,8 +28,8 @@ import unolegends.domain.rules.impl.StrategiaVittoriaStandard;
  * È anche il punto in cui verranno applicate le abilità passive dei Legend,
  * perché tutte le domande "si può fare?" e "quante carte?" passano da qui.</p>
  *
- * <p>Si crea con un metodo statico per modalità ({@link #standard(Set)}, e allo
- * Step 4 {@code noMercy(Set)}) che riceve le {@link OpzionePartita} attive e
+ * <p>Si crea con un metodo statico per modalità ({@link #standard(Set)} e
+ * {@link #noMercy(Set)}) che riceve le {@link OpzionePartita} attive e
  * sceglie le strategie concrete. Si è scelto di non introdurre un Builder: con
  * poche strategie {@code RegoleDiGioco.standard(opzioni)} è più leggibile di
  * {@code builder()...build()}, e il costruttore lungo lo chiamano solo questi
@@ -128,17 +130,39 @@ public class RegoleDiGioco {
      * Un'opzione nuova si aggiunge con una riga qui.
      */
     public static RegoleDiGioco standard(Set<OpzionePartita> opzioni) {
-        Objects.requireNonNull(opzioni, "opzioni non puo essere null");
-        IStrategiaFinePartita finePartita = opzioni.contains(OpzionePartita.ENDLESS)
-                ? new StrategiaFinePartitaEndless()
-                : new StrategiaFinePartitaStandard();
-
         return new RegoleDiGioco(
                 new StrategiaVittoriaStandard(),
                 new StrategiaSconfittaStandard(),
                 new StrategiaCompatibilitaCarte(),
                 new StrategiaPescaSingola(),
                 new StrategiaPenalitaMancatoUno(),
-                finePartita);
+                finePartita(opzioni));
+    }
+
+    /** Numero di carte che fa scattare l'eliminazione in No Mercy (Mercy rule). */
+    public static final int SOGLIA_ELIMINAZIONE_NO_MERCY = 25;
+
+    /**
+     * Regole della No Mercy, con le opzioni scelte nel menu. Rispetto alla partita
+     * normale cambiano la pesca volontaria (finché trovi una carta giocabile) e la
+     * sconfitta (eliminazione a 25 carte). Lo stacking, obbligatorio in No Mercy,
+     * arriverà con lo Step 5.
+     */
+    public static RegoleDiGioco noMercy(Set<OpzionePartita> opzioni) {
+        return new RegoleDiGioco(
+                new StrategiaVittoriaStandard(),
+                new StrategiaSconfittaNoMercy(SOGLIA_ELIMINAZIONE_NO_MERCY),
+                new StrategiaCompatibilitaCarte(),
+                new StrategiaPescaFinoAGiocabile(),
+                new StrategiaPenalitaMancatoUno(),
+                finePartita(opzioni));
+    }
+
+    /** Opzione Endless: comune alle due modalità. */
+    private static IStrategiaFinePartita finePartita(Set<OpzionePartita> opzioni) {
+        Objects.requireNonNull(opzioni, "opzioni non puo essere null");
+        return opzioni.contains(OpzionePartita.ENDLESS)
+                ? new StrategiaFinePartitaEndless()
+                : new StrategiaFinePartitaStandard();
     }
 }

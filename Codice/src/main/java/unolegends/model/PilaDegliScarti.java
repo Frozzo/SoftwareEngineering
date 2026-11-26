@@ -32,6 +32,17 @@ public class PilaDegliScarti {
     }
 
     /**
+     * Inserisce delle carte subito sotto la carta in cima. Serve a "Scarta tutto"
+     * (No Mercy): le carte scartate finiscono nella pila ma la carta in cima, e
+     * quindi il colore attivo, resta la Scarta tutto appena giocata.
+     */
+    public void inserisciSottoLaCima(List<Carta> carte) {
+        Objects.requireNonNull(carte, "carte non puo essere null");
+        int posizione = Math.max(0, scarti.size() - 1);
+        scarti.addAll(posizione, carte);
+    }
+
+    /**
      * Rimuove gli scarti rimescolabili, mantenendo la carta in cima.
      */
     public List<Carta> estraiCartePerRimescolamento() {
